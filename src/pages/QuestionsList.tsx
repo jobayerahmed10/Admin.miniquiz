@@ -26,6 +26,7 @@ export const QuestionsList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
 
   // Delete modal states
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
@@ -71,17 +72,26 @@ export const QuestionsList: React.FC = () => {
     }
   };
 
+  // Get list of unique subjects
+  const availableSubjects = Array.from(
+    new Set(questions.map((q) => q.subject || 'সাধারণ'))
+  );
+
   // Filter & search logic
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch =
       q.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.option_a.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.option_b.toLowerCase().includes(searchTerm.toLowerCase());
+      q.option_b.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.subject && q.subject.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus =
       statusFilter === 'all' ? true : q.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    const matchesSubject =
+      subjectFilter === 'all' ? true : (q.subject || 'সাধারণ') === subjectFilter;
+
+    return matchesSearch && matchesStatus && matchesSubject;
   });
 
   // Format date helper for Bengali locale
@@ -153,53 +163,72 @@ export const QuestionsList: React.FC = () => {
       )}
 
       {/* SEARCH AND FILTER BAR */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         {/* Search Field */}
-        <div className="relative w-full sm:max-w-md">
+        <div className="relative w-full md:max-w-xs">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="প্রশ্ন দিয়ে অনুসন্ধান করুন..."
+            placeholder="প্রশ্ন বা বিষয় দিয়ে খুঁজুন..."
             className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-900 dark:text-slate-100 placeholder-slate-400"
           />
         </div>
 
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-              statusFilter === 'all'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            সব প্রশ্ন ({questions.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('published')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
-              statusFilter === 'published'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            প্রকাশিত ({questions.filter((q) => q.status === 'published').length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('draft')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
-              statusFilter === 'draft'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
-            }`}
-          >
-            <FileEdit className="w-3.5 h-3.5" />
-            ড্রাফট ({questions.filter((q) => q.status === 'draft').length})
-          </button>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Subject Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs">
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="all">সকল বিষয় ({questions.length})</option>
+              {availableSubjects.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub} ({questions.filter((q) => (q.subject || 'সাধারণ') === sub).length})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl overflow-x-auto">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                statusFilter === 'all'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              সব
+            </button>
+            <button
+              onClick={() => setStatusFilter('published')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
+                statusFilter === 'published'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              প্রকাশিত
+            </button>
+            <button
+              onClick={() => setStatusFilter('draft')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
+                statusFilter === 'draft'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
+              }`}
+            >
+              <FileEdit className="w-3 h-3" />
+              ড্রাফট
+            </button>
+          </div>
         </div>
       </div>
 
@@ -233,10 +262,11 @@ export const QuestionsList: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="py-3.5 px-6">ID / প্রশ্ন (Question)</th>
-                  <th className="py-3.5 px-4 w-32">স্ট্যাটাস (Status)</th>
-                  <th className="py-3.5 px-4 w-44">তৈরির তারিখ (Created At)</th>
-                  <th className="py-3.5 px-6 w-36 text-right">অ্যাকশন (Actions)</th>
+                  <th className="py-3.5 px-6">প্রশ্ন (Question)</th>
+                  <th className="py-3.5 px-4 w-32">বিষয় (Subject)</th>
+                  <th className="py-3.5 px-4 w-28">স্ট্যাটাস</th>
+                  <th className="py-3.5 px-4 w-36">তৈরির তারিখ</th>
+                  <th className="py-3.5 px-6 w-32 text-right">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
@@ -264,6 +294,13 @@ export const QuestionsList: React.FC = () => {
                           ঘ: {q.option_d}
                         </span>
                       </div>
+                    </td>
+
+                    {/* Subject Column */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-[11px] border border-indigo-200/60 dark:border-indigo-800/60">
+                        {q.subject || 'সাধারণ'}
+                      </span>
                     </td>
 
                     {/* Status Column */}
@@ -354,8 +391,13 @@ export const QuestionsList: React.FC = () => {
             </div>
 
             <div>
-              <span className="text-[11px] font-bold uppercase text-slate-400">প্রশ্ন:</span>
-              <p className="font-bold text-base text-slate-900 dark:text-slate-100 mt-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-bold uppercase text-slate-400">প্রশ্ন:</span>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold text-[10px]">
+                  {viewQuestion.subject || 'সাধারণ'}
+                </span>
+              </div>
+              <p className="font-bold text-base text-slate-900 dark:text-slate-100">
                 {viewQuestion.question}
               </p>
             </div>

@@ -11,10 +11,12 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { insertQuestion } from '../lib/supabase';
-import { QuestionStatus } from '../types';
+import { QuestionStatus, DEFAULT_SUBJECTS } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
 
 export const CreateQuestion: React.FC = () => {
+  const [subject, setSubject] = useState<string>('বাংলা');
+  const [customSubject, setCustomSubject] = useState<string>('');
   const [questionText, setQuestionText] = useState('');
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -47,6 +49,8 @@ export const CreateQuestion: React.FC = () => {
 
     setLoading(true);
 
+    const finalSubject = subject === 'অন্যান্য' ? customSubject.trim() || 'অন্যান্য' : subject;
+
     const newQuestionData = {
       question: questionText.trim(),
       option_a: optionA.trim(),
@@ -56,6 +60,7 @@ export const CreateQuestion: React.FC = () => {
       correct_answer: correctAnswer,
       explanation: explanation.trim(),
       status: status,
+      subject: finalSubject,
     };
 
     const result = await insertQuestion(newQuestionData);
@@ -146,6 +151,37 @@ export const CreateQuestion: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Subject Selection (বিষয় নির্বাচন) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
+              বিষয় (Subject) <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                {DEFAULT_SUBJECTS.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
+
+              {subject === 'অন্যান্য' && (
+                <input
+                  type="text"
+                  required
+                  value={customSubject}
+                  onChange={(e) => setCustomSubject(e.target.value)}
+                  placeholder="কাস্টম বিষয় লিখুন (যেমন: পদার্থবিজ্ঞান)"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+              )}
+            </div>
+          </div>
+
           {/* Question Field */}
           <div>
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">

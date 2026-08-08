@@ -87,6 +87,7 @@ function normalizeQuestionRow(row: any): Question {
     correct_answer: row.correct_answer || row.correct_option || row.answer || 'option_a',
     explanation: row.explanation || row.description || '',
     status: row.status === 'published' ? 'published' : 'draft',
+    subject: row.subject || row.category || row.topic || row.subject_name || 'সাধারণ',
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at,
   };
@@ -240,7 +241,7 @@ export const insertQuestion = async (
   }
 
   try {
-    const payload = {
+    const payload: any = {
       question: newQuestion.question,
       option_a: newQuestion.option_a,
       option_b: newQuestion.option_b,
@@ -249,13 +250,26 @@ export const insertQuestion = async (
       correct_answer: newQuestion.correct_answer,
       explanation: newQuestion.explanation || '',
       status: newQuestion.status,
+      subject: newQuestion.subject || 'সাধারণ',
     };
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('questions')
       .insert([payload])
       .select()
       .single();
+
+    // If 'subject' column doesn't exist in Supabase table schema, retry without 'subject'
+    if (error && (error.message.includes('subject') || error.code === 'PGRST204')) {
+      delete payload.subject;
+      const retryResult = await client
+        .from('questions')
+        .insert([payload])
+        .select()
+        .single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
 
     if (error) {
       console.error('Supabase insert error:', error);
@@ -298,13 +312,26 @@ export const updateQuestion = async (
     if (updatedFields.correct_answer !== undefined) payload.correct_answer = updatedFields.correct_answer;
     if (updatedFields.explanation !== undefined) payload.explanation = updatedFields.explanation;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('questions')
       .update(payload)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && (error.message.includes('subject') || error.code === 'PGRST204')) {
+      delete payload.subject;
+      const retryResult = await client
+        .from('questions')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
 
     if (error) {
       console.error('Supabase update error:', error);

@@ -40,6 +40,7 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
           option_d: row.option_d || '',
           correct_answer: row.correct_answer || row.correct_option || 'option_a',
           explanation: row.explanation || '',
+          subject: row.subject || row.category || row.topic || 'সাধারণ',
           status: 'published',
           created_at: row.created_at,
         }));
@@ -128,6 +129,12 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
 
               {/* Question Card */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold text-[11px]">
+                    {currentQ.subject || 'সাধারণ'}
+                  </span>
+                </div>
+
                 <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 mb-4 leading-relaxed">
                   {currentQ.question}
                 </h4>
