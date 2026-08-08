@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { insertQuestion } from '../lib/supabase';
 import { QuestionStatus } from '../types';
+import { RlsErrorHelper } from '../components/RlsErrorHelper';
 
 export const CreateQuestion: React.FC = () => {
   const [questionText, setQuestionText] = useState('');
@@ -122,12 +123,15 @@ export const CreateQuestion: React.FC = () => {
 
         {/* Feedback Alerts */}
         {errorMsg && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">সংরক্ষণ করতে ব্যর্থ হয়েছে!</p>
-              <p className="mt-0.5 opacity-90">{errorMsg}</p>
+          <div className="mb-6 space-y-3">
+            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">সংরক্ষণ করতে ব্যর্থ হয়েছে!</p>
+                <p className="mt-0.5 opacity-90">{errorMsg}</p>
+              </div>
             </div>
+            <RlsErrorHelper errorMsg={errorMsg} />
           </div>
         )}
 

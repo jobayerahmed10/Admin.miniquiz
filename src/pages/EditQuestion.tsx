@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw } from 'lucide-react';
 import { fetchQuestionById, updateQuestion } from '../lib/supabase';
 import { QuestionStatus } from '../types';
+import { RlsErrorHelper } from '../components/RlsErrorHelper';
 
 export const EditQuestion: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -138,12 +139,15 @@ export const EditQuestion: React.FC = () => {
         </div>
 
         {errorMsg && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">ত্রুটি!</p>
-              <p className="mt-0.5 opacity-90">{errorMsg}</p>
+          <div className="mb-6 space-y-3">
+            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">ত্রুটি!</p>
+                <p className="mt-0.5 opacity-90">{errorMsg}</p>
+              </div>
             </div>
+            <RlsErrorHelper errorMsg={errorMsg} />
           </div>
         )}
 

@@ -18,6 +18,7 @@ import {
 import { fetchAllQuestions, deleteQuestion } from '../lib/supabase';
 import { Question } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { RlsErrorHelper } from '../components/RlsErrorHelper';
 
 export const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -134,17 +135,20 @@ export const QuestionsList: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-            <span>{error}</span>
+        <div className="space-y-3">
+          <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={loadQuestions}
+              className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 font-bold rounded-lg text-[11px]"
+            >
+              পুনরায় চেষ্টা করুন
+            </button>
           </div>
-          <button
-            onClick={loadQuestions}
-            className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 font-bold rounded-lg text-[11px]"
-          >
-            পুনরায় চেষ্টা করুন
-          </button>
+          <RlsErrorHelper errorMsg={error} />
         </div>
       )}
 
