@@ -16,11 +16,13 @@ import {
   Eye,
   Database,
   Award,
+  Sparkles,
 } from 'lucide-react';
 import { fetchAllQuestions, deleteQuestion } from '../lib/supabase';
 import { Question } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
+import { AddAiQuestionsModal } from '../components/AddAiQuestionsModal';
 
 export const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -37,6 +39,9 @@ export const QuestionsList: React.FC = () => {
 
   // Expanded details modal
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null);
+
+  // AI Question Modal
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -137,6 +142,13 @@ export const QuestionsList: React.FC = () => {
             রিফ্রেশ
           </button>
           <button
+            onClick={() => setIsAiModalOpen(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-purple-600/20 transition-all flex items-center gap-2 border border-purple-400/30"
+          >
+            <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
+            এআই দিয়ে প্রশ্ন যোগ করুন
+          </button>
+          <button
             onClick={() => navigate('/admin/exams')}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2"
           >
@@ -148,7 +160,7 @@ export const QuestionsList: React.FC = () => {
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
           >
             <PlusCircle className="w-4 h-4" />
-            নতুন প্রশ্ন যোগ করুন
+            ম্যানুয়ালি প্রশ্ন যোগ
           </Link>
         </div>
       </div>
@@ -457,6 +469,14 @@ export const QuestionsList: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* AI Questions Modal */}
+      <AddAiQuestionsModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        onQuestionsSaved={() => loadQuestions()}
+        availableSubjects={availableSubjects}
+      />
     </div>
   );
 };

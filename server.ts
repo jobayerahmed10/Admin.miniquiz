@@ -57,7 +57,7 @@ const handleExtractQuestions = async (req: express.Request, res: express.Respons
     const ai = getGeminiClient();
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: `You are an expert Bangladeshi competitive exam (BCS, Primary Teacher, NTRCA, Admission) question parser.
 Extract all multiple choice questions (MCQs) from the provided unformatted Bengali text.
 For each question, accurately extract or determine:
@@ -131,7 +131,7 @@ const handleGenerateQuestions = async (req: express.Request, res: express.Respon
     const numQuestions = Math.min(Math.max(Number(count) || 5, 1), 25);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: `Generate exactly ${numQuestions} high-quality, authentic Bengali MCQs for the topic "${topic}" (Subject: ${
         subject || 'সাধারণ জ্ঞান'
       }).
