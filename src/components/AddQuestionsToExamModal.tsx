@@ -158,6 +158,114 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
     }
   };
 
+  // Local Bengali MCQ Regex Parser Fallback
+  const parseBengaliMCQsLocally = (text: string) => {
+    const questions: Array<{
+      question: string;
+      option_a: string;
+      option_b: string;
+      option_c: string;
+      option_d: string;
+      correct_answer: 'option_a' | 'option_b' | 'option_c' | 'option_d';
+      explanation: string;
+      subject: string;
+    }> = [];
+
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let currentQ: any = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      const optMatch = line.match(/^([কখগঘa-dA-D1-4])[\.\)\:-]\s*(.+)$/);
+      const ansMatch =
+        line.match(/^(সঠিক\s*)?উত্তর[:\s]+([কখগঘa-dA-D1-4])/i) ||
+        line.match(/^Ans(wer)?[:\s]+([কখগঘa-dA-D1-4])/i);
+      const expMatch = line.match(/^(ব্যাখ্যা|নোট|Explanation|Note)[:\s]+(.+)$/i);
+
+      if (ansMatch && currentQ) {
+        const char = ansMatch[ansMatch.length - 1].toLowerCase();
+        if (['ক', 'a', '1'].includes(char)) currentQ.correct_answer = 'option_a';
+        else if (['খ', 'b', '2'].includes(char)) currentQ.correct_answer = 'option_b';
+        else if (['গ', 'c', '3'].includes(char)) currentQ.correct_answer = 'option_c';
+        else if (['ঘ', 'd', '4'].includes(char)) currentQ.correct_answer = 'option_d';
+        continue;
+      }
+
+      if (expMatch && currentQ) {
+        currentQ.explanation = expMatch[2];
+        continue;
+      }
+
+      if (optMatch && currentQ) {
+        const label = optMatch[1].toLowerCase();
+        const val = optMatch[2];
+        if (['ক', 'a', '1'].includes(label)) currentQ.option_a = val;
+        else if (['খ', 'b', '2'].includes(label)) currentQ.option_b = val;
+        else if (['গ', 'c', '3'].includes(label)) currentQ.option_c = val;
+        else if (['ঘ', 'd', '4'].includes(label)) currentQ.option_d = val;
+        continue;
+      }
+
+      const qStart = line.match(/^([০-৯0-9]+\s*[\.\):-]|প্রশ্ন\s*[০-৯0-9]*[:\.\s]|Q[0-9]*[:\.\s])\s*(.+)$/i);
+      if (qStart) {
+        if (currentQ && currentQ.question && currentQ.option_a && currentQ.option_b) {
+          questions.push({
+            question: currentQ.question,
+            option_a: currentQ.option_a || 'ক',
+            option_b: currentQ.option_b || 'খ',
+            option_c: currentQ.option_c || 'গ',
+            option_d: currentQ.option_d || 'ঘ',
+            correct_answer: currentQ.correct_answer || 'option_a',
+            explanation: currentQ.explanation || '',
+            subject: exam.subject || 'সাধারণ',
+          });
+        }
+        currentQ = {
+          question: qStart[2] || line,
+          option_a: '',
+          option_b: '',
+          option_c: '',
+          option_d: '',
+          correct_answer: 'option_a',
+          explanation: '',
+        };
+        continue;
+      }
+
+      if (currentQ) {
+        if (!currentQ.option_a) {
+          currentQ.question += ' ' + line;
+        }
+      } else {
+        currentQ = {
+          question: line.replace(/^[০-৯0-9\.\)\s]+/, ''),
+          option_a: '',
+          option_b: '',
+          option_c: '',
+          option_d: '',
+          correct_answer: 'option_a',
+          explanation: '',
+        };
+      }
+    }
+
+    if (currentQ && currentQ.question && currentQ.option_a && currentQ.option_b) {
+      questions.push({
+        question: currentQ.question,
+        option_a: currentQ.option_a || 'ক',
+        option_b: currentQ.option_b || 'খ',
+        option_c: currentQ.option_c || 'গ',
+        option_d: currentQ.option_d || 'ঘ',
+        correct_answer: currentQ.correct_answer || 'option_a',
+        explanation: currentQ.explanation || '',
+        subject: exam.subject || 'সাধারণ',
+      });
+    }
+
+    return questions;
+  };
+
   // ----------------------------------------------------
   // 2. COPY PASTE AI EXTRACT HANDLER
   // ----------------------------------------------------
@@ -180,28 +288,41 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       });
 
       const resText = await response.text();
-      let data: any = {};
+      let data: any = null;
       try {
         data = JSON.parse(resText);
       } catch (pErr) {
-        throw new Error(
-          response.ok
-            ? 'সার্ভারের আউটপুট পড়তে সমস্যা হয়েছে।'
-            : `সার্ভারে সমস্যা হয়েছে (স্ট্যাটাস: ${response.status})`
-        );
+        data = null;
       }
+
       setExtracting(false);
 
-      if (!response.ok || !data.success) {
-        setExtractError(data.error || 'প্রশ্ন ডিটেক্ট করতে ব্যর্থ হয়েছে।');
-      } else if (Array.isArray(data.questions) && data.questions.length > 0) {
+      if (response.ok && data?.success && Array.isArray(data.questions) && data.questions.length > 0) {
         setExtractedQuestions(data.questions);
+        return;
+      }
+
+      // Fallback to local regex Bengali parser if server returned error or non-JSON
+      const localParsed = parseBengaliMCQsLocally(rawText);
+      if (localParsed.length > 0) {
+        setExtractedQuestions(localParsed);
+        return;
+      }
+
+      if (data && data.error) {
+        setExtractError(data.error);
       } else {
-        setExtractError('টেক্সট থেকে কোনো সঠিক প্রশ্ন চিহ্নিত করা যায়নি। ফরম্যাট ঠিক রেখে আবার চেষ্টা করুন।');
+        setExtractError('টেক্সট থেকে প্রশ্ন চেনা যায়নি। প্রতিটি প্রশ্ন ও চার্ট অপশন আলাদা লাইনে লিখে চেষ্টা করুন।');
       }
     } catch (err: any) {
       setExtracting(false);
-      setExtractError(err?.message || 'এআই সার্ভারে যোগাযোগ করতে সমস্যা হয়েছে।');
+      // Fallback to local regex Bengali parser
+      const localParsed = parseBengaliMCQsLocally(rawText);
+      if (localParsed.length > 0) {
+        setExtractedQuestions(localParsed);
+      } else {
+        setExtractError('এআই বা টেক্সট পার্সারে ত্রুটি হয়েছে। টেক্সটের ফরম্যাট চেক করুন।');
+      }
     }
   };
 
