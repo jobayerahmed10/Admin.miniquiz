@@ -97,8 +97,11 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   useEffect(() => {
     if (isOpen) {
       loadQuestionBank();
+      if (exam && exam.question_count) {
+        setTopicCount(exam.question_count);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, exam]);
 
   const loadQuestionBank = async () => {
     setLoadingBank(true);
@@ -865,8 +868,8 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
+            <div className="space-y-3">
+              <div>
                 <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
                   টপিক / বিষয়বস্তু (Topic) <span className="text-red-500">*</span>
                 </label>
@@ -875,25 +878,46 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder='যেমন: "বাংলা ব্যাকরণ - কারক ও বিভক্তি" বা "১৯৭১ সালের মুক্তিযুদ্ধ"'
+                  placeholder='যেমন: "সূরা বাকারা" বা "বাংলা ব্যাকরণ - কারক ও বিভক্তি"'
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-slate-100"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-                  প্রশ্ন সংখ্যা (Count)
-                </label>
-                <select
-                  value={topicCount}
-                  onChange={(e) => setTopicCount(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100"
-                >
-                  <option value={5}>৫ টি প্রশ্ন</option>
-                  <option value={10}>১০ টি প্রশ্ন</option>
-                  <option value={15}>১৫ টি প্রশ্ন</option>
-                  <option value={20}>২০ টি প্রশ্ন</option>
-                </select>
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    প্রশ্ন সংখ্যা নির্বাচন (Question Count)
+                  </label>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">কাস্টম:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={topicCount}
+                      onChange={(e) => setTopicCount(Math.min(Math.max(Number(e.target.value) || 1, 1), 200))}
+                      className="w-20 px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-extrabold text-center text-purple-600 dark:text-purple-400 focus:outline-none focus:border-purple-500"
+                    />
+                    <span className="text-slate-500 dark:text-slate-400">টি</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[5, 10, 15, 20, 25, 30, 50, 100, 200].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setTopicCount(num)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        topicCount === num
+                          ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-600/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-400'
+                      }`}
+                    >
+                      {num} টি
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

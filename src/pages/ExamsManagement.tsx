@@ -908,9 +908,32 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
                     min="1"
                     required
                     value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setQuestionCount(val);
+                      setTotalMarks(val);
+                    }}
                     className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
                   />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[5, 10, 15, 20, 25, 30, 50, 100, 200].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => {
+                          setQuestionCount(num);
+                          setTotalMarks(num);
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          questionCount === num
+                            ? 'bg-emerald-600 text-white border-emerald-500'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>

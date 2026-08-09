@@ -119,6 +119,64 @@ ${text}`,
 app.post('/api/gemini/extract-questions', handleExtractQuestions);
 app.post('/api/gemini/extract-questions/', handleExtractQuestions);
 
+// Helper function to generate a batch of questions from Gemini
+const generateBatchOfQuestions = async (
+  ai: ReturnType<typeof getGeminiClient>,
+  topic: string,
+  subject: string,
+  batchCount: number,
+  batchIndex: number
+) => {
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.6-flash',
+    contents: `Generate exactly ${batchCount} distinct, authentic Bengali MCQs for topic "${topic}" (Subject: ${
+      subject || 'সাধারণ জ্ঞান'
+    }). Batch #${batchIndex + 1}.
+Requirements:
+1. Questions must be clear and accurate for competitive exams (BCS, NTRCA, Primary Teacher, University Admission).
+2. Provide 4 distinct options (option_a, option_b, option_c, option_d).
+3. Set correct_answer strictly to "option_a", "option_b", "option_c", or "option_d".
+4. Provide a helpful explanation (explanation) in Bengali under each question.
+5. Set subject to "${subject || 'সাধারণ'}".`,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            question: { type: Type.STRING },
+            option_a: { type: Type.STRING },
+            option_b: { type: Type.STRING },
+            option_c: { type: Type.STRING },
+            option_d: { type: Type.STRING },
+            correct_answer: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+            subject: { type: Type.STRING },
+          },
+          required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
+        },
+      },
+    },
+  });
+
+  let jsonText = response.text?.trim() || '[]';
+  jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+
+  try {
+    return JSON.parse(jsonText);
+  } catch (err) {
+    console.error(`Batch ${batchIndex + 1} JSON parse warning. Output text:`, jsonText);
+    // Attempt simple JSON repair if slightly malformed
+    const repaired = jsonText.replace(/,\s*\]/, ']').replace(/,\s*\}/, '}');
+    try {
+      return JSON.parse(repaired);
+    } catch (rErr) {
+      return [];
+    }
+  }
+};
+
 // 2. AI Question Generator from Topic
 const handleGenerateQuestions = async (req: express.Request, res: express.Response) => {
   try {
@@ -128,53 +186,33 @@ const handleGenerateQuestions = async (req: express.Request, res: express.Respon
     }
 
     const ai = getGeminiClient();
-    const numQuestions = Math.min(Math.max(Number(count) || 5, 1), 25);
+    const targetCount = Math.min(Math.max(Number(count) || 5, 1), 200);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `Generate exactly ${numQuestions} high-quality, authentic Bengali MCQs for the topic "${topic}" (Subject: ${
-        subject || 'সাধারণ জ্ঞান'
-      }).
-Requirements:
-1. Each question must be clear, accurate, and suitable for BCS, NTRCA, Primary Teacher or university admission exams.
-2. Provide 4 distinct options (option_a, option_b, option_c, option_d).
-3. Set correct_answer strictly to one of: "option_a", "option_b", "option_c", or "option_d".
-4. Provide a detailed, highly informative explanation (explanation) in Bengali under each question explaining the concept clearly.
-5. Set subject to "${subject || 'সাধারণ'}".`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              question: { type: Type.STRING },
-              option_a: { type: Type.STRING },
-              option_b: { type: Type.STRING },
-              option_c: { type: Type.STRING },
-              option_d: { type: Type.STRING },
-              correct_answer: { type: Type.STRING },
-              explanation: { type: Type.STRING },
-              subject: { type: Type.STRING },
-            },
-            required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
-          },
-        },
-      },
-    });
+    // Chunk total count into batches of at most 10 items to prevent token limit truncation
+    const BATCH_SIZE = 10;
+    const batchSizes: number[] = [];
+    let remaining = targetCount;
 
-    let jsonText = response.text?.trim() || '[]';
-    jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
-
-    let generatedQuestions = [];
-    try {
-      generatedQuestions = JSON.parse(jsonText);
-    } catch (parseErr) {
-      console.error('JSON parse error from Gemini generated output:', jsonText);
-      return res.status(500).json({ error: 'এআই দিয়ে প্রশ্ন তৈরির আউটপুট প্রসেস করতে সমস্যা হয়েছে।' });
+    while (remaining > 0) {
+      const currentBatch = Math.min(remaining, BATCH_SIZE);
+      batchSizes.push(currentBatch);
+      remaining -= currentBatch;
     }
 
-    return res.json({ success: true, questions: generatedQuestions });
+    // Execute batches in parallel
+    const batchResults = await Promise.all(
+      batchSizes.map((bSize, idx) =>
+        generateBatchOfQuestions(ai, topic.trim(), subject, bSize, idx)
+      )
+    );
+
+    const allQuestions = batchResults.flat().filter((q) => q && q.question && q.option_a && q.option_b);
+
+    if (allQuestions.length === 0) {
+      return res.status(500).json({ error: 'এআই প্রশ্ন জেনারেট করতে পারেনি। টপিক নাম স্পষ্ট করে আবার চেষ্টা করুন।' });
+    }
+
+    return res.json({ success: true, questions: allQuestions });
   } catch (error: any) {
     console.error('Error generating questions:', error);
     return res.status(500).json({

@@ -457,8 +457,8 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
+              <div className="space-y-3">
+                <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">
                     টপিক / বিষয়বস্তু (Topic) <span className="text-red-400">*</span>
                   </label>
@@ -466,26 +466,46 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                     type="text"
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
-                    placeholder="যেমন: কুরআনের সুরা বাকারা, ৯ই মে স্বাধীনতা যুদ্ধ, কারক ও বিভক্তি"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                    placeholder="যেমন: সূরা বাকারা, কারক ও বিভক্তি, বাংলাদেশের মুক্তিযুদ্ধ..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500 font-medium"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    প্রশ্ন সংখ্যা (Count)
-                  </label>
-                  <select
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
-                  >
-                    <option value={5}>৫ টি প্রশ্ন</option>
-                    <option value={10}>১০ টি প্রশ্ন</option>
-                    <option value={15}>১৫ টি প্রশ্ন</option>
-                    <option value={20}>২০ টি প্রশ্ন</option>
-                    <option value={25}>২৫ টি প্রশ্ন</option>
-                  </select>
+                <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-300">
+                      প্রশ্ন সংখ্যা (Count Select)
+                    </label>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-slate-400 font-medium">কাস্টম সংখ্যা:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={questionCount}
+                        onChange={(e) => setQuestionCount(Math.min(Math.max(Number(e.target.value) || 1, 1), 200))}
+                        className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-purple-300 font-bold text-center focus:outline-none focus:border-purple-500"
+                      />
+                      <span className="text-slate-400">টি</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[5, 10, 15, 20, 25, 30, 50, 100, 200].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setQuestionCount(num)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          questionCount === num
+                            ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-600/30'
+                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+                        }`}
+                      >
+                        {num} টি
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
