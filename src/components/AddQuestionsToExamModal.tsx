@@ -179,7 +179,17 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
         }),
       });
 
-      const data = await response.json();
+      const resText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch (pErr) {
+        throw new Error(
+          response.ok
+            ? 'সার্ভারের আউটপুট পড়তে সমস্যা হয়েছে।'
+            : `সার্ভারে সমস্যা হয়েছে (স্ট্যাটাস: ${response.status})`
+        );
+      }
       setExtracting(false);
 
       if (!response.ok || !data.success) {
@@ -249,7 +259,17 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
         }),
       });
 
-      const data = await response.json();
+      const resText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch (pErr) {
+        throw new Error(
+          response.ok
+            ? 'সার্ভারের রেসপন্স পড়তে সমস্যা হয়েছে।'
+            : `সার্ভারে সমস্যা হয়েছে (স্ট্যাটাস: ${response.status})`
+        );
+      }
       setGeneratingTopic(false);
 
       if (!response.ok || !data.success) {

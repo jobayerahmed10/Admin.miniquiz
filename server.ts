@@ -38,7 +38,7 @@ app.post('/api/gemini/extract-questions', async (req, res) => {
     const ai = getGeminiClient();
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: `You are an expert Bangladeshi competitive exam (BCS, Primary Teacher, NTRCA, Admission) question parser.
 Extract all multiple choice questions (MCQs) from the provided unformatted Bengali text.
 For each question, accurately extract or determine:
@@ -77,8 +77,16 @@ ${text}`,
       },
     });
 
-    const jsonText = response.text?.trim() || '[]';
-    const parsedQuestions = JSON.parse(jsonText);
+    let jsonText = response.text?.trim() || '[]';
+    jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+
+    let parsedQuestions = [];
+    try {
+      parsedQuestions = JSON.parse(jsonText);
+    } catch (parseErr) {
+      console.error('JSON parse error from Gemini extraction output:', jsonText);
+      return res.status(500).json({ error: 'এআই থেকে প্রাপ্ত উত্তর সঠিক JSON ফরম্যাটে নেই।' });
+    }
 
     return res.json({ success: true, questions: parsedQuestions });
   } catch (error: any) {
@@ -101,7 +109,7 @@ app.post('/api/gemini/generate-questions', async (req, res) => {
     const numQuestions = Math.min(Math.max(Number(count) || 5, 1), 25);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: `Generate exactly ${numQuestions} high-quality, authentic Bengali MCQs for the topic "${topic}" (Subject: ${
         subject || 'সাধারণ জ্ঞান'
       }).
@@ -133,8 +141,16 @@ Requirements:
       },
     });
 
-    const jsonText = response.text?.trim() || '[]';
-    const generatedQuestions = JSON.parse(jsonText);
+    let jsonText = response.text?.trim() || '[]';
+    jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+
+    let generatedQuestions = [];
+    try {
+      generatedQuestions = JSON.parse(jsonText);
+    } catch (parseErr) {
+      console.error('JSON parse error from Gemini generated output:', jsonText);
+      return res.status(500).json({ error: 'এআই দিয়ে প্রশ্ন তৈরির আউটপুট প্রসেস করতে সমস্যা হয়েছে।' });
+    }
 
     return res.json({ success: true, questions: generatedQuestions });
   } catch (error: any) {
