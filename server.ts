@@ -10,13 +10,32 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Logging middleware for API routes
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    console.log(`[API Request] ${req.method} ${req.url}`);
+  }
+  next();
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
 
 // Server-side Gemini client helper
 function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    process.env.API_KEY;
+
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY পরিবেশের ভেরিয়েবল পাওয়া যায়নি।');
+    throw new Error('GEMINI_API_KEY কনফিগার করা হয়নি। AI Studio-র Settings > Secrets-এ GEMINI_API_KEY যুক্ত করুন।');
   }
+
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -28,7 +47,7 @@ function getGeminiClient() {
 }
 
 // 1. AI Question Extraction from pasted text
-app.post('/api/gemini/extract-questions', async (req, res) => {
+const handleExtractQuestions = async (req: express.Request, res: express.Response) => {
   try {
     const { text, defaultSubject } = req.body;
     if (!text || typeof text !== 'string' || !text.trim()) {
@@ -55,7 +74,7 @@ Here is the raw unformatted text:
 ${text}`,
       config: {
         systemInstruction:
-          'Extract questions cleanly into a structured JSON array. Do not include markdown code block backticks if possible, but match schema exactly.',
+          'Extract questions cleanly into a structured JSON array matching schema. Do not output markdown backticks if possible.',
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
@@ -95,10 +114,13 @@ ${text}`,
       error: error.message || 'এআই দিয়ে প্রশ্ন এক্সট্র্যাক্ট করতে সমস্যা হয়েছে।',
     });
   }
-});
+};
+
+app.post('/api/gemini/extract-questions', handleExtractQuestions);
+app.post('/api/gemini/extract-questions/', handleExtractQuestions);
 
 // 2. AI Question Generator from Topic
-app.post('/api/gemini/generate-questions', async (req, res) => {
+const handleGenerateQuestions = async (req: express.Request, res: express.Response) => {
   try {
     const { topic, subject, count = 5 } = req.body;
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
@@ -159,6 +181,14 @@ Requirements:
       error: error.message || 'এআই দিয়ে প্রশ্ন তৈরি করতে সমস্যা হয়েছে।',
     });
   }
+};
+
+app.post('/api/gemini/generate-questions', handleGenerateQuestions);
+app.post('/api/gemini/generate-questions/', handleGenerateQuestions);
+
+// Catch-all 404 handler for unmatched /api routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: `এপিআই এন্ডপয়েন্ট পাওয়া যায়নি: ${req.originalUrl}` });
 });
 
 async function startServer() {
