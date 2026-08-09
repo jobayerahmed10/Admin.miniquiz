@@ -10,10 +10,19 @@ import {
   Trash2,
   Plus,
   BookOpen,
-  HelpCircle,
+  Edit3,
+  Check,
+  Globe,
+  PlusCircle,
 } from 'lucide-react';
 import { insertBatchQuestions } from '../lib/supabase';
 import { Question } from '../types';
+
+// Helper to detect Arabic characters for RTL alignment
+export const isArabicText = (text?: string | null): boolean => {
+  if (!text) return false;
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+};
 
 interface AddAiQuestionsModalProps {
   isOpen: boolean;
@@ -32,6 +41,24 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 
   // Common State
   const [subject, setSubject] = useState('সাধারণ জ্ঞান');
+  const [customSubjectInput, setCustomSubjectInput] = useState('');
+  const [showAddSubjectInput, setShowAddSubjectInput] = useState(false);
+  const [subjectList, setSubjectList] = useState<string[]>(() => {
+    const defaultList = [
+      'সাধারণ জ্ঞান',
+      'বাংলা ভাষা ও সাহিত্য',
+      'ইংরেজি',
+      'গণিত',
+      'বাংলাদেশ বিষয়াবলী',
+      'আন্তর্জাতিক বিষয়াবলী',
+      'বিজ্ঞান',
+      'কম্পিউটার ও তথ্যপ্রযুক্তি',
+      'আল কুরআন ও হাদিস',
+      'ইসলাম শিক্ষা',
+    ];
+    return Array.from(new Set([...defaultList, ...availableSubjects]));
+  });
+
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -49,7 +76,22 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   const [genError, setGenError] = useState<string | null>(null);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
 
+  // Editing state for preview cards
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+
   if (!isOpen) return null;
+
+  const handleAddCustomSubject = () => {
+    if (customSubjectInput.trim()) {
+      const newSub = customSubjectInput.trim();
+      if (!subjectList.includes(newSub)) {
+        setSubjectList((prev) => [...prev, newSub]);
+      }
+      setSubject(newSub);
+      setCustomSubjectInput('');
+      setShowAddSubjectInput(false);
+    }
+  };
 
   // Local Regex Parser fallback if API fails
   const parseBengaliMCQsLocally = (text: string, defaultSub: string) => {
@@ -103,6 +145,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             explanation: currentQ.explanation || '',
             subject: defaultSub,
             status: 'published',
+            is_rtl: isArabicText(currentQ.question),
           });
         }
         currentQ = {
@@ -145,6 +188,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         explanation: currentQ.explanation || '',
         subject: defaultSub,
         status: 'published',
+        is_rtl: isArabicText(currentQ.question),
       });
     }
 
@@ -180,7 +224,13 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       setExtracting(false);
 
       if (response.ok && data?.success && Array.isArray(data.questions) && data.questions.length > 0) {
-        setExtractedQuestions(data.questions.map((q: any) => ({ ...q, subject: subject || q.subject || 'সাধারণ' })));
+        setExtractedQuestions(
+          data.questions.map((q: any) => ({
+            ...q,
+            subject: subject || q.subject || 'সাধারণ',
+            is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
+          }))
+        );
         return;
       }
 
@@ -240,7 +290,13 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       setGenerating(false);
 
       if (response.ok && data?.success && Array.isArray(data.questions) && data.questions.length > 0) {
-        setGeneratedQuestions(data.questions.map((q: any) => ({ ...q, subject: subject || 'সাধারণ জ্ঞান' })));
+        setGeneratedQuestions(
+          data.questions.map((q: any) => ({
+            ...q,
+            subject: subject || 'সাধারণ জ্ঞান',
+            is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
+          }))
+        );
       } else {
         setGenError(data?.error || 'এআই দিয়ে প্রশ্ন জেনারেট করতে ব্যর্থ হয়েছে। পরে চেষ্টা করুন।');
       }
@@ -248,6 +304,38 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       setGenerating(false);
       setGenError(err?.message || 'এআই সার্ভারে যোগাযোগ করতে সমস্যা হয়েছে।');
     }
+  };
+
+  const handleUpdateQuestion = (idx: number, updatedFields: Partial<any>) => {
+    const updater = (prev: any[]) =>
+      prev.map((q, i) => (i === idx ? { ...q, ...updatedFields } : q));
+
+    if (activeTab === 'copyPaste') {
+      setExtractedQuestions(updater);
+    } else {
+      setGeneratedQuestions(updater);
+    }
+  };
+
+  const handleAddManualQuestion = () => {
+    const newQ = {
+      question: 'নতুন প্রশ্ন লিখুন...',
+      option_a: 'প্রথম অপশন',
+      option_b: 'দ্বিতীয় অপশন',
+      option_c: 'তৃতীয় অপশন',
+      option_d: 'চতুর্থ অপশন',
+      correct_answer: 'option_a',
+      explanation: '',
+      subject: subject || 'সাধারণ',
+      is_rtl: isArabicText('নতুন প্রশ্ন লিখুন...'),
+    };
+
+    if (activeTab === 'copyPaste') {
+      setExtractedQuestions((prev) => [newQ, ...prev]);
+    } else {
+      setGeneratedQuestions((prev) => [newQ, ...prev]);
+    }
+    setEditingIdx(0);
   };
 
   // Save previewed questions to Supabase public.questions
@@ -289,7 +377,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-3">
@@ -364,21 +452,56 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             </div>
           )}
 
-          {/* Global Subject Selector */}
-          <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-slate-400" />
-              <label className="text-xs font-bold text-slate-300">বিষয় / Subject:</label>
+          {/* Global Subject Selector & Custom Addition */}
+          <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-purple-400" />
+                <label className="text-xs font-bold text-slate-300">বিষয় / Subject নির্বাচন করুন:</label>
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
+                >
+                  {subjectList.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddSubjectInput(!showAddSubjectInput)}
+                  className="px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-colors"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  নতুন বিষয় যোগ
+                </button>
+              </div>
             </div>
-            <div className="flex-1 max-w-xs">
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="যেমন: বাংলা ব্যাকরণ, আল কুরআন..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+
+            {showAddSubjectInput && (
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+                <input
+                  type="text"
+                  value={customSubjectInput}
+                  onChange={(e) => setCustomSubjectInput(e.target.value)}
+                  placeholder="যেমন: আল কুরআন, সূরা আল বাকারা, কম্পিউটার বিজ্ঞান..."
+                  className="flex-1 bg-slate-950 border border-indigo-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomSubject}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-500 transition-colors"
+                >
+                  যোগ করুন
+                </button>
+              </div>
+            )}
           </div>
 
           {/* TAB 1: COPY PASTE */}
@@ -388,7 +511,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 <span className="font-bold flex items-center gap-1.5 mb-1">
                   <Sparkles className="w-4 h-4 text-indigo-400" /> এআই অটো-ডিটেকশন নির্দেশিকা:
                 </span>
-                আপনার যে কোনো কাঁচা ফরম্যাটের প্রশ্ন ও উত্তর নিচের বক্সে কপি-পেস্ট করুন। এআই প্রশ্ন, চারটি অপশন, সঠিক উত্তর এবং ব্যাখ্যা স্বয়ংক্রিয়ভাবে ডিটেক্ট করে ফেলবে!
+                বাংলা, ইংরেজি বা আরবি ভাষার কাঁচা প্রশ্ন ও উত্তর নিচের বক্সে পেস্ট করুন। এআই প্রশ্ন, চারটি অপশন, সঠিক উত্তর এবং ব্যাখ্যা স্বয়ংক্রিয়ভাবে ডিটেক্ট করে ফেলবে!
               </div>
 
               {extractError && (
@@ -447,7 +570,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 <span className="font-bold flex items-center gap-1.5 mb-1">
                   <Wand2 className="w-4 h-4 text-purple-400" /> টপিক থেকে অটো জেনারেটর:
                 </span>
-                শুধুমাত্র আপনার কাঙ্ক্ষিত টপিকের নাম লিখুন। এআই ওই টপিক নিয়ে ৪টি অপশন ও বিস্তারিত ব্যাখ্যাসহ সম্পূর্ণ সঠিক প্রশ্ন জেনারেট করে দেবে!
+                শুধুমাত্র আপনার কাঙ্ক্ষিত টপিকের নাম লিখুন (বাংলা, আরবি বা ইংরেজি)। এআই ৪টি অপশন ও বিস্তারিত ব্যাখ্যাসহ সম্পূর্ণ সঠিক প্রশ্ন জেনারেট করে দেবে!
               </div>
 
               {genError && (
@@ -531,105 +654,303 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             </div>
           )}
 
-          {/* PREVIEW EXTRACTED/GENERATED QUESTIONS */}
+          {/* PREVIEW EXTRACTED/GENERATED QUESTIONS - INTERACTIVE APP PREVIEW WITH CLICK-TO-EDIT & RTL SUPPORT */}
           {currentQuestions.length > 0 && (
             <div className="pt-4 border-t border-slate-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  প্রাপ্ত প্রশ্নসমূহ ({currentQuestions.length} টি)
-                </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800">
+                <div>
+                  <h3 className="text-sm font-black text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 className="w-4.5 h-4.5" />
+                    অ্যাপস প্রিভিউ কার্ডসমূহ ({currentQuestions.length} টি)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    যেকোনো প্রশ্ন সম্পাদনা করতে এডিট বাটন চাপুন। আরবি প্রশ্ন স্বয়ংক্রিয়ভাবে ডান দিকে (RTL) সাজানো থাকবে।
+                  </p>
+                </div>
 
-                <button
-                  onClick={() => handleSaveToQuestionBank(currentQuestions)}
-                  disabled={saving}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      সংরক্ষণ হচ্ছে...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      প্রশ্ন ব্যাংকে সংরক্ষণ করুন
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAddManualQuestion}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    ম্যানুয়ালি যোগ
+                  </button>
+
+                  <button
+                    onClick={() => handleSaveToQuestionBank(currentQuestions)}
+                    disabled={saving}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        সংরক্ষণ হচ্ছে...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        প্রশ্ন ব্যাংকে সেভ করুন
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
-                {currentQuestions.map((q, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-2 relative"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-black text-slate-100">
-                        {idx + 1}. {q.question}
-                      </p>
-                      <button
-                        onClick={() => {
-                          if (activeTab === 'copyPaste') {
-                            setExtractedQuestions((prev) => prev.filter((_, i) => i !== idx));
-                          } else {
-                            setGeneratedQuestions((prev) => prev.filter((_, i) => i !== idx));
-                          }
-                        }}
-                        className="text-slate-500 hover:text-red-400 p-1 transition-colors"
-                        title="মুছে ফেলুন"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
+                {currentQuestions.map((q, idx) => {
+                  const isEditing = editingIdx === idx;
+                  const isArabic = q.is_rtl || isArabicText(q.question) || isArabicText(q.option_a);
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 text-slate-300">
-                      <div
-                        className={`p-2 rounded-xl border ${
-                          q.correct_answer === 'option_a'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        ক. {q.option_a}
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl border ${
-                          q.correct_answer === 'option_b'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        খ. {q.option_b}
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl border ${
-                          q.correct_answer === 'option_c'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        গ. {q.option_c}
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl border ${
-                          q.correct_answer === 'option_d'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        ঘ. {q.option_d}
-                      </div>
-                    </div>
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-2xl bg-slate-950 border transition-all ${
+                        isEditing
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-xl'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {/* Top Header Controls */}
+                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/60">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-extrabold text-[11px] border border-indigo-500/30">
+                            প্রশ্ন #{idx + 1}
+                          </span>
 
-                    {q.explanation && (
-                      <p className="text-[11px] text-indigo-300 bg-indigo-950/40 p-2 rounded-xl border border-indigo-900/40">
-                        <span className="font-bold">ব্যাখ্যা:</span> {q.explanation}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQuestion(idx, { is_rtl: !isArabic })}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-colors ${
+                              isArabic
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                            title="লেখা ডান/বাম এলাইনমেন্ট পরিবর্তন করুন"
+                          >
+                            <Globe className="w-3 h-3" />
+                            {isArabic ? 'আরবি (RTL ডান)' : 'বাংলা/ENG (LTR বাম)'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingIdx(isEditing ? null : idx)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ${
+                              isEditing
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {isEditing ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" /> সম্পন্ন
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 className="w-3.5 h-3.5 text-indigo-400" /> এডিট
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (activeTab === 'copyPaste') {
+                                setExtractedQuestions((prev) => prev.filter((_, i) => i !== idx));
+                              } else {
+                                setGeneratedQuestions((prev) => prev.filter((_, i) => i !== idx));
+                              }
+                            }}
+                            className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                            title="মুছে ফেলুন"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* EDIT MODE vs PREVIEW MODE */}
+                      {isEditing ? (
+                        <div className="space-y-3 pt-1">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                              প্রশ্ন:
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={q.question}
+                              onChange={(e) =>
+                                handleUpdateQuestion(idx, {
+                                  question: e.target.value,
+                                  is_rtl: isArabicText(e.target.value),
+                                })
+                              }
+                              dir={isArabic ? 'rtl' : 'ltr'}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                ক. অপশন এ:
+                              </label>
+                              <input
+                                type="text"
+                                value={q.option_a}
+                                onChange={(e) => handleUpdateQuestion(idx, { option_a: e.target.value })}
+                                dir={isArabic ? 'rtl' : 'ltr'}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                খ. অপশন বি:
+                              </label>
+                              <input
+                                type="text"
+                                value={q.option_b}
+                                onChange={(e) => handleUpdateQuestion(idx, { option_b: e.target.value })}
+                                dir={isArabic ? 'rtl' : 'ltr'}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                গ. অপশন সি:
+                              </label>
+                              <input
+                                type="text"
+                                value={q.option_c}
+                                onChange={(e) => handleUpdateQuestion(idx, { option_c: e.target.value })}
+                                dir={isArabic ? 'rtl' : 'ltr'}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                ঘ. অপশন ডি:
+                              </label>
+                              <input
+                                type="text"
+                                value={q.option_d}
+                                onChange={(e) => handleUpdateQuestion(idx, { option_d: e.target.value })}
+                                dir={isArabic ? 'rtl' : 'ltr'}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                              <label className="block text-[10px] font-bold text-emerald-400 mb-1">
+                                সঠিক উত্তর নির্বাচন করুন:
+                              </label>
+                              <select
+                                value={q.correct_answer}
+                                onChange={(e) => handleUpdateQuestion(idx, { correct_answer: e.target.value })}
+                                className="w-full bg-slate-900 border border-emerald-500/50 rounded-xl px-2.5 py-1.5 text-xs text-emerald-300 font-bold focus:outline-none"
+                              >
+                                <option value="option_a">ক (অপশন এ)</option>
+                                <option value="option_b">খ (অপশন বি)</option>
+                                <option value="option_c">গ (অপশন সি)</option>
+                                <option value="option_d">ঘ (অপশন ডি)</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                বিষয় / Subject:
+                              </label>
+                              <input
+                                type="text"
+                                value={q.subject || ''}
+                                onChange={(e) => handleUpdateQuestion(idx, { subject: e.target.value })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-indigo-300 mb-1">
+                              ব্যাখ্যা (Explanation):
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={q.explanation || ''}
+                              onChange={(e) => handleUpdateQuestion(idx, { explanation: e.target.value })}
+                              dir={isArabicText(q.explanation) ? 'rtl' : 'ltr'}
+                              placeholder="ব্যাখ্যা লিখুন..."
+                              className="w-full bg-slate-900 border border-indigo-900/60 rounded-xl p-2 text-xs text-indigo-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        /* APP-LIKE REALISTIC CARD PREVIEW */
+                        <div className="space-y-3">
+                          <p
+                            dir={isArabic ? 'rtl' : 'ltr'}
+                            className={`font-black text-sm text-slate-100 leading-relaxed ${
+                              isArabic ? 'text-right font-serif' : 'text-left'
+                            }`}
+                          >
+                            {idx + 1}. {q.question}
+                          </p>
+
+                          {/* Options Grid */}
+                          <div
+                            dir={isArabic ? 'rtl' : 'ltr'}
+                            className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"
+                          >
+                            {[
+                              { key: 'option_a', label: isArabic ? 'أ' : 'ক', text: q.option_a },
+                              { key: 'option_b', label: isArabic ? 'ب' : 'খ', text: q.option_b },
+                              { key: 'option_c', label: isArabic ? 'ج' : 'গ', text: q.option_c },
+                              { key: 'option_d', label: isArabic ? 'د' : 'ঘ', text: q.option_d },
+                            ].map((opt) => {
+                              const isCorrect = q.correct_answer === opt.key;
+                              return (
+                                <div
+                                  key={opt.key}
+                                  onClick={() => handleUpdateQuestion(idx, { correct_answer: opt.key })}
+                                  className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                                    isArabic ? 'text-right justify-start' : 'text-left justify-start'
+                                  } ${
+                                    isCorrect
+                                      ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 font-bold ring-1 ring-emerald-500/30'
+                                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-6 h-6 rounded-lg text-[11px] font-black flex items-center justify-center shrink-0 ${
+                                      isCorrect
+                                        ? 'bg-emerald-500 text-slate-950'
+                                        : 'bg-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </span>
+                                  <span className="flex-1 truncate">{opt.text}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {q.explanation && (
+                            <div
+                              dir={isArabicText(q.explanation) ? 'rtl' : 'ltr'}
+                              className={`text-[11px] text-indigo-300 bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-900/40 ${
+                                isArabicText(q.explanation) ? 'text-right' : 'text-left'
+                              }`}
+                            >
+                              <span className="font-bold text-indigo-400">ব্যাখ্যা:</span> {q.explanation}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -638,3 +959,4 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
     </div>
   );
 };
+

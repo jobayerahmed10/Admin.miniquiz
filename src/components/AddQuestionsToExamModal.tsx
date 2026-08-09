@@ -16,9 +16,12 @@ import {
   Database,
   Trash2,
   Edit,
+  Globe,
+  PlusCircle,
 } from 'lucide-react';
 import { Question, Exam } from '../types';
 import { fetchAllQuestions, insertQuestion, insertBatchQuestions } from '../lib/supabase';
+import { isArabicText } from './AddAiQuestionsModal';
 
 interface AddQuestionsToExamModalProps {
   isOpen: boolean;
@@ -59,17 +62,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [rawText, setRawText] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
-  const [extractedQuestions, setExtractedQuestions] = useState<
-    {
-      question: string;
-      option_a: string;
-      option_b: string;
-      option_c: string;
-      option_d: string;
-      correct_answer: string;
-      explanation: string;
-    }[]
-  >([]);
+  const [extractedQuestions, setExtractedQuestions] = useState<any[]>([]);
   const [savingExtracted, setSavingExtracted] = useState(false);
 
   // 3. AI Topic Generator State
@@ -78,18 +71,28 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [topicSubject, setTopicSubject] = useState(exam.subject || 'সাধারণ জ্ঞান');
   const [generatingTopic, setGeneratingTopic] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
-  const [generatedQuestions, setGeneratedQuestions] = useState<
-    {
-      question: string;
-      option_a: string;
-      option_b: string;
-      option_c: string;
-      option_d: string;
-      correct_answer: string;
-      explanation: string;
-    }[]
-  >([]);
+  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
   const [savingGenerated, setSavingGenerated] = useState(false);
+
+  // Edit Card Indices for preview lists
+  const [editingExtractedIdx, setEditingExtractedIdx] = useState<number | null>(null);
+  const [editingGeneratedIdx, setEditingGeneratedIdx] = useState<number | null>(null);
+
+  // Custom Subject input
+  const [customSubInput, setCustomSubInput] = useState('');
+  const [showCustomSubInput, setShowCustomSubInput] = useState(false);
+  const [subjectsList, setSubjectsList] = useState<string[]>([
+    exam.subject || 'সাধারণ',
+    'বাংলা ভাষা ও সাহিত্য',
+    'ইংরেজি',
+    'গণিত',
+    'সাধারণ জ্ঞান',
+    'বাংলাদেশ বিষয়াবলী',
+    'আন্তর্জাতিক বিষয়াবলী',
+    'বিজ্ঞান',
+    'কম্পিউটার ও তথ্যপ্রযুক্তি',
+    'আল কুরআন ও হাদিস',
+  ]);
 
   // Toast / General message
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
@@ -596,7 +599,8 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                 rows={2}
                 value={manualQuestion}
                 onChange={(e) => setManualQuestion(e.target.value)}
-                placeholder='যেমন: "বাংলাদেশের জাতীয় পতাকার দৈর্ঘ্য ও প্রস্থের অনুপাত কত?"'
+                dir={isArabicText(manualQuestion) ? 'rtl' : 'ltr'}
+                placeholder='যেমন: "বাংলাদেশের জাতীয় পতাকার দৈর্ঘ্য ও প্রস্থের অনুপাত কত?" বা আরবি প্রশ্ন'
                 className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
               />
             </div>
@@ -612,6 +616,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={manualOptionA}
                   onChange={(e) => setManualOptionA(e.target.value)}
+                  dir={isArabicText(manualOptionA) ? 'rtl' : 'ltr'}
                   placeholder="যেমন: ১০:৬"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
                 />
@@ -626,6 +631,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={manualOptionB}
                   onChange={(e) => setManualOptionB(e.target.value)}
+                  dir={isArabicText(manualOptionB) ? 'rtl' : 'ltr'}
                   placeholder="যেমন: ৫:৩"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
                 />
@@ -640,6 +646,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={manualOptionC}
                   onChange={(e) => setManualOptionC(e.target.value)}
+                  dir={isArabicText(manualOptionC) ? 'rtl' : 'ltr'}
                   placeholder="যেমন: ৪:৩"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
                 />
@@ -654,6 +661,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={manualOptionD}
                   onChange={(e) => setManualOptionD(e.target.value)}
+                  dir={isArabicText(manualOptionD) ? 'rtl' : 'ltr'}
                   placeholder="যেমন: ক ও খ উভয়ই"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
                 />
@@ -680,16 +688,60 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
 
               {/* Subject */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-                  বিষয় (Subject)
-                </label>
-                <input
-                  type="text"
-                  value={manualSubject}
-                  onChange={(e) => setManualSubject(e.target.value)}
-                  placeholder="যেমন: বাংলাদেশ বিষয়াবলী"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    বিষয় (Subject)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomSubInput(!showCustomSubInput)}
+                    className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>{showCustomSubInput} {showCustomSubInput ? 'লিস্ট থেকে বাছুন' : 'নতুন বিষয় যোগ করুন'}</span>
+                  </button>
+                </div>
+
+                {showCustomSubInput ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customSubInput}
+                      onChange={(e) => setCustomSubInput(e.target.value)}
+                      placeholder="নতুন বিষয়ের নাম..."
+                      className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-emerald-500 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customSubInput.trim()) {
+                          const newSub = customSubInput.trim();
+                          if (!subjectsList.includes(newSub)) {
+                            setSubjectsList([...subjectsList, newSub]);
+                          }
+                          setManualSubject(newSub);
+                          setCustomSubInput('');
+                          setShowCustomSubInput(false);
+                        }
+                      }}
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold"
+                    >
+                      যোগ করুন
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={manualSubject}
+                    onChange={(e) => setManualSubject(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100"
+                  >
+                    {subjectsList.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -702,6 +754,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                 rows={2}
                 value={manualExplanation}
                 onChange={(e) => setManualExplanation(e.target.value)}
+                dir={isArabicText(manualExplanation) ? 'rtl' : 'ltr'}
                 placeholder="প্রশ্নের ব্যাখ্যা লিখুন (যেমন: ১০:৬ বা ৫:৩ দুটি অনুপাতই সঠিক...)"
                 className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400"
               />
@@ -813,33 +866,182 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                  {extractedQuestions.map((q, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs space-y-2"
-                    >
-                      <div className="font-extrabold text-slate-900 dark:text-slate-100">
-                        {idx + 1}. {q.question}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-slate-600 dark:text-slate-300 font-medium">
-                        <div>ক. {q.option_a}</div>
-                        <div>খ. {q.option_b}</div>
-                        <div>গ. {q.option_c}</div>
-                        <div>ঘ. {q.option_d}</div>
-                      </div>
-                      <div className="flex items-center justify-between pt-1 text-[11px]">
-                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                          সঠিক উত্তর: {q.correct_answer === 'option_a' ? 'ক' : q.correct_answer === 'option_b' ? 'খ' : q.correct_answer === 'option_c' ? 'গ' : 'ঘ'}
-                        </span>
-                        {q.explanation && (
-                          <span className="text-slate-500 italic">
-                            ব্যাখ্যা: {q.explanation}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {extractedQuestions.map((q, idx) => {
+                    const isAr = isArabicText(q.question) || isArabicText(q.option_a);
+                    const isEditing = editingExtractedIdx === idx;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs space-y-3 transition-all"
+                        dir={isAr ? 'rtl' : 'ltr'}
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                          <span className="font-bold text-slate-500 text-[11px] flex items-center gap-1">
+                            প্রশ্ন #{idx + 1}
+                            {isAr && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 rounded font-bold">
+                                আরবি / Arabic
+                              </span>
+                            )}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingExtractedIdx(isEditing ? null : idx)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-200 flex items-center gap-1"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{isEditing} {isEditing ? 'প্রিভিউ দেখুন' : 'এডিট করুন'}</span>
+                          </button>
+                        </div>
+
+                        {isEditing ? (
+                          <div className="space-y-2.5 pt-1">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                প্রশ্ন (Question)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={q.question}
+                                onChange={(e) => {
+                                  const updated = [...extractedQuestions];
+                                  updated[idx].question = e.target.value;
+                                  setExtractedQuestions(updated);
+                                }}
+                                dir={isArabicText(q.question) ? 'rtl' : 'ltr'}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ক. অপশন A</label>
+                                <input
+                                  type="text"
+                                  value={q.option_a}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].option_a = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_a) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">খ. অপশন B</label>
+                                <input
+                                  type="text"
+                                  value={q.option_b}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].option_b = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_b) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">গ. অপশন C</label>
+                                <input
+                                  type="text"
+                                  value={q.option_c}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].option_c = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_c) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ঘ. অপশন D</label>
+                                <input
+                                  type="text"
+                                  value={q.option_d}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].option_d = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_d) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">সঠিক উত্তর</label>
+                                <select
+                                  value={q.correct_answer}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].correct_answer = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                                >
+                                  <option value="option_a">ক (Option A)</option>
+                                  <option value="option_b">খ (Option B)</option>
+                                  <option value="option_c">গ (Option C)</option>
+                                  <option value="option_d">ঘ (Option D)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ব্যাখ্যা (Explanation)</label>
+                                <input
+                                  type="text"
+                                  value={q.explanation || ''}
+                                  onChange={(e) => {
+                                    const updated = [...extractedQuestions];
+                                    updated[idx].explanation = e.target.value;
+                                    setExtractedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.explanation || '') ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-extrabold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                              {q.question}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-slate-700 dark:text-slate-300 font-medium">
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_a' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 dark:text-emerald-300 font-bold' : 'border-slate-200 dark:border-slate-700'}`}>
+                                <span className="font-bold text-slate-500 ml-1">ক.</span> {q.option_a}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_b' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 dark:text-emerald-300 font-bold' : 'border-slate-200 dark:border-slate-700'}`}>
+                                <span className="font-bold text-slate-500 ml-1">খ.</span> {q.option_b}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_c' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 dark:text-emerald-300 font-bold' : 'border-slate-200 dark:border-slate-700'}`}>
+                                <span className="font-bold text-slate-500 ml-1">গ.</span> {q.option_c}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_d' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 dark:text-emerald-300 font-bold' : 'border-slate-200 dark:border-slate-700'}`}>
+                                <span className="font-bold text-slate-500 ml-1">ঘ.</span> {q.option_d}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 text-[11px]">
+                              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                                সঠিক উত্তর: {q.correct_answer === 'option_a' ? 'ক' : q.correct_answer === 'option_b' ? 'খ' : q.correct_answer === 'option_c' ? 'গ' : 'ঘ'}
+                              </span>
+                              {q.explanation && (
+                                <span className="text-slate-500 dark:text-slate-400 italic">
+                                  ব্যাখ্যা: {q.explanation}
+                                </span>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -878,6 +1080,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   required
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
+                  dir={isArabicText(topic) ? 'rtl' : 'ltr'}
                   placeholder='যেমন: "সূরা বাকারা" বা "বাংলা ব্যাকরণ - কারক ও বিভক্তি"'
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-slate-100"
                 />
@@ -964,33 +1167,182 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                  {generatedQuestions.map((q, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-purple-50/40 dark:bg-purple-950/20 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 text-xs space-y-2"
-                    >
-                      <div className="font-extrabold text-slate-900 dark:text-slate-100">
-                        {idx + 1}. {q.question}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-slate-600 dark:text-slate-300 font-medium">
-                        <div>ক. {q.option_a}</div>
-                        <div>খ. {q.option_b}</div>
-                        <div>গ. {q.option_c}</div>
-                        <div>ঘ. {q.option_d}</div>
-                      </div>
-                      <div className="pt-1 text-[11px] space-y-1">
-                        <div className="font-extrabold text-purple-700 dark:text-purple-300">
-                          সঠিক উত্তর: {q.correct_answer === 'option_a' ? 'ক' : q.correct_answer === 'option_b' ? 'খ' : q.correct_answer === 'option_c' ? 'গ' : 'ঘ'}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {generatedQuestions.map((q, idx) => {
+                    const isAr = isArabicText(q.question) || isArabicText(q.option_a);
+                    const isEditing = editingGeneratedIdx === idx;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-4 bg-purple-50/40 dark:bg-purple-950/20 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 text-xs space-y-3 transition-all"
+                        dir={isAr ? 'rtl' : 'ltr'}
+                      >
+                        <div className="flex items-center justify-between border-b border-purple-200/60 dark:border-purple-800/60 pb-2">
+                          <span className="font-bold text-purple-700 dark:text-purple-300 text-[11px] flex items-center gap-1">
+                            প্রশ্ন #{idx + 1}
+                            {isAr && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 rounded font-bold">
+                                আরবি / Arabic
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingGeneratedIdx(isEditing ? null : idx)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg text-purple-700 dark:text-purple-300 flex items-center gap-1"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-purple-500" />
+                            <span>{isEditing ? 'প্রিভিউ দেখুন' : 'এডিট করুন'}</span>
+                          </button>
                         </div>
-                        {q.explanation && (
-                          <div className="p-2 bg-white/80 dark:bg-slate-900/80 rounded-xl text-slate-600 dark:text-slate-300 border border-purple-100 dark:border-purple-900">
-                            <strong>ব্যাখ্যা:</strong> {q.explanation}
+
+                        {isEditing ? (
+                          <div className="space-y-2.5 pt-1">
+                            <div>
+                              <label className="block text-[10px] font-bold text-purple-800 dark:text-purple-300 mb-0.5">
+                                প্রশ্ন (Question)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={q.question}
+                                onChange={(e) => {
+                                  const updated = [...generatedQuestions];
+                                  updated[idx].question = e.target.value;
+                                  setGeneratedQuestions(updated);
+                                }}
+                                dir={isArabicText(q.question) ? 'rtl' : 'ltr'}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ক. অপশন A</label>
+                                <input
+                                  type="text"
+                                  value={q.option_a}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].option_a = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_a) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">খ. অপশন B</label>
+                                <input
+                                  type="text"
+                                  value={q.option_b}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].option_b = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_b) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">গ. অপশন C</label>
+                                <input
+                                  type="text"
+                                  value={q.option_c}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].option_c = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_c) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ঘ. অপশন D</label>
+                                <input
+                                  type="text"
+                                  value={q.option_d}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].option_d = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.option_d) ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">সঠিক উত্তর</label>
+                                <select
+                                  value={q.correct_answer}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].correct_answer = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs font-bold"
+                                >
+                                  <option value="option_a">ক (Option A)</option>
+                                  <option value="option_b">খ (Option B)</option>
+                                  <option value="option_c">গ (Option C)</option>
+                                  <option value="option_d">ঘ (Option D)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">ব্যাখ্যা (Explanation)</label>
+                                <input
+                                  type="text"
+                                  value={q.explanation || ''}
+                                  onChange={(e) => {
+                                    const updated = [...generatedQuestions];
+                                    updated[idx].explanation = e.target.value;
+                                    setGeneratedQuestions(updated);
+                                  }}
+                                  dir={isArabicText(q.explanation || '') ? 'rtl' : 'ltr'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
                           </div>
+                        ) : (
+                          <>
+                            <div className="font-extrabold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                              {q.question}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-slate-700 dark:text-slate-300 font-medium">
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_a' ? 'border-purple-500 bg-purple-50/50 text-purple-900 dark:text-purple-300 font-bold' : 'border-purple-100 dark:border-purple-900/50'}`}>
+                                <span className="font-bold text-slate-500 ml-1">ক.</span> {q.option_a}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_b' ? 'border-purple-500 bg-purple-50/50 text-purple-900 dark:text-purple-300 font-bold' : 'border-purple-100 dark:border-purple-900/50'}`}>
+                                <span className="font-bold text-slate-500 ml-1">খ.</span> {q.option_b}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_c' ? 'border-purple-500 bg-purple-50/50 text-purple-900 dark:text-purple-300 font-bold' : 'border-purple-100 dark:border-purple-900/50'}`}>
+                                <span className="font-bold text-slate-500 ml-1">গ.</span> {q.option_c}
+                              </div>
+                              <div className={`p-2 rounded-lg bg-white/70 dark:bg-slate-900/60 border ${q.correct_answer === 'option_d' ? 'border-purple-500 bg-purple-50/50 text-purple-900 dark:text-purple-300 font-bold' : 'border-purple-100 dark:border-purple-900/50'}`}>
+                                <span className="font-bold text-slate-500 ml-1">ঘ.</span> {q.option_d}
+                              </div>
+                            </div>
+                            <div className="pt-1 text-[11px] space-y-1">
+                              <div className="font-extrabold text-purple-700 dark:text-purple-300">
+                                সঠিক উত্তর: {q.correct_answer === 'option_a' ? 'ক' : q.correct_answer === 'option_b' ? 'খ' : q.correct_answer === 'option_c' ? 'গ' : 'ঘ'}
+                              </div>
+                              {q.explanation && (
+                                <div className="p-2 bg-white/80 dark:bg-slate-900/80 rounded-xl text-slate-600 dark:text-slate-300 border border-purple-100 dark:border-purple-900">
+                                  <strong>ব্যাখ্যা:</strong> {q.explanation}
+                                </div>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
