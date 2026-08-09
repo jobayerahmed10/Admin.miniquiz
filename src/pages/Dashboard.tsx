@@ -12,6 +12,7 @@ import {
   Sparkles,
   AlertCircle,
   Smartphone,
+  Award,
 } from 'lucide-react';
 import { fetchDashboardStats, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import { DashboardStats } from '../types';
@@ -123,7 +124,7 @@ export const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Database className="w-4 h-4 text-emerald-600" />
-            পরিসংখ্যান সারসংক্ষেপ (public.questions)
+            পরিসংখ্যান সারসংক্ষেপ (public.questions & public.exams)
           </h2>
           <button
             onClick={loadData}
@@ -135,25 +136,25 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Questions Card */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 মোট প্রশ্ন
               </span>
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl group-hover:scale-110 transition-transform">
-                <HelpCircle className="w-6 h-6" />
+              <div className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl group-hover:scale-110 transition-transform">
+                <HelpCircle className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-slate-100">
+            <div className="mt-3">
+              <span className="text-3xl font-black text-slate-900 dark:text-slate-100">
                 {loading ? '...' : stats.totalQuestions}
               </span>
-              <span className="text-xs text-slate-500 ml-2 font-medium">টি প্রশ্ন অন্তর্ভুক্ত</span>
+              <span className="text-xs text-slate-500 ml-2 font-medium">টি প্রশ্ন</span>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>সব প্রশ্নের তালিকা দেখুন</span>
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>সব প্রশ্ন দেখুন</span>
               <Link to="/admin/questions" className="text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
                 দেখা <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -161,23 +162,23 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Published Questions Card */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-emerald-500/50 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 প্রকাশিত প্রশ্ন
               </span>
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-2xl group-hover:scale-110 transition-transform">
-                <CheckCircle2 className="w-6 h-6" />
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-2xl group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400">
+            <div className="mt-3">
+              <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
                 {loading ? '...' : stats.publishedQuestions}
               </span>
-              <span className="text-xs text-slate-500 ml-2 font-medium">স্টুডেন্টদের জন্য উন্মুক্ত</span>
+              <span className="text-xs text-slate-500 ml-2 font-medium">স্টুডেন্টদের জন্য</span>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>স্টুডেন্ট অ্যাপে প্রদর্শিত হচ্ছে</span>
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>স্টুডেন্ট অ্যাপে ওপেন</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
                 Active
               </span>
@@ -185,26 +186,50 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Draft Questions Card */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-amber-500/50 transition-all">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-amber-500/50 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 Draft প্রশ্ন
               </span>
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
-                <FileEdit className="w-6 h-6" />
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
+                <FileEdit className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-black text-amber-600 dark:text-amber-400">
+            <div className="mt-3">
+              <span className="text-3xl font-black text-amber-600 dark:text-amber-400">
                 {loading ? '...' : stats.draftQuestions}
               </span>
-              <span className="text-xs text-[#64748b] ml-2 font-medium">অপ্রকাশিত অবস্থায় সংরক্ষিত</span>
+              <span className="text-xs text-[#64748b] ml-2 font-medium">অপ্রকাশিত</span>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>সম্পাদনা করে পাবলিশ করুন</span>
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>সম্পাদনা করুন</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
                 Draft
               </span>
+            </div>
+          </div>
+
+          {/* Exams & Model Tests Card */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-indigo-500/50 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                পরীক্ষা ও মডেল টেস্ট
+              </span>
+              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform">
+                <Award className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                {loading ? '...' : (stats.totalExams || 0)}
+              </span>
+              <span className="text-xs text-slate-500 ml-2 font-medium">টি মডেল টেস্ট ({stats.activeExams || 0} active)</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>পরীক্ষা পরিচালনা করুন</span>
+              <Link to="/admin/exams" className="text-indigo-600 font-semibold flex items-center gap-1 hover:underline">
+                ম্যানেজ করুন <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         </div>

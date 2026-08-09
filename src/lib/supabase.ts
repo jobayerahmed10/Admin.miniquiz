@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Question, SupabaseConfig, DashboardStats } from '../types';
+import { Question, SupabaseConfig, DashboardStats, Exam, ExamBadgeType, ExamStatus } from '../types';
 
 const STORAGE_KEY_URL = 'miniquiz_supabase_url';
 const STORAGE_KEY_KEY = 'miniquiz_supabase_anon_key';
@@ -141,35 +141,51 @@ export const fetchDashboardStats = async (): Promise<{ stats: DashboardStats; er
   const client = getSupabaseClient();
   if (!client) {
     return {
-      stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0 },
+      stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0, totalExams: 0, activeExams: 0 },
       error: 'সুপাবেস কানেক্ট করা নেই। অনুগ্রহ করে URL ও Key প্রদান করুন।',
     };
   }
 
   try {
-    const { data, error } = await client
+    const { data: questionsData, error: qError } = await client
       .from('questions')
       .select('id, status');
 
-    if (error) {
+    if (qError) {
       return {
-        stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0 },
-        error: `ডাটাবেস ত্রুটি: ${error.message}`,
+        stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0, totalExams: 0, activeExams: 0 },
+        error: `ডাটাবেস ত্রুটি: ${qError.message}`,
       };
     }
 
-    const totalQuestions = data?.length || 0;
-    const publishedQuestions = data?.filter((q: any) => q.status === 'published').length || 0;
-    const draftQuestions = data?.filter((q: any) => q.status === 'draft').length || 0;
+    const totalQuestions = questionsData ? questionsData.length : 0;
+    const publishedQuestions = questionsData ? questionsData.filter((q) => q.status === 'published').length : 0;
+    const draftQuestions = questionsData ? questionsData.filter((q) => q.status === 'draft').length : 0;
+
+    let totalExams = 0;
+    let activeExams = 0;
+
+    // Fetch exams count if exams table exists
+    const { data: examsData } = await client.from('exams').select('id, status');
+    if (examsData) {
+      totalExams = examsData.length;
+      activeExams = examsData.filter((e) => e.status === 'active').length;
+    }
 
     return {
-      stats: { totalQuestions, publishedQuestions, draftQuestions },
+      stats: {
+        totalQuestions,
+        publishedQuestions,
+        draftQuestions,
+        totalExams,
+        activeExams,
+      },
       error: null,
     };
   } catch (err: any) {
     return {
-      stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0 },
-      error: err?.message || 'ডেটা লোড করতে সমস্যা হয়েছে।',
+      stats: { totalQuestions: 0, publishedQuestions: 0, draftQuestions: 0, totalExams: 0, activeExams: 0 },
+      error: err?.message || 'পরিসংখ্যান লোড করতে সমস্যা হয়েছে।',
     };
   }
 };
@@ -383,3 +399,224 @@ export const deleteQuestion = async (id: string | number): Promise<{ success: bo
     };
   }
 };
+
+/* ==========================================================================
+   PUBLIC.EXAMS TABLE CRUD FUNCTIONS
+   ========================================================================== */
+
+export const normalizeExamRow = (row: any): Exam => {
+  return {
+    id: String(row.id),
+    title: row.title || 'শিরোনাম ছাড়া পরীক্ষা',
+    badge: row.badge || 'মডেল টেস্ট',
+    badge_type: (row.badge_type || 'daily') as ExamBadgeType,
+    subject: row.subject || 'সকল বিষয়',
+    question_count: typeof row.question_count === 'number' ? row.question_count : Number(row.question_count || 0),
+    time_minutes: typeof row.time_minutes === 'number' ? row.time_minutes : Number(row.time_minutes || 0),
+    negative_marks: typeof row.negative_marks === 'number' ? row.negative_marks : Number(row.negative_marks || 0),
+    total_marks: typeof row.total_marks === 'number' ? row.total_marks : Number(row.total_marks || 0),
+    description: row.description || '',
+    status: (row.status === 'active' ? 'active' : 'draft') as ExamStatus,
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at,
+  };
+};
+
+// Fetch All Exams
+export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | null; isTableMissing?: boolean }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { exams: [], error: 'সুপাবেস কানেকশন পাওয়া যায়নি।' };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('exams')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase fetchAllExams error:', error);
+      const isMissing = error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('exams');
+      return {
+        exams: [],
+        error: `পরীক্ষার তালিকা লোড ব্যর্থ: ${error.message}`,
+        isTableMissing: isMissing,
+      };
+    }
+
+    const normalized = (data || []).map(normalizeExamRow);
+    return { exams: normalized, error: null };
+  } catch (err: any) {
+    return { exams: [], error: err?.message || 'পরীক্ষার তালিকা লোড হতে সমস্যা হয়েছে।' };
+  }
+};
+
+// Fetch Exam By ID
+export const fetchExamById = async (id: string): Promise<{ exam: Exam | null; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { exam: null, error: 'সুপাবেস কানেকশন পাওয়া যায়নি।' };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('exams')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      return { exam: null, error: `পরীক্ষার তথ্য পাওয়া যায়নি: ${error.message}` };
+    }
+
+    return { exam: normalizeExamRow(data), error: null };
+  } catch (err: any) {
+    return { exam: null, error: err?.message || 'পরীক্ষা লোড করতে সমস্যা হয়েছে।' };
+  }
+};
+
+// Insert New Exam
+export const insertExam = async (
+  newExam: Omit<Exam, 'id' | 'created_at' | 'updated_at'>
+): Promise<{ success: boolean; data?: Exam; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'সুপাবেস কানেকশন পাওয়া যায়নি।' };
+  }
+
+  try {
+    const payload = {
+      title: newExam.title,
+      badge: newExam.badge,
+      badge_type: newExam.badge_type,
+      subject: newExam.subject,
+      question_count: newExam.question_count,
+      time_minutes: newExam.time_minutes,
+      negative_marks: newExam.negative_marks,
+      total_marks: newExam.total_marks,
+      description: newExam.description || '',
+      status: newExam.status,
+    };
+
+    const { data, error } = await client
+      .from('exams')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase insertExam error:', error);
+      return {
+        success: false,
+        error: `পরীক্ষা তৈরি ব্যর্থ হয়েছে: ${error.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: normalizeExamRow(data),
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'পরীক্ষা তৈরি করতে ব্যর্থ হয়েছে।',
+    };
+  }
+};
+
+// Update Exam
+export const updateExam = async (
+  id: string,
+  updatedFields: Partial<Exam>
+): Promise<{ success: boolean; data?: Exam; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'সুপাবেস কানেকশন পাওয়া যায়নি।' };
+  }
+
+  try {
+    const payload: any = {};
+    if (updatedFields.title !== undefined) payload.title = updatedFields.title;
+    if (updatedFields.badge !== undefined) payload.badge = updatedFields.badge;
+    if (updatedFields.badge_type !== undefined) payload.badge_type = updatedFields.badge_type;
+    if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
+    if (updatedFields.question_count !== undefined) payload.question_count = updatedFields.question_count;
+    if (updatedFields.time_minutes !== undefined) payload.time_minutes = updatedFields.time_minutes;
+    if (updatedFields.negative_marks !== undefined) payload.negative_marks = updatedFields.negative_marks;
+    if (updatedFields.total_marks !== undefined) payload.total_marks = updatedFields.total_marks;
+    if (updatedFields.description !== undefined) payload.description = updatedFields.description;
+    if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+
+    const { data, error } = await client
+      .from('exams')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase updateExam error:', error);
+      return {
+        success: false,
+        error: `পরীক্ষা আপডেট ব্যর্থ হয়েছে: ${error.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: normalizeExamRow(data),
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'পরীক্ষা তথ্য পরিবর্তন করা যায়নি।',
+    };
+  }
+};
+
+// Toggle Exam Status (active <-> draft)
+export const toggleExamStatus = async (
+  id: string,
+  currentStatus: ExamStatus
+): Promise<{ success: boolean; newStatus?: ExamStatus; error: string | null }> => {
+  const newStatus: ExamStatus = currentStatus === 'active' ? 'draft' : 'active';
+  const result = await updateExam(id, { status: newStatus });
+  if (result.success) {
+    return { success: true, newStatus, error: null };
+  }
+  return { success: false, error: result.error };
+};
+
+// Delete Exam
+export const deleteExam = async (id: string): Promise<{ success: boolean; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'সুপাবেস কানেকশন পাওয়া যায়নি।' };
+  }
+
+  try {
+    const { error } = await client
+      .from('exams')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase deleteExam error:', error);
+      return {
+        success: false,
+        error: `পরীক্ষা মুছে ফেলা সম্ভব হয়নি: ${error.message}`,
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'পরীক্ষা মুছতে সমস্যা হয়েছে।',
+    };
+  }
+};
+
