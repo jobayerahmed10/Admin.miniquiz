@@ -38,7 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLogout, userEmail }) => {
   const navLinks = [
     { path: '/admin', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
     { path: '/admin/exams', label: 'পরীক্ষা ও মডেল টেস্ট', icon: Award },
-    { path: '/admin/questions', label: 'প্রশ্নসমূহ', icon: HelpCircle },
+    { path: '/admin/questions', label: 'প্রশ্ন ব্যাংক', icon: Database },
     { path: '/admin/questions/create', label: 'নতুন প্রশ্ন তৈরি', icon: PlusCircle },
   ];
 

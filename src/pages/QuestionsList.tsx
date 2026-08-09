@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Database,
+  Award,
 } from 'lucide-react';
 import { fetchAllQuestions, deleteQuestion } from '../lib/supabase';
 import { Question } from '../types';
@@ -117,15 +119,15 @@ export const QuestionsList: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
-            <HelpCircle className="w-6 h-6 text-emerald-600" />
-            প্রশ্ন তালিকা (Question Management)
+            <Database className="w-6 h-6 text-emerald-600" />
+            প্রশ্ন ব্যাংক (Question Bank)
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Supabase <code>public.questions</code> টেবিলের সকল প্রশ্ন দেখুন, সম্পাদনা বা মুছে ফেলুন
+            আপনার সকল সাবজেক্টের প্রশ্ন সংরক্ষিত স্থান। এখান থেকে প্রশ্ন তৈরি, এডিট বা সিলেক্ট করে মডেল টেস্ট তৈরি করুন।
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={loadQuestions}
             disabled={loading}
@@ -133,6 +135,13 @@ export const QuestionsList: React.FC = () => {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             রিফ্রেশ
+          </button>
+          <button
+            onClick={() => navigate('/admin/exams')}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-2"
+          >
+            <Award className="w-4 h-4" />
+            পরীক্ষা ও মডেল টেস্টে যান
           </button>
           <Link
             to="/admin/questions/create"

@@ -88,6 +88,7 @@ function normalizeQuestionRow(row: any): Question {
     explanation: row.explanation || row.description || '',
     status: row.status === 'published' ? 'published' : 'draft',
     subject: row.subject || row.category || row.topic || row.subject_name || 'সাধারণ',
+    exam_id: row.exam_id || null,
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at,
   };
@@ -305,6 +306,85 @@ export const insertQuestion = async (
       success: false,
       error: err?.message || 'প্রশ্ন তৈরি করতে ত্রুটি ঘটেছে।',
     };
+  }
+};
+
+// Batch Insert Multiple Questions
+export const insertBatchQuestions = async (
+  questionsToInsert: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<{ success: boolean; data?: Question[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'সুপাবেস কনফিগারেশন অনুপস্থিত।' };
+  }
+
+  try {
+    const payload = questionsToInsert.map((q) => ({
+      question: q.question,
+      option_a: q.option_a,
+      option_b: q.option_b,
+      option_c: q.option_c,
+      option_d: q.option_d,
+      correct_answer: q.correct_answer,
+      explanation: q.explanation || '',
+      status: q.status || 'published',
+      subject: q.subject || 'সাধারণ',
+      ...(q.exam_id ? { exam_id: q.exam_id } : {}),
+    }));
+
+    let { data, error } = await client
+      .from('questions')
+      .insert(payload)
+      .select();
+
+    if (error && (error.message.includes('subject') || error.message.includes('exam_id') || error.code === 'PGRST204')) {
+      const fallbackPayload = payload.map((p: any) => {
+        const { subject, exam_id, ...rest } = p;
+        return rest;
+      });
+      const retryResult = await client
+        .from('questions')
+        .insert(fallbackPayload)
+        .select();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
+    if (error) {
+      console.error('Supabase insertBatchQuestions error:', error);
+      return { success: false, error: error.message };
+    }
+
+    const normalized = (data || []).map(normalizeQuestionRow);
+    return { success: true, data: normalized, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'ব্যাচ প্রশ্ন করতে সমস্যা হয়েছে।' };
+  }
+};
+
+// Fetch questions linked to a specific exam or list of IDs
+export const fetchQuestionsByExamId = async (
+  examId: string | number
+): Promise<{ questions: Question[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { questions: [], error: 'সুপাবেস কনফিগার করা নেই।' };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('questions')
+      .select('*')
+      .eq('exam_id', examId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      return { questions: [], error: error.message };
+    }
+
+    return { questions: (data || []).map(normalizeQuestionRow), error: null };
+  } catch (err: any) {
+    return { questions: [], error: err?.message || 'পরীক্ষার প্রশ্ন দেখতে ব্যর্থ।' };
   }
 };
 

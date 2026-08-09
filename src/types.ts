@@ -11,6 +11,7 @@ export interface Question {
   explanation?: string | null;
   status: QuestionStatus;
   subject?: string | null; // বিষয় (যেমন: বাংলা, ইংরেজি, গণিত, ইত্যাদি)
+  exam_id?: string | number | null; // এই প্রশ্নটি নির্দিষ্ট কোনো মডেল টেস্টের অন্তর্ভুক্ত কি না
   created_at?: string;
   updated_at?: string;
 }
@@ -30,6 +31,8 @@ export interface Exam {
   total_marks: number;
   description?: string | null;
   status: ExamStatus;
+  question_ids?: (string | number)[];
+  questions?: Question[];
   created_at?: string;
   updated_at?: string;
 }

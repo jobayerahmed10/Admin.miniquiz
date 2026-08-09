@@ -1,0 +1,168 @@
+import express from 'express';
+import path from 'path';
+import dotenv from 'dotenv';
+import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI, Type } from '@google/genai';
+
+dotenv.config();
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json({ limit: '10mb' }));
+
+// Server-side Gemini client helper
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY পরিবেশের ভেরিয়েবল পাওয়া যায়নি।');
+  }
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+}
+
+// 1. AI Question Extraction from pasted text
+app.post('/api/gemini/extract-questions', async (req, res) => {
+  try {
+    const { text, defaultSubject } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'টেক্সট ইনপুট দেওয়া বাধ্যতামূলক।' });
+    }
+
+    const ai = getGeminiClient();
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: `You are an expert Bangladeshi competitive exam (BCS, Primary Teacher, NTRCA, Admission) question parser.
+Extract all multiple choice questions (MCQs) from the provided unformatted Bengali text.
+For each question, accurately extract or determine:
+1. question: The clear question text in Bengali.
+2. option_a: Option A text.
+3. option_b: Option B text.
+4. option_c: Option C text.
+5. option_d: Option D text.
+6. correct_answer: Must be strictly one of: "option_a", "option_b", "option_c", or "option_d".
+7. explanation: Clear, educational explanation in Bengali explaining why the answer is correct and providing relevant background context.
+8. subject: Subject or category (e.g., "${defaultSubject || 'সাধারণ'}").
+
+Here is the raw unformatted text:
+${text}`,
+      config: {
+        systemInstruction:
+          'Extract questions cleanly into a structured JSON array. Do not include markdown code block backticks if possible, but match schema exactly.',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              option_a: { type: Type.STRING },
+              option_b: { type: Type.STRING },
+              option_c: { type: Type.STRING },
+              option_d: { type: Type.STRING },
+              correct_answer: { type: Type.STRING },
+              explanation: { type: Type.STRING },
+              subject: { type: Type.STRING },
+            },
+            required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
+          },
+        },
+      },
+    });
+
+    const jsonText = response.text?.trim() || '[]';
+    const parsedQuestions = JSON.parse(jsonText);
+
+    return res.json({ success: true, questions: parsedQuestions });
+  } catch (error: any) {
+    console.error('Error extracting questions:', error);
+    return res.status(500).json({
+      error: error.message || 'এআই দিয়ে প্রশ্ন এক্সট্র্যাক্ট করতে সমস্যা হয়েছে।',
+    });
+  }
+});
+
+// 2. AI Question Generator from Topic
+app.post('/api/gemini/generate-questions', async (req, res) => {
+  try {
+    const { topic, subject, count = 5 } = req.body;
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({ error: 'টপিকের নাম দেওয়া বাধ্যতামূলক।' });
+    }
+
+    const ai = getGeminiClient();
+    const numQuestions = Math.min(Math.max(Number(count) || 5, 1), 25);
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: `Generate exactly ${numQuestions} high-quality, authentic Bengali MCQs for the topic "${topic}" (Subject: ${
+        subject || 'সাধারণ জ্ঞান'
+      }).
+Requirements:
+1. Each question must be clear, accurate, and suitable for BCS, NTRCA, Primary Teacher or university admission exams.
+2. Provide 4 distinct options (option_a, option_b, option_c, option_d).
+3. Set correct_answer strictly to one of: "option_a", "option_b", "option_c", or "option_d".
+4. Provide a detailed, highly informative explanation (explanation) in Bengali under each question explaining the concept clearly.
+5. Set subject to "${subject || 'সাধারণ'}".`,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              option_a: { type: Type.STRING },
+              option_b: { type: Type.STRING },
+              option_c: { type: Type.STRING },
+              option_d: { type: Type.STRING },
+              correct_answer: { type: Type.STRING },
+              explanation: { type: Type.STRING },
+              subject: { type: Type.STRING },
+            },
+            required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
+          },
+        },
+      },
+    });
+
+    const jsonText = response.text?.trim() || '[]';
+    const generatedQuestions = JSON.parse(jsonText);
+
+    return res.json({ success: true, questions: generatedQuestions });
+  } catch (error: any) {
+    console.error('Error generating questions:', error);
+    return res.status(500).json({
+      error: error.message || 'এআই দিয়ে প্রশ্ন তৈরি করতে সমস্যা হয়েছে।',
+    });
+  }
+});
+
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();
