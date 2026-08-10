@@ -19,7 +19,7 @@ import {
   Globe,
   PlusCircle,
 } from 'lucide-react';
-import { Question, Exam } from '../types';
+import { Question, Exam, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
 import { fetchAllQuestions, insertQuestion, insertBatchQuestions } from '../lib/supabase';
 import { isArabicText } from './AddAiQuestionsModal';
 
@@ -54,6 +54,13 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [manualCorrect, setManualCorrect] = useState<'option_a' | 'option_b' | 'option_c' | 'option_d'>('option_a');
   const [manualExplanation, setManualExplanation] = useState('');
   const [manualSubject, setManualSubject] = useState(exam.subject || 'সাধারণ');
+  const [manualCustomSubject, setManualCustomSubject] = useState('');
+  const [manualTopic, setManualTopic] = useState('');
+  const [manualCustomTopic, setManualCustomTopic] = useState('');
+  const [showManualCustomTopic, setShowManualCustomTopic] = useState(false);
+  const [manualPost, setManualPost] = useState('');
+  const [manualCustomPost, setManualCustomPost] = useState('');
+  const [showManualCustomPost, setShowManualCustomPost] = useState(false);
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
   const [manualSuccess, setManualSuccess] = useState<string | null>(null);
@@ -132,6 +139,10 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
 
     setManualSubmitting(true);
 
+    const finalSubject = manualSubject === 'অন্যান্য' ? (manualCustomSubject.trim() || 'অন্যান্য') : (manualSubject || exam.subject || 'সাধারণ');
+    const finalTopic = showManualCustomTopic ? manualCustomTopic.trim() : (manualTopic === 'অন্যান্য' ? manualCustomTopic.trim() : manualTopic.trim());
+    const finalPost = showManualCustomPost ? manualCustomPost.trim() : (manualPost === 'অন্যান্য' ? manualCustomPost.trim() : manualPost.trim());
+
     const newQ = {
       question: manualQuestion.trim(),
       option_a: manualOptionA.trim(),
@@ -141,7 +152,9 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       correct_answer: manualCorrect,
       explanation: manualExplanation.trim() || null,
       status: 'published' as const,
-      subject: manualSubject || exam.subject || 'সাধারণ',
+      subject: finalSubject,
+      topic: finalTopic,
+      post: finalPost,
       exam_id: exam.id,
     };
 
@@ -589,6 +602,122 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                 <span>{manualSuccess}</span>
               </div>
             )}
+
+            {/* Subject, Topic & Post (বিষয়, টপিক ও পদ) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Subject */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  বিষয় (Subject)
+                </label>
+                <select
+                  value={manualSubject}
+                  onChange={(e) => setManualSubject(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none"
+                >
+                  {subjectsList.map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                  <option value="অন্যান্য">অন্যান্য (ম্যানুয়াল)</option>
+                </select>
+
+                {manualSubject === 'অন্যান্য' && (
+                  <input
+                    type="text"
+                    value={manualCustomSubject}
+                    onChange={(e) => setManualCustomSubject(e.target.value)}
+                    placeholder="নতুন বিষয় ম্যানুয়ালি লিখুন..."
+                    className="w-full mt-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-800/80 border border-indigo-500 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  />
+                )}
+              </div>
+
+              {/* Topic */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    টপিক (Topic)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualCustomTopic(!showManualCustomTopic)}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                  >
+                    {showManualCustomTopic ? 'লিস্ট থেকে বাছুন' : '+ নতুন ম্যানুয়াল'}
+                  </button>
+                </div>
+
+                {showManualCustomTopic ? (
+                  <input
+                    type="text"
+                    value={manualCustomTopic}
+                    onChange={(e) => setManualCustomTopic(e.target.value)}
+                    placeholder="নতুন টপিক ম্যানুয়ালি লিখুন..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-indigo-500 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  />
+                ) : (
+                  <select
+                    value={manualTopic}
+                    onChange={(e) => {
+                      if (e.target.value === 'অন্যান্য') {
+                        setShowManualCustomTopic(true);
+                      } else {
+                        setManualTopic(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
+                  >
+                    <option value="">-- টপিক নির্বাচন করুন --</option>
+                    {DEFAULT_TOPICS.map((top) => (
+                      <option key={top} value={top}>{top}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Post */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    পদ (Post)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualCustomPost(!showManualCustomPost)}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                  >
+                    {showManualCustomPost ? 'লিস্ট থেকে বাছুন' : '+ নতুন ম্যানুয়াল'}
+                  </button>
+                </div>
+
+                {showManualCustomPost ? (
+                  <input
+                    type="text"
+                    value={manualCustomPost}
+                    onChange={(e) => setManualCustomPost(e.target.value)}
+                    placeholder="নতুন পদের নাম ম্যানুয়ালি লিখুন..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-indigo-500 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  />
+                ) : (
+                  <select
+                    value={manualPost}
+                    onChange={(e) => {
+                      if (e.target.value === 'অন্যান্য') {
+                        setShowManualCustomPost(true);
+                      } else {
+                        setManualPost(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
+                  >
+                    <option value="">-- পদ নির্বাচন করুন --</option>
+                    {DEFAULT_POSTS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">

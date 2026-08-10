@@ -18,9 +18,15 @@ import {
 import { insertBatchQuestions } from '../lib/supabase';
 import { Question } from '../types';
 
-// Helper to detect Arabic characters for RTL alignment
+// Helper to detect Arabic characters for RTL alignment.
+// If text contains Bengali or English characters (mixed text), force LTR (return false)
 export const isArabicText = (text?: string | null): boolean => {
-  if (!text) return false;
+  if (!text || !text.trim()) return false;
+  // If Bengali characters are present, it's a Bengali sentence -> return false (LTR)
+  if (/[\u0980-\u09FF]/.test(text)) return false;
+  // If English letters are present, return false (LTR)
+  if (/[a-zA-Z]/.test(text)) return false;
+  // Only if text contains Arabic characters and no Bengali/English characters -> RTL
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
 };
 
@@ -71,6 +77,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 
   // Tab 2: Topic Gen State
   const [topic, setTopic] = useState('');
+  const [post, setPost] = useState('');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -356,6 +363,8 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       explanation: q.explanation || '',
       status: 'published',
       subject: q.subject || subject || 'সাধারণ',
+      topic: q.topic || topic || '',
+      post: q.post || post || '',
     }));
 
     const { success, error } = await insertBatchQuestions(formattedForSave);
@@ -452,35 +461,54 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             </div>
           )}
 
-          {/* Global Subject Selector & Custom Addition */}
+          {/* Global Subject, Topic & Post Selector */}
           <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-purple-400" />
-                <label className="text-xs font-bold text-slate-300">বিষয় / Subject নির্বাচন করুন:</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">বিষয় / Subject:</label>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
+                  >
+                    {subjectList.map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSubjectInput(!showAddSubjectInput)}
+                    className="p-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold shrink-0 transition-colors"
+                    title="নতুন বিষয় যোগ করুন"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
-                >
-                  {subjectList.map((sub) => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
-                  ))}
-                </select>
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">টপিক / Topic:</label>
+                <input
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="যেমন: কারক ও বিভক্তি"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+                />
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowAddSubjectInput(!showAddSubjectInput)}
-                  className="px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-colors"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  নতুন বিষয় যোগ
-                </button>
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">পদ / Post (Designation):</label>
+                <input
+                  type="text"
+                  value={post}
+                  onChange={(e) => setPost(e.target.value)}
+                  placeholder="যেমন: সহকারী শিক্ষক"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+                />
               </div>
             </div>
 
@@ -490,7 +518,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                   type="text"
                   value={customSubjectInput}
                   onChange={(e) => setCustomSubjectInput(e.target.value)}
-                  placeholder="যেমন: আল কুরআন, সূরা আল বাকারা, কম্পিউটার বিজ্ঞান..."
+                  placeholder="যেমন: আল কুরআন, সূরা আল বাকারা..."
                   className="flex-1 bg-slate-950 border border-indigo-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
                 />
                 <button

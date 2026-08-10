@@ -90,7 +90,9 @@ export const QuestionsList: React.FC = () => {
       q.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.option_a.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.option_b.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (q.subject && q.subject.toLowerCase().includes(searchTerm.toLowerCase()));
+      (q.subject && q.subject.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (q.topic && q.topic.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (q.post && q.post.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus =
       statusFilter === 'all' ? true : q.status === statusFilter;
@@ -317,11 +319,23 @@ export const QuestionsList: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Subject Column */}
+                    {/* Subject, Topic & Post Column */}
                     <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="inline-block px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-[11px] border border-indigo-200/60 dark:border-indigo-800/60">
-                        {q.subject || 'সাধারণ'}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-[11px] border border-indigo-200/60 dark:border-indigo-800/60">
+                          {q.subject || 'সাধারণ'}
+                        </span>
+                        {q.topic && (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold text-[10px] border border-purple-200/50 dark:border-purple-800/50">
+                            টপিক: {q.topic}
+                          </span>
+                        )}
+                        {q.post && (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[10px] border border-amber-200/50 dark:border-amber-800/50">
+                            পদ: {q.post}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Status Column */}
@@ -412,11 +426,21 @@ export const QuestionsList: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-bold uppercase text-slate-400">প্রশ্ন:</span>
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                <span className="text-[11px] font-bold uppercase text-slate-400">তথ্য:</span>
                 <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold text-[10px]">
                   {viewQuestion.subject || 'সাধারণ'}
                 </span>
+                {viewQuestion.topic && (
+                  <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold text-[10px]">
+                    টপিক: {viewQuestion.topic}
+                  </span>
+                )}
+                {viewQuestion.post && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[10px]">
+                    পদ: {viewQuestion.post}
+                  </span>
+                )}
               </div>
               <p className="font-bold text-base text-slate-900 dark:text-slate-100">
                 {viewQuestion.question}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw } from 'lucide-react';
 import { fetchQuestionById, updateQuestion } from '../lib/supabase';
-import { QuestionStatus, DEFAULT_SUBJECTS } from '../types';
+import { QuestionStatus, DEFAULT_SUBJECTS, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
 
 export const EditQuestion: React.FC = () => {
@@ -11,6 +11,15 @@ export const EditQuestion: React.FC = () => {
 
   const [subject, setSubject] = useState<string>('বাংলা');
   const [customSubject, setCustomSubject] = useState<string>('');
+  
+  const [topic, setTopic] = useState<string>('');
+  const [customTopic, setCustomTopic] = useState<string>('');
+  const [showCustomTopic, setShowCustomTopic] = useState<boolean>(false);
+
+  const [post, setPost] = useState<string>('');
+  const [customPost, setCustomPost] = useState<string>('');
+  const [showCustomPost, setShowCustomPost] = useState<boolean>(false);
+
   const [questionText, setQuestionText] = useState('');
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -47,6 +56,22 @@ export const EditQuestion: React.FC = () => {
         setCorrectAnswer(question.correct_answer || 'option_a');
         setExplanation(question.explanation || '');
         setStatus(question.status || 'published');
+        if (question.topic) {
+          if (DEFAULT_TOPICS.includes(question.topic)) {
+            setTopic(question.topic);
+          } else {
+            setShowCustomTopic(true);
+            setCustomTopic(question.topic);
+          }
+        }
+        if (question.post) {
+          if (DEFAULT_POSTS.includes(question.post)) {
+            setPost(question.post);
+          } else {
+            setShowCustomPost(true);
+            setCustomPost(question.post);
+          }
+        }
         if (question.subject) {
           if (DEFAULT_SUBJECTS.includes(question.subject)) {
             setSubject(question.subject);
@@ -80,6 +105,8 @@ export const EditQuestion: React.FC = () => {
     setSaving(true);
 
     const finalSubject = subject === 'অন্যান্য' ? customSubject.trim() || 'অন্যান্য' : subject;
+    const finalTopic = showCustomTopic ? customTopic.trim() : (topic === 'অন্যান্য' ? customTopic.trim() : topic.trim());
+    const finalPost = showCustomPost ? customPost.trim() : (post === 'অন্যান্য' ? customPost.trim() : post.trim());
 
     const updatedData = {
       question: questionText.trim(),
@@ -91,6 +118,8 @@ export const EditQuestion: React.FC = () => {
       explanation: explanation.trim(),
       status: status,
       subject: finalSubject,
+      topic: finalTopic,
+      post: finalPost,
     };
 
     const result = await updateQuestion(id, updatedData);
@@ -174,12 +203,15 @@ export const EditQuestion: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Subject Selection (বিষয় নির্বাচন) */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
-              বিষয় (Subject) <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Subject, Topic & Post (বিষয়, টপিক ও পদ) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Subject Selection (বিষয়) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  বিষয় (Subject) <span className="text-red-500">*</span>
+                </label>
+              </div>
               <select
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
@@ -198,9 +230,103 @@ export const EditQuestion: React.FC = () => {
                   required
                   value={customSubject}
                   onChange={(e) => setCustomSubject(e.target.value)}
-                  placeholder="কাস্টম বিষয় লিখুন (যেমন: পদার্থবিজ্ঞান)"
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  placeholder="নতুন বিষয়ের নাম ম্যানুয়ালি লিখুন..."
+                  className="w-full mt-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-emerald-500 rounded-2xl text-xs font-bold focus:outline-none text-slate-900 dark:text-slate-100 placeholder-slate-400"
                 />
+              )}
+            </div>
+
+            {/* Topic Field (টপিক) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  টপিক (Topic)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomTopic(!showCustomTopic)}
+                  className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                >
+                  {showCustomTopic ? 'লিস্ট থেকে বাছুন' : '+ নতুন ম্যানুয়াল'}
+                </button>
+              </div>
+
+              {showCustomTopic ? (
+                <input
+                  type="text"
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  placeholder="নতুন টপিক ম্যানুয়ালি লিখুন..."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-emerald-500 rounded-2xl text-xs font-bold focus:outline-none text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+              ) : (
+                <div className="space-y-2">
+                  <select
+                    value={topic}
+                    onChange={(e) => {
+                      if (e.target.value === 'অন্যান্য') {
+                        setShowCustomTopic(true);
+                      } else {
+                        setTopic(e.target.value);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  >
+                    <option value="">-- টপিক নির্বাচন করুন (ঐচ্ছিক) --</option>
+                    {DEFAULT_TOPICS.map((top) => (
+                      <option key={top} value={top}>
+                        {top}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Post / Designation Field (পদ) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  পদ (Post / Designation)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomPost(!showCustomPost)}
+                  className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                >
+                  {showCustomPost ? 'লিস্ট থেকে বাছুন' : '+ নতুন ম্যানুয়াল'}
+                </button>
+              </div>
+
+              {showCustomPost ? (
+                <input
+                  type="text"
+                  value={customPost}
+                  onChange={(e) => setCustomPost(e.target.value)}
+                  placeholder="নতুন পদের নাম ম্যানুয়ালি লিখুন..."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-emerald-500 rounded-2xl text-xs font-bold focus:outline-none text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+              ) : (
+                <div className="space-y-2">
+                  <select
+                    value={post}
+                    onChange={(e) => {
+                      if (e.target.value === 'অন্যান্য') {
+                        setShowCustomPost(true);
+                      } else {
+                        setPost(e.target.value);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  >
+                    <option value="">-- পদ নির্বাচন করুন (ঐচ্ছিক) --</option>
+                    {DEFAULT_POSTS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
           </div>

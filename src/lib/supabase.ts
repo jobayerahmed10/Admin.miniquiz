@@ -87,7 +87,9 @@ function normalizeQuestionRow(row: any): Question {
     correct_answer: row.correct_answer || row.correct_option || row.answer || 'option_a',
     explanation: row.explanation || row.description || '',
     status: row.status === 'published' ? 'published' : 'draft',
-    subject: row.subject || row.category || row.topic || row.subject_name || 'সাধারণ',
+    subject: row.subject || row.category || row.subject_name || 'সাধারণ',
+    topic: row.topic || row.topic_name || '',
+    post: row.post || row.post_name || row.designation || row.position || '',
     exam_id: row.exam_id || null,
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at,
@@ -268,6 +270,8 @@ export const insertQuestion = async (
       explanation: newQuestion.explanation || '',
       status: newQuestion.status,
       subject: newQuestion.subject || 'সাধারণ',
+      topic: newQuestion.topic || '',
+      post: newQuestion.post || '',
     };
 
     let { data, error } = await client
@@ -276,14 +280,23 @@ export const insertQuestion = async (
       .select()
       .single();
 
-    // If 'subject' column doesn't exist in Supabase table schema, retry without 'subject'
-    if (error && (error.message.includes('subject') || error.code === 'PGRST204')) {
-      delete payload.subject;
-      const retryResult = await client
+    // If 'subject', 'topic', or 'post' column doesn't exist in Supabase table schema, retry gracefully
+    if (error && (error.message.includes('subject') || error.message.includes('topic') || error.message.includes('post') || error.code === 'PGRST204')) {
+      delete payload.topic;
+      delete payload.post;
+      let retryResult = await client
         .from('questions')
         .insert([payload])
         .select()
         .single();
+      if (retryResult.error && retryResult.error.message.includes('subject')) {
+        delete payload.subject;
+        retryResult = await client
+          .from('questions')
+          .insert([payload])
+          .select()
+          .single();
+      }
       data = retryResult.data;
       error = retryResult.error;
     }
@@ -329,6 +342,8 @@ export const insertBatchQuestions = async (
       explanation: q.explanation || '',
       status: q.status || 'published',
       subject: q.subject || 'সাধারণ',
+      topic: q.topic || '',
+      post: q.post || '',
       ...(q.exam_id ? { exam_id: q.exam_id } : {}),
     }));
 
@@ -337,9 +352,9 @@ export const insertBatchQuestions = async (
       .insert(payload)
       .select();
 
-    if (error && (error.message.includes('subject') || error.message.includes('exam_id') || error.code === 'PGRST204')) {
+    if (error && (error.message.includes('subject') || error.message.includes('topic') || error.message.includes('post') || error.message.includes('exam_id') || error.code === 'PGRST204')) {
       const fallbackPayload = payload.map((p: any) => {
-        const { subject, exam_id, ...rest } = p;
+        const { subject, topic, post, exam_id, ...rest } = p;
         return rest;
       });
       const retryResult = await client
@@ -409,6 +424,8 @@ export const updateQuestion = async (
     if (updatedFields.explanation !== undefined) payload.explanation = updatedFields.explanation;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
+    if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
+    if (updatedFields.post !== undefined) payload.post = updatedFields.post;
 
     let { data, error } = await client
       .from('questions')
@@ -417,14 +434,24 @@ export const updateQuestion = async (
       .select()
       .single();
 
-    if (error && (error.message.includes('subject') || error.code === 'PGRST204')) {
-      delete payload.subject;
-      const retryResult = await client
+    if (error && (error.message.includes('subject') || error.message.includes('topic') || error.message.includes('post') || error.code === 'PGRST204')) {
+      delete payload.topic;
+      delete payload.post;
+      let retryResult = await client
         .from('questions')
         .update(payload)
         .eq('id', id)
         .select()
         .single();
+      if (retryResult.error && retryResult.error.message.includes('subject')) {
+        delete payload.subject;
+        retryResult = await client
+          .from('questions')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+      }
       data = retryResult.data;
       error = retryResult.error;
     }
