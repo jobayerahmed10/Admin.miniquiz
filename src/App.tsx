@@ -84,7 +84,15 @@ const AdminLayout: React.FC<{
         onClose={() => setAiModalOpen(false)}
         onQuestionsSaved={() => {
           setAiModalOpen(false);
-          window.location.reload();
+          fetchDashboardStats().then(({ stats: fetchedStats }) => {
+            if (fetchedStats) {
+              setStats({
+                questionsCount: fetchedStats.totalQuestions || 30,
+                examsCount: fetchedStats.totalExams || 2,
+              });
+            }
+          });
+          window.dispatchEvent(new CustomEvent('questions_updated'));
         }}
       />
     </div>
