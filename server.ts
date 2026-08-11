@@ -68,7 +68,7 @@ For each question, accurately extract or determine:
 5. option_d: Option D text.
 6. correct_answer: Must be strictly one of: "option_a", "option_b", "option_c", or "option_d".
 7. explanation: Clear, educational explanation in Bengali explaining why the answer is correct and providing relevant background context.
-8. subject: Subject or category (e.g., "${defaultSubject || 'সাধারণ'}").
+8. subject: Must be strictly "${defaultSubject || 'ইংরেজি'}".
 
 Here is the raw unformatted text:
 ${text}`,
@@ -130,14 +130,14 @@ const generateBatchOfQuestions = async (
   const response = await ai.models.generateContent({
     model: 'gemini-3.6-flash',
     contents: `Generate exactly ${batchCount} distinct, authentic Bengali MCQs for topic "${topic}" (Subject: ${
-      subject || 'সাধারণ জ্ঞান'
+      subject || 'ইংরেজি'
     }). Batch #${batchIndex + 1}.
 Requirements:
 1. Questions must be clear and accurate for competitive exams (BCS, NTRCA, Primary Teacher, University Admission).
 2. Provide 4 distinct options (option_a, option_b, option_c, option_d).
 3. Set correct_answer strictly to "option_a", "option_b", "option_c", or "option_d".
 4. Provide a helpful explanation (explanation) in Bengali under each question.
-5. Set subject to "${subject || 'সাধারণ'}".`,
+5. Set subject strictly to "${subject || 'ইংরেজি'}".`,
     config: {
       responseMimeType: 'application/json',
       responseSchema: {

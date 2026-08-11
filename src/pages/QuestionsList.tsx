@@ -18,7 +18,7 @@ import {
   Award,
   Sparkles,
 } from 'lucide-react';
-import { fetchAllQuestions, deleteQuestion } from '../lib/supabase';
+import { fetchAllQuestions, deleteQuestion, updateQuestion } from '../lib/supabase';
 import { Question } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
@@ -43,6 +43,12 @@ export const QuestionsList: React.FC = () => {
   // AI Question Modal
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
+  // Bulk selection and Subject updates
+  const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
+  const [bulkSubject, setBulkSubject] = useState<string>('ইংরেজি');
+  const [isBulkUpdating, setIsBulkUpdating] = useState<boolean>(false);
+  const [inlineUpdatingId, setInlineUpdatingId] = useState<string | number | null>(null);
+
   const navigate = useNavigate();
 
   const loadQuestions = async () => {
@@ -60,6 +66,36 @@ export const QuestionsList: React.FC = () => {
   useEffect(() => {
     loadQuestions();
   }, []);
+
+  const handleSingleSubjectChange = async (questionId: string | number, newSubject: string) => {
+    setInlineUpdatingId(questionId);
+    const { success, error: err } = await updateQuestion(questionId, { subject: newSubject });
+    setInlineUpdatingId(null);
+
+    if (success) {
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === questionId ? { ...q, subject: newSubject } : q))
+      );
+    } else {
+      alert(`বিষয় আপডেট করতে সমস্যা হয়েছে: ${err || ''}`);
+    }
+  };
+
+  const handleBulkSubjectChange = async () => {
+    if (selectedIds.length === 0) return;
+    setIsBulkUpdating(true);
+
+    for (const id of selectedIds) {
+      await updateQuestion(id, { subject: bulkSubject });
+    }
+
+    setQuestions((prev) =>
+      prev.map((q) => (selectedIds.includes(q.id) ? { ...q, subject: bulkSubject } : q))
+    );
+
+    setIsBulkUpdating(false);
+    setSelectedIds([]);
+  };
 
   const handleDeleteConfirm = async () => {
     if (!deletingId) return;
@@ -255,6 +291,57 @@ export const QuestionsList: React.FC = () => {
         </div>
       </div>
 
+      {/* BULK ACTION BAR */}
+      {selectedIds.length > 0 && (
+        <div className="bg-indigo-950/90 border border-indigo-500/40 p-4 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2 text-xs font-bold text-indigo-200">
+            <span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[11px]">
+              {selectedIds.length}
+            </span>
+            <span>টি প্রশ্ন সিলেক্ট করা হয়েছে</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-300 font-semibold">নতুন বিষয় সেট করুন:</span>
+            <select
+              value={bulkSubject}
+              onChange={(e) => setBulkSubject(e.target.value)}
+              className="bg-slate-900 border border-indigo-500/50 text-indigo-100 text-xs font-extrabold px-3 py-1.5 rounded-xl focus:outline-none"
+            >
+              <option value="ইংরেজি">ইংরেজি</option>
+              <option value="বাংলা">বাংলা</option>
+              <option value="বাংলা ভাষা ও সাহিত্য">বাংলা ভাষা ও সাহিত্য</option>
+              <option value="সাধারণ জ্ঞান">সাধারণ জ্ঞান</option>
+              <option value="গণিত">গণিত</option>
+              <option value="বাংলাদেশ বিষয়াবলী">বাংলাদেশ বিষয়াবলী</option>
+              <option value="আন্তর্জাতিক বিষয়াবলী">আন্তর্জাতিক বিষয়াবলী</option>
+              <option value="বিজ্ঞান">বিজ্ঞান</option>
+              <option value="কম্পিউটার ও তথ্যপ্রযুক্তি">কম্পিউটার ও তথ্যপ্রযুক্তি</option>
+            </select>
+
+            <button
+              onClick={handleBulkSubjectChange}
+              disabled={isBulkUpdating}
+              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl transition-all shadow flex items-center gap-1.5"
+            >
+              {isBulkUpdating ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              বিষয় পরিবর্তন করুন
+            </button>
+
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 bg-slate-800 text-slate-300 hover:text-white text-xs rounded-xl font-bold transition-colors"
+            >
+              বাতিল
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* QUESTIONS TABLE */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         {loading ? (
@@ -285,58 +372,117 @@ export const QuestionsList: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3.5 px-4 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredQuestions.length > 0 &&
+                        filteredQuestions.every((q) => selectedIds.includes(q.id))
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(filteredQuestions.map((q) => q.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="py-3.5 px-6">প্রশ্ন (Question)</th>
-                  <th className="py-3.5 px-4 w-32">বিষয় (Subject)</th>
+                  <th className="py-3.5 px-4 w-44">বিষয় (Subject)</th>
                   <th className="py-3.5 px-4 w-28">স্ট্যাটাস</th>
                   <th className="py-3.5 px-4 w-36">তৈরির তারিখ</th>
                   <th className="py-3.5 px-6 w-32 text-right">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                {filteredQuestions.map((q) => (
-                  <tr
-                    key={q.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    {/* Question text & options teaser */}
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug line-clamp-2">
-                        {q.question}
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                          ক: {q.option_a}
-                        </span>
-                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                          খ: {q.option_b}
-                        </span>
-                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                          গ: {q.option_c}
-                        </span>
-                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                          ঘ: {q.option_d}
-                        </span>
-                      </div>
-                    </td>
+                {filteredQuestions.map((q) => {
+                  const isSelected = selectedIds.includes(q.id);
+                  return (
+                    <tr
+                      key={q.id}
+                      className={`transition-colors ${
+                        isSelected
+                          ? 'bg-indigo-950/30 dark:bg-indigo-950/50'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                      }`}
+                    >
+                      {/* Checkbox Column */}
+                      <td className="py-4 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [...prev, q.id]);
+                            } else {
+                              setSelectedIds((prev) => prev.filter((id) => id !== q.id));
+                            }
+                          }}
+                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
 
-                    {/* Subject, Topic & Post Column */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-start">
-                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-[11px] border border-indigo-200/60 dark:border-indigo-800/60">
-                          {q.subject || 'সাধারণ'}
-                        </span>
-                        {q.topic && (
-                          <span className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold text-[10px] border border-purple-200/50 dark:border-purple-800/50">
-                            টপিক: {q.topic}
+                      {/* Question text & options teaser */}
+                      <td className="py-4 px-6">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug line-clamp-2">
+                          {q.question}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                            ক: {q.option_a}
                           </span>
-                        )}
-                        {q.post && (
-                          <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[10px] border border-amber-200/50 dark:border-amber-800/50">
-                            পদ: {q.post}
+                          <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                            খ: {q.option_b}
                           </span>
-                        )}
-                      </div>
-                    </td>
+                          <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                            গ: {q.option_c}
+                          </span>
+                          <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                            ঘ: {q.option_d}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Subject, Topic & Post Column */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1 items-start">
+                          <div className="flex items-center gap-1">
+                            <select
+                              value={q.subject || 'ইংরেজি'}
+                              disabled={inlineUpdatingId === q.id}
+                              onChange={(e) => handleSingleSubjectChange(q.id, e.target.value)}
+                              className="bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 font-bold text-[11px] px-2 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                              title="বিষয় পরিবর্তন করতে ক্লিক করুন"
+                            >
+                              <option value="ইংরেজি">ইংরেজি</option>
+                              <option value="বাংলা">বাংলা</option>
+                              <option value="বাংলা ভাষা ও সাহিত্য">বাংলা ভাষা ও সাহিত্য</option>
+                              <option value="সাধারণ জ্ঞান">সাধারণ জ্ঞান</option>
+                              <option value="গণিত">গণিত</option>
+                              <option value="বাংলাদেশ বিষয়াবলী">বাংলাদেশ বিষয়াবলী</option>
+                              <option value="আন্তর্জাতিক বিষয়াবলী">আন্তর্জাতিক বিষয়াবলী</option>
+                              <option value="বিজ্ঞান">বিজ্ঞান</option>
+                              <option value="কম্পিউটার ও তথ্যপ্রযুক্তি">কম্পিউটার ও তথ্যপ্রযুক্তি</option>
+                              <option value="সাধারণ">সাধারণ</option>
+                            </select>
+                            {inlineUpdatingId === q.id && (
+                              <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />
+                            )}
+                          </div>
+                          {q.topic && (
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold text-[10px] border border-purple-200/50 dark:border-purple-800/50">
+                              টপিক: {q.topic}
+                            </span>
+                          )}
+                          {q.post && (
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[10px] border border-amber-200/50 dark:border-amber-800/50">
+                              পদ: {q.post}
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
                     {/* Status Column */}
                     <td className="py-4 px-4 whitespace-nowrap">
@@ -383,7 +529,8 @@ export const QuestionsList: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

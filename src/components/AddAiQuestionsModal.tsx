@@ -46,14 +46,14 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'copyPaste' | 'topicGen'>('copyPaste');
 
   // Common State
-  const [subject, setSubject] = useState('সাধারণ জ্ঞান');
+  const [subject, setSubject] = useState('ইংরেজি');
   const [customSubjectInput, setCustomSubjectInput] = useState('');
   const [showAddSubjectInput, setShowAddSubjectInput] = useState(false);
   const [subjectList, setSubjectList] = useState<string[]>(() => {
     const defaultList = [
-      'সাধারণ জ্ঞান',
-      'বাংলা ভাষা ও সাহিত্য',
       'ইংরেজি',
+      'বাংলা ভাষা ও সাহিত্য',
+      'সাধারণ জ্ঞান',
       'গণিত',
       'বাংলাদেশ বিষয়াবলী',
       'আন্তর্জাতিক বিষয়াবলী',
@@ -362,7 +362,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       correct_answer: (q.correct_answer as any) || 'option_a',
       explanation: q.explanation || '',
       status: 'published',
-      subject: q.subject || subject || 'সাধারণ',
+      subject: subject || q.subject || 'ইংরেজি',
       topic: q.topic || topic || '',
       post: q.post || post || '',
     }));
