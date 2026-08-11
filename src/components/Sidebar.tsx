@@ -1,0 +1,253 @@
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Award,
+  GraduationCap,
+  Database,
+  Sparkles,
+  PenTool,
+  BookOpen,
+  Users,
+  X,
+  Flame,
+  ChevronLeft,
+} from 'lucide-react';
+
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenAiModal: () => void;
+  questionsCount?: number;
+  examsCount?: number;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  onClose,
+  onOpenAiModal,
+  questionsCount = 30,
+  examsCount = 2,
+}) => {
+  const location = useLocation();
+
+  const menuItems = [
+    {
+      id: 'dashboard',
+      path: '/admin',
+      title: 'ড্যাশবোর্ড ও ওভারভিউ',
+      subTitle: 'DASHBOARD',
+      icon: LayoutDashboard,
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      id: 'exams',
+      path: '/admin/exams',
+      title: 'ফ্রি পরীক্ষা ও মডেল টেস্ট',
+      subTitle: 'MODEL TESTS',
+      icon: Award,
+      badge: examsCount,
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'courses',
+      path: '#',
+      title: 'কোর্স ও লাইভ ব্যাচ',
+      subTitle: 'COURSES & BATCHES',
+      icon: GraduationCap,
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      id: 'questions',
+      path: '/admin/questions',
+      title: 'মাস্টার প্রশ্ন ব্যাংক',
+      subTitle: 'QUESTION BANK',
+      icon: Database,
+      badge: questionsCount,
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'ai-hub',
+      path: 'action:ai-hub',
+      title: 'এআই প্রশ্ন তৈরি হাব',
+      subTitle: 'AI QUESTION HUB',
+      icon: Sparkles,
+      badge: 'AI 3.6',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold',
+      isAi: true,
+    },
+    {
+      id: 'cq-exams',
+      path: '#',
+      title: 'সিকিউ ও লিখিত পরীক্ষা',
+      subTitle: 'WRITTEN & CQ EXAMS',
+      icon: PenTool,
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      id: 'glossary',
+      path: '#',
+      title: 'শব্দকোষ ও রিসোর্স',
+      subTitle: 'GLOSSARY & PDF NOTES',
+      icon: BookOpen,
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      id: 'users',
+      path: '#',
+      title: 'ব্যবহারকারী ও ভিআইপি এক্সেস',
+      subTitle: 'USERS & VIP ACCESS',
+      icon: Users,
+      badge: null,
+      badgeColor: '',
+    },
+  ];
+
+  return (
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#0a111e] text-slate-200 border-r border-slate-800/80 flex flex-col transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/20">
+              ত
+            </div>
+            <div>
+              <h2 className="font-extrabold text-white text-base tracking-tight leading-tight">
+                তামরীন একাডেমি
+              </h2>
+              <p className="text-[11px] text-emerald-400/90 font-medium tracking-wide">
+                NTRCA Cadre Admin CMS
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="মেনু বন্ধ করুন"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Special Banner / Pill */}
+        <div className="px-3.5 pt-3.5 pb-1">
+          <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-emerald-950/80 border border-emerald-500/30 rounded-2xl p-3 flex items-start gap-2.5">
+            <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+              <Flame className="w-4 h-4 text-emerald-400 fill-emerald-400/20 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-emerald-200 leading-snug">
+                ১৮তম NTRCA ক্যাডার স্পেশাল
+              </h4>
+              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                প্রভাষক ও সহকারী শিক্ষক (আরবি)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              item.path !== '#' &&
+              item.path !== 'action:ai-hub' &&
+              location.pathname === item.path;
+
+            const handleClick = (e: React.MouseEvent) => {
+              if (item.isAi || item.path === 'action:ai-hub') {
+                e.preventDefault();
+                onOpenAiModal();
+                if (window.innerWidth < 1024) {
+                  onClose();
+                }
+              } else if (item.path === '#') {
+                e.preventDefault();
+                alert(`"${item.title}" মডিউলটি শিগগিরই যুক্ত হচ্ছে।`);
+              } else {
+                if (window.innerWidth < 1024) {
+                  onClose();
+                }
+              }
+            };
+
+            return (
+              <Link
+                key={item.id}
+                to={item.path === 'action:ai-hub' ? '#' : item.path}
+                onClick={handleClick}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all duration-200 group ${
+                  isActive
+                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
+                      isActive ? 'text-slate-950' : item.isAi ? 'text-amber-400' : 'text-slate-400 group-hover:text-emerald-400'
+                    }`}
+                  />
+                  <div className="truncate">
+                    <span
+                      className={`block font-bold text-xs truncate ${
+                        isActive ? 'text-slate-950' : 'text-slate-100'
+                      }`}
+                    >
+                      {item.title}
+                    </span>
+                    <span
+                      className={`block text-[9px] font-semibold tracking-wider uppercase -mt-0.5 ${
+                        isActive ? 'text-emerald-950/80' : 'text-slate-500'
+                      }`}
+                    >
+                      {item.subTitle}
+                    </span>
+                  </div>
+                </div>
+
+                {item.badge !== null && item.badge !== undefined && (
+                  <span
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold shrink-0 ml-2 ${
+                      isActive
+                        ? 'bg-slate-950 text-emerald-400'
+                        : item.badgeColor
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="p-3.5 border-t border-slate-800/80 bg-[#070c16] text-[10px] text-slate-500 flex items-center justify-between">
+          <span className="font-semibold">v2.5 Full-Stack</span>
+          <span className="text-emerald-400/80 font-mono font-medium">Gemini 3.6 API</span>
+        </div>
+      </aside>
+    </>
+  );
+};

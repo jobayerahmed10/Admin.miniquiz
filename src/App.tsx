@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useOutletContext } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { AddAiQuestionsModal } from './components/AddAiQuestionsModal';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { ExamsManagement } from './pages/ExamsManagement';
 import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
-import { getSupabaseClient } from './lib/supabase';
+import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
+
+interface AdminContextType {
+  onOpenAiModal: () => void;
+}
+
+export function useAdminContext() {
+  return useOutletContext<AdminContextType>();
+}
 
 // Protected Layout component wrapping admin routes
 const AdminLayout: React.FC<{
@@ -15,21 +25,76 @@ const AdminLayout: React.FC<{
   onLogout: () => void;
   userEmail?: string;
 }> = ({ isAuthenticated, onLogout, userEmail }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [stats, setStats] = useState({ questionsCount: 30, examsCount: 2 });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const { stats: fetchedStats } = await fetchDashboardStats();
+      if (fetchedStats) {
+        setStats({
+          questionsCount: fetchedStats.totalQuestions || 30,
+          examsCount: fetchedStats.totalExams || 2,
+        });
+      }
+    };
+    loadStats();
+  }, []);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
+  const handleOpenAiModal = () => {
+    setAiModalOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
-      <Navbar onLogout={onLogout} userEmail={userEmail} />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
-        <Outlet />
-      </main>
-      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 text-center text-xs text-slate-500">
-        MiniQuiz Admin Panel &copy; {new Date().getFullYear()} &bull; Supabase Backend Connected
-      </footer>
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onOpenAiModal={handleOpenAiModal}
+        questionsCount={stats.questionsCount}
+        examsCount={stats.examsCount}
+      />
+
+      {/* Main Container Area - shifted when sidebar is open */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'lg:pl-72' : 'lg:pl-0'}`}>
+        <Navbar
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onLogout={onLogout}
+          userEmail={userEmail}
+        />
+
+        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-6 pb-12">
+          <Outlet context={{ onOpenAiModal: handleOpenAiModal }} />
+        </main>
+
+        <footer className="border-t border-slate-800/80 bg-[#060911] py-4 text-center text-xs text-slate-500 font-medium">
+          তামরীন একাডেমি এডমিন সিএমএস v2.5 &bull; NTRCA Cadre Special Admin Panel &bull; Supabase Backend Connected
+        </footer>
+      </div>
+
+      {/* Global AI Questions Hub Modal */}
+      <AddAiQuestionsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        onQuestionsSaved={() => {
+          setAiModalOpen(false);
+          window.location.reload();
+        }}
+      />
     </div>
   );
+};
+
+// Wrapper for Dashboard page to consume admin context
+const DashboardRoute: React.FC = () => {
+  const { onOpenAiModal } = useAdminContext();
+  return <Dashboard onOpenAiModal={onOpenAiModal} />;
 };
 
 export default function App() {
@@ -87,9 +152,9 @@ export default function App() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center text-white">
         <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-mono">MiniQuiz Admin লোড হচ্ছে...</p>
+        <p className="text-xs text-slate-400 font-mono">তামরীন একাডেমি এডমিন লোড হচ্ছে...</p>
       </div>
     );
   }
@@ -121,7 +186,7 @@ export default function App() {
             />
           }
         >
-          <Route path="/admin" element={<Dashboard />} />
+          <Route path="/admin" element={<DashboardRoute />} />
           <Route path="/admin/exams" element={<ExamsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
           <Route path="/admin/questions/create" element={<CreateQuestion />} />

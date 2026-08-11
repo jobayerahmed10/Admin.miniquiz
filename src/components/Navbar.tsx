@@ -1,30 +1,30 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  HelpCircle,
-  PlusCircle,
-  Award,
-  LogOut,
+  Menu,
   Database,
   Smartphone,
-  Menu,
-  X,
-  ShieldCheck,
+  LogOut,
+  CreditCard,
+  Sun,
+  Moon,
+  BarChart2,
+  Sparkles,
 } from 'lucide-react';
 import { SupabaseConfigModal } from './SupabaseConfigModal';
 import { StudentPreviewModal } from './StudentPreviewModal';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 interface NavbarProps {
+  onToggleSidebar?: () => void;
   onLogout?: () => void;
   userEmail?: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onLogout, userEmail }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onLogout, userEmail }) => {
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,158 +35,105 @@ export const Navbar: React.FC<NavbarProps> = ({ onLogout, userEmail }) => {
     navigate('/login');
   };
 
-  const navLinks = [
-    { path: '/admin', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
-    { path: '/admin/exams', label: 'পরীক্ষা ও মডেল টেস্ট', icon: Award },
-    { path: '/admin/questions', label: 'প্রশ্ন ব্যাংক', icon: Database },
-    { path: '/admin/questions/create', label: 'নতুন প্রশ্ন তৈরি', icon: PlusCircle },
-  ];
-
   const dbConfigured = isSupabaseConfigured();
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    if (document.documentElement.classList.contains('dark')) {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  };
 
   return (
     <>
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Brand Logo & Name */}
-          <div className="flex items-center space-x-3 space-x-reverse">
-            <Link to="/admin" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center font-black text-lg text-white shadow-lg shadow-emerald-900/30 group-hover:scale-105 transition-transform">
-                MQ
-              </div>
-              <div>
-                <span className="font-extrabold text-base tracking-tight text-white block">
-                  MiniQuiz <span className="text-emerald-400 font-semibold text-xs px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 ml-1">অ্যাডমিন</span>
-                </span>
-                <span className="text-[11px] text-slate-400 block -mt-0.5">
-                  প্রশ্নমালা ব্যবস্থাপনা প্যানেল
-                </span>
-              </div>
+      <header className="bg-[#080d1a] text-white border-b border-slate-800/80 sticky top-0 z-30 shadow-lg">
+        <div className="w-full px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
+          {/* Left Controls: Sidebar Toggle + Quick Nav Badge */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={onToggleSidebar}
+              className="p-2.5 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/30 transition-all flex items-center justify-center shrink-0 shadow-sm"
+              title="সাইডবার মেনু টগল করুন"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <Link
+              to="/admin"
+              className="px-3.5 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold flex items-center gap-2 transition-all shrink-0"
+            >
+              <BarChart2 className="w-4 h-4 text-emerald-400" />
+              <span className="hidden xs:inline">ড্যাশবোর্ড</span>
             </Link>
           </div>
 
-          {/* Desktop Nav Items */}
-          <nav className="hidden md:flex items-center space-x-1 space-x-reverse">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-emerald-600/90 text-white shadow-sm'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Action Tools & User Menu */}
-          <div className="hidden md:flex items-center space-x-2 space-x-reverse">
-            {/* Supabase Status Indicator */}
+          {/* Right Controls matching Screenshot 1 */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Payment & Fees Pill Button */}
             <button
-              onClick={() => setConfigModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
-                dbConfigured
-                  ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 hover:bg-emerald-900/60'
-                  : 'bg-amber-950/60 border-amber-800 text-amber-300 hover:bg-amber-900/60 animate-pulse'
-              }`}
+              onClick={() => alert('পেমেন্ট ও ফি ব্যবস্থাপনা শীঘ্রই যুক্ত হচ্ছে।')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-bold bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/40 transition-all shadow-sm"
             >
-              <Database className="w-3.5 h-3.5" />
-              <span>{dbConfigured ? 'Supabase কানেক্টেড' : 'Supabase সেটআপ করুন'}</span>
+              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">পেমেন্ট ও ফি</span>
             </button>
 
-            {/* Student View Live Tester */}
+            {/* Database Status Indicator Pill */}
+            <button
+              onClick={() => setConfigModalOpen(true)}
+              className={`p-2 sm:px-3 sm:py-1.5 rounded-2xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                dbConfigured
+                  ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/80'
+                  : 'bg-amber-950/80 border-amber-500/40 text-amber-300 hover:bg-amber-900/80 animate-pulse'
+              }`}
+              title={dbConfigured ? 'Supabase ডাটাবেস সক্রিয়' : 'Supabase সেটআপ করুন'}
+            >
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping hidden sm:block" />
+              <span className="hidden md:inline">
+                {dbConfigured ? 'ডিবি কানেক্টেড' : 'ডিবি সেটআপ'}
+              </span>
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 sm:p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-800 transition-all"
+              title="থিম পরিবর্তন করুন"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+            </button>
+
+            {/* Student View Button */}
             <button
               onClick={() => setPreviewModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
-              title="স্টুডেন্ট অ্যাপে প্রকাশিত প্রশ্ন কীভাবে দেখায় তা পরীক্ষা করুন"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition-all"
+              title="স্টুডেন্ট অ্যাপে অ্যাপের চেহারা দেখুন"
             >
               <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
               <span>স্টুডেন্ট প্রিভিউ</span>
             </button>
 
-            {/* Logout */}
+            {/* Admin Profile Circle Avatar "জে" */}
+            <div
+              className="w-9 h-9 rounded-2xl bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center border-2 border-emerald-400 shadow-md shadow-emerald-500/20 cursor-pointer"
+              title={userEmail || 'এডমিন ইউজার'}
+            >
+              জে
+            </div>
+
+            {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors ml-1"
-              title="লগআউট করুন"
+              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-2xl transition-colors"
+              title="লগআউট"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
-
-          {/* Mobile Menu Toggle Button */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={() => setConfigModalOpen(true)}
-              className="p-2 text-slate-300 bg-slate-800 rounded-lg"
-            >
-              <Database className="w-4 h-4 text-emerald-400" />
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-300 hover:text-white bg-slate-800 rounded-lg transition-colors"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
         </div>
-
-        {/* Mobile Navigation Dropdown */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-800 bg-slate-900 px-4 pt-3 pb-5 space-y-2 animate-fadeIn">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium ${
-                    isActive
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
-
-            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setPreviewModalOpen(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700"
-              >
-                <Smartphone className="w-4 h-4 text-emerald-400" />
-                <span>স্টুডেন্ট অ্যাপ লাইভ প্রিভিউ</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-950/50 text-red-300 text-xs font-semibold rounded-xl border border-red-900"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>লগআউট করুন</span>
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Modals */}
