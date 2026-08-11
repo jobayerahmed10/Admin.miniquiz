@@ -88,13 +88,19 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleSubjectChange = (newSub: string) => {
+    setSubject(newSub);
+    setExtractedQuestions((prev) => prev.map((q) => ({ ...q, subject: newSub })));
+    setGeneratedQuestions((prev) => prev.map((q) => ({ ...q, subject: newSub })));
+  };
+
   const handleAddCustomSubject = () => {
     if (customSubjectInput.trim()) {
       const newSub = customSubjectInput.trim();
       if (!subjectList.includes(newSub)) {
         setSubjectList((prev) => [...prev, newSub]);
       }
-      setSubject(newSub);
+      handleSubjectChange(newSub);
       setCustomSubjectInput('');
       setShowAddSubjectInput(false);
     }
@@ -234,7 +240,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         setExtractedQuestions(
           data.questions.map((q: any) => ({
             ...q,
-            subject: subject || q.subject || 'সাধারণ',
+            subject: subject || 'ইংরেজি',
             is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
           }))
         );
@@ -281,7 +287,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: topic.trim(),
-          subject: subject || 'সাধারণ জ্ঞান',
+          subject: subject || 'ইংরেজি',
           count: questionCount,
         }),
       });
@@ -300,7 +306,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         setGeneratedQuestions(
           data.questions.map((q: any) => ({
             ...q,
-            subject: subject || 'সাধারণ জ্ঞান',
+            subject: subject || 'ইংরেজি',
             is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
           }))
         );
@@ -333,7 +339,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       option_d: 'চতুর্থ অপশন',
       correct_answer: 'option_a',
       explanation: '',
-      subject: subject || 'সাধারণ',
+      subject: subject || 'ইংরেজি',
       is_rtl: isArabicText('নতুন প্রশ্ন লিখুন...'),
     };
 
@@ -469,7 +475,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 <div className="flex items-center gap-1.5">
                   <select
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    onChange={(e) => handleSubjectChange(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
                   >
                     {subjectList.map((sub) => (

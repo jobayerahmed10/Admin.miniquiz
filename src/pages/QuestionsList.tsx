@@ -117,7 +117,7 @@ export const QuestionsList: React.FC = () => {
 
   // Get list of unique subjects
   const availableSubjects = Array.from(
-    new Set(questions.map((q) => q.subject || 'সাধারণ'))
+    new Set(questions.map((q) => q.subject || 'ইংরেজি'))
   );
 
   // Filter & search logic
@@ -134,7 +134,7 @@ export const QuestionsList: React.FC = () => {
       statusFilter === 'all' ? true : q.status === statusFilter;
 
     const matchesSubject =
-      subjectFilter === 'all' ? true : (q.subject || 'সাধারণ') === subjectFilter;
+      subjectFilter === 'all' ? true : (q.subject || 'ইংরেজি') === subjectFilter;
 
     return matchesSearch && matchesStatus && matchesSubject;
   });
@@ -247,7 +247,7 @@ export const QuestionsList: React.FC = () => {
               <option value="all">সকল বিষয় ({questions.length})</option>
               {availableSubjects.map((sub) => (
                 <option key={sub} value={sub}>
-                  {sub} ({questions.filter((q) => (q.subject || 'সাধারণ') === sub).length})
+                  {sub} ({questions.filter((q) => (q.subject || 'ইংরেজি') === sub).length})
                 </option>
               ))}
             </select>
@@ -576,7 +576,7 @@ export const QuestionsList: React.FC = () => {
               <div className="flex flex-wrap items-center gap-1.5 mb-2">
                 <span className="text-[11px] font-bold uppercase text-slate-400">তথ্য:</span>
                 <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold text-[10px]">
-                  {viewQuestion.subject || 'সাধারণ'}
+                  {viewQuestion.subject || 'ইংরেজি'}
                 </span>
                 {viewQuestion.topic && (
                   <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold text-[10px]">
