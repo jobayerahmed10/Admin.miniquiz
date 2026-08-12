@@ -56,45 +56,64 @@ const handleExtractQuestions = async (req: express.Request, res: express.Respons
 
     const ai = getGeminiClient();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `You are an expert Bangladeshi competitive exam (BCS, Primary Teacher, NTRCA, Admission) question parser.
-Extract all multiple choice questions (MCQs) from the provided unformatted Bengali text.
-For each question, accurately extract or determine:
-1. question: The clear question text in Bengali.
-2. option_a: Option A text.
-3. option_b: Option B text.
-4. option_c: Option C text.
-5. option_d: Option D text.
-6. correct_answer: Must be strictly one of: "option_a", "option_b", "option_c", or "option_d".
-7. explanation: Clear, educational explanation in Bengali explaining why the answer is correct and providing relevant background context.
-8. subject: Must be strictly "${defaultSubject || 'ইংরেজি'}".
+    const promptText = `You are an expert multi-lingual exam question parser specializing in Bangladeshi competitive exams (BCS, Primary Teacher, NTRCA, Admission), Islamic Studies, Arabic, English, and General Knowledge.
+Extract all multiple choice questions (MCQs) from the provided raw text.
+The raw text may be in Bengali, Arabic, English, or mixed languages.
+
+Parsing Rules:
+1. "question": Extract the clear question text in its original script/language (Bengali, Arabic, English, etc.).
+2. "option_a": Option A / ক / أ text.
+3. "option_b": Option B / খ / ب text.
+4. "option_c": Option C / গ / ج text.
+5. "option_d": Option D / ঘ / د text.
+6. "correct_answer": Must be strictly one of: "option_a", "option_b", "option_c", or "option_d".
+   - Map Option A / ক / 1 / أ -> "option_a"
+   - Map Option B / খ / 2 / ب -> "option_b"
+   - Map Option C / গ / 3 / ج -> "option_c"
+   - Map Option D / ঘ / 4 / د -> "option_d"
+   - Recognize Arabic answer indicators like "الإجابة الصحيحة", "الجواب", "الإجابة".
+7. "explanation": Clear, educational explanation or background context in the corresponding language (Bengali, Arabic, or English).
+8. "subject": Must be strictly "${defaultSubject || 'ইংরেজি'}".
 
 Here is the raw unformatted text:
-${text}`,
-      config: {
-        systemInstruction:
-          'Extract questions cleanly into a structured JSON array matching schema. Do not output markdown backticks if possible.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              question: { type: Type.STRING },
-              option_a: { type: Type.STRING },
-              option_b: { type: Type.STRING },
-              option_c: { type: Type.STRING },
-              option_d: { type: Type.STRING },
-              correct_answer: { type: Type.STRING },
-              explanation: { type: Type.STRING },
-              subject: { type: Type.STRING },
+${text}`;
+
+    const generateCall = async (modelName: string) => {
+      return await ai.models.generateContent({
+        model: modelName,
+        contents: promptText,
+        config: {
+          systemInstruction:
+            'Extract questions cleanly into a structured JSON array matching schema. Preserve Arabic, Bengali, and English characters accurately.',
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                option_a: { type: Type.STRING },
+                option_b: { type: Type.STRING },
+                option_c: { type: Type.STRING },
+                option_d: { type: Type.STRING },
+                correct_answer: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                subject: { type: Type.STRING },
+              },
+              required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
             },
-            required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
           },
         },
-      },
-    });
+      });
+    };
+
+    let response;
+    try {
+      response = await generateCall('gemini-2.5-flash');
+    } catch (err1) {
+      console.warn('gemini-2.5-flash error, falling back to gemini-2.0-flash:', err1);
+      response = await generateCall('gemini-2.0-flash');
+    }
 
     let jsonText = response.text?.trim() || '[]';
     jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
@@ -127,38 +146,51 @@ const generateBatchOfQuestions = async (
   batchCount: number,
   batchIndex: number
 ) => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: `Generate exactly ${batchCount} distinct, authentic Bengali MCQs for topic "${topic}" (Subject: ${
-      subject || 'ইংরেজি'
-    }). Batch #${batchIndex + 1}.
+  const promptText = `Generate exactly ${batchCount} distinct, authentic, high-quality MCQs for topic "${topic}" (Subject: ${
+    subject || 'ইংরেজি'
+  }). Batch #${batchIndex + 1}.
+
 Requirements:
-1. Questions must be clear and accurate for competitive exams (BCS, NTRCA, Primary Teacher, University Admission).
+1. Language requirement: Write questions, options, and explanations in the natural language appropriate for the topic and subject. For example, if the topic or subject is in Arabic or related to Arabic/Islamic Studies (e.g. "كتاب الطهارة", "আরবি প্রভাষক", "আল কুরআন"), write the question text, options, and explanations in Arabic (with vowels/harakat if appropriate). If Bengali or English, write in Bengali or English.
 2. Provide 4 distinct options (option_a, option_b, option_c, option_d).
 3. Set correct_answer strictly to "option_a", "option_b", "option_c", or "option_d".
-4. Provide a helpful explanation (explanation) in Bengali under each question.
-5. Set subject strictly to "${subject || 'ইংরেজি'}".`,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            question: { type: Type.STRING },
-            option_a: { type: Type.STRING },
-            option_b: { type: Type.STRING },
-            option_c: { type: Type.STRING },
-            option_d: { type: Type.STRING },
-            correct_answer: { type: Type.STRING },
-            explanation: { type: Type.STRING },
-            subject: { type: Type.STRING },
+4. Provide a helpful explanation (explanation) in the corresponding language under each question.
+5. Set subject strictly to "${subject || 'ইংরেজি'}".`;
+
+  const generateCall = async (modelName: string) => {
+    return await ai.models.generateContent({
+      model: modelName,
+      contents: promptText,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              option_a: { type: Type.STRING },
+              option_b: { type: Type.STRING },
+              option_c: { type: Type.STRING },
+              option_d: { type: Type.STRING },
+              correct_answer: { type: Type.STRING },
+              explanation: { type: Type.STRING },
+              subject: { type: Type.STRING },
+            },
+            required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
           },
-          required: ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'],
         },
       },
-    },
-  });
+    });
+  };
+
+  let response;
+  try {
+    response = await generateCall('gemini-2.5-flash');
+  } catch (mErr) {
+    console.warn('gemini-2.5-flash batch error, falling back to gemini-2.0-flash:', mErr);
+    response = await generateCall('gemini-2.0-flash');
+  }
 
   let jsonText = response.text?.trim() || '[]';
   jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');

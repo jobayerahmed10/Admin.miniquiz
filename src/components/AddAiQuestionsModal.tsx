@@ -115,18 +115,19 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      const optMatch = line.match(/^([কখগঘa-dA-D1-4])[\.\)\:-]\s*(.+)$/);
+      const optMatch = line.match(/^([কখগঘa-dA-D1-4أبجد])[\.\)\:-]\s*(.+)$/);
       const ansMatch =
-        line.match(/^(সঠিক\s*)?উত্তর[:\s]+([কখগঘa-dA-D1-4])/i) ||
-        line.match(/^Ans(wer)?[:\s]+([কখগঘa-dA-D1-4])/i);
-      const expMatch = line.match(/^(ব্যাখ্যা|নোট|Explanation|Note)[:\s]+(.+)$/i);
+        line.match(/^(সঠিক\s*)?উত্তর[:\s]+([কখগঘa-dA-D1-4أبجد])/i) ||
+        line.match(/^Ans(wer)?[:\s]+([কখগঘa-dA-D1-4أبجد])/i) ||
+        line.match(/^(الإجابة\s*الصحيحة|الجواب|الإجابة)[:\s]+([কখগঘa-dA-D1-4أبجد])/i);
+      const expMatch = line.match(/^(ব্যাখ্যা|নোট|Explanation|Note|الشرح|التوضيح)[:\s]+(.+)$/i);
 
       if (ansMatch && currentQ) {
         const char = ansMatch[ansMatch.length - 1].toLowerCase();
-        if (['ক', 'a', '1'].includes(char)) currentQ.correct_answer = 'option_a';
-        else if (['খ', 'b', '2'].includes(char)) currentQ.correct_answer = 'option_b';
-        else if (['গ', 'c', '3'].includes(char)) currentQ.correct_answer = 'option_c';
-        else if (['ঘ', 'd', '4'].includes(char)) currentQ.correct_answer = 'option_d';
+        if (['ক', 'a', '1', 'أ'].includes(char)) currentQ.correct_answer = 'option_a';
+        else if (['খ', 'b', '2', 'ب'].includes(char)) currentQ.correct_answer = 'option_b';
+        else if (['গ', 'c', '3', 'ج'].includes(char)) currentQ.correct_answer = 'option_c';
+        else if (['ঘ', 'd', '4', 'د'].includes(char)) currentQ.correct_answer = 'option_d';
         continue;
       }
 
@@ -138,14 +139,14 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       if (optMatch && currentQ) {
         const label = optMatch[1].toLowerCase();
         const val = optMatch[2];
-        if (['ক', 'a', '1'].includes(label)) currentQ.option_a = val;
-        else if (['খ', 'b', '2'].includes(label)) currentQ.option_b = val;
-        else if (['গ', 'c', '3'].includes(label)) currentQ.option_c = val;
-        else if (['ঘ', 'd', '4'].includes(label)) currentQ.option_d = val;
+        if (['ক', 'a', '1', 'أ'].includes(label)) currentQ.option_a = val;
+        else if (['খ', 'b', '2', 'ب'].includes(label)) currentQ.option_b = val;
+        else if (['গ', 'c', '3', 'ج'].includes(label)) currentQ.option_c = val;
+        else if (['ঘ', 'd', '4', 'د'].includes(label)) currentQ.option_d = val;
         continue;
       }
 
-      const qStart = line.match(/^([০-৯0-9]+\s*[\.\):-]|প্রশ্ন\s*[০-৯0-9]*[:\.\s]|Q[0-9]*[:\.\s])\s*(.+)$/i);
+      const qStart = line.match(/^([০-৯0-9\u0660-\u0669\u06f0-\u06f9]+\s*[\.\):-]|প্রশ্ন\s*[০-৯0-9]*[:\.\s]|Q[0-9]*[:\.\s]|السؤال\s*[\u0660-\u0669\u06f0-\u06f90-9]*[:\.\s]|س\s*[\u0660-\u0669\u06f0-\u06f90-9]*[:\.\s])\s*(.+)$/i);
       if (qStart) {
         if (currentQ && currentQ.question && currentQ.option_a && currentQ.option_b) {
           questions.push({
@@ -179,7 +180,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         }
       } else {
         currentQ = {
-          question: line.replace(/^[০-৯0-9\.\)\s]+/, ''),
+          question: line.replace(/^[০-৯0-9\u0660-\u0669\u06f0-\u06f9\.\)\s]+/, ''),
           option_a: '',
           option_b: '',
           option_c: '',
