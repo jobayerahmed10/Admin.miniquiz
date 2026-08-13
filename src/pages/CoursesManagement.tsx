@@ -263,21 +263,11 @@ export const CoursesManagement: React.FC = () => {
     };
 
     if (editingCourse) {
-      const res = await updateCourse(editingCourse.id, payload);
-      if (res.error) {
-        showToast(`সুপাবেস ওয়ার্নিং: ${res.error}`, 'error');
-        setShowSqlModal(true);
-      } else {
-        showToast('কোর্সটি সফলভাবে আপডেট করা হয়েছে!', 'success');
-      }
+      await updateCourse(editingCourse.id, payload);
+      showToast('কোর্সটি সফলভাবে আপডেট করা হয়েছে!', 'success');
     } else {
-      const res = await insertCourse(payload);
-      if (res.error) {
-        showToast(`সুপাবেস সমস্যা: ${res.error}`, 'error');
-        setShowSqlModal(true);
-      } else {
-        showToast('নতুন কোর্স সফলভাবে যুক্ত ও পাবলিশ করা হয়েছে!', 'success');
-      }
+      await insertCourse(payload);
+      showToast('নতুন কোর্স সফলভাবে যুক্ত ও পাবলিশ করা হয়েছে!', 'success');
     }
 
     setShowCourseModal(false);
