@@ -13,6 +13,7 @@ import {
   X,
   Flame,
   ChevronLeft,
+  ExternalLink,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -105,6 +106,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: BookOpen,
       badge: null,
       badgeColor: '',
+    },
+    {
+      id: 'student-portal',
+      path: '/student',
+      title: 'স্টুডেন্ট পোর্টাল (লাইভ)',
+      subTitle: 'STUDENT PORTAL & APP',
+      icon: ExternalLink,
+      badge: 'ভিউ',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold',
     },
     {
       id: 'users',

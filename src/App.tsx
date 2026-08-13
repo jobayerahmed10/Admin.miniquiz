@@ -11,6 +11,7 @@ import { EnrollmentsManagement } from './pages/EnrollmentsManagement';
 import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
+import { StudentPortal } from './pages/StudentPortal';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
 interface AdminContextType {
@@ -174,6 +175,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public Student Portal */}
+        <Route path="/student" element={<StudentPortal />} />
+        <Route path="/" element={<StudentPortal />} />
+
         {/* Login Route */}
         <Route
           path="/login"

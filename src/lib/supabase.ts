@@ -979,6 +979,56 @@ const setLocalCourseSheetsCache = (data: Record<string, CourseSheet[]>) => {
   localStorage.setItem(COURSE_SHEETS_CACHE_KEY, JSON.stringify(data));
 };
 
+// Fetch Published Courses specifically for Student App / Student Portal
+export const fetchPublishedCoursesForStudent = async (): Promise<{
+  courses: Course[];
+  error: string | null;
+  isTableMissing?: boolean;
+  isSupabaseConnected: boolean;
+}> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+    return {
+      courses: publishedOnly,
+      error: 'Supabase URL & Anon Key কানেক্ট করা নেই। কেবল এডমিনের স্থানীয় ব্রাউজার ডাটা ফিল্টার করা হয়েছে।',
+      isTableMissing: true,
+      isSupabaseConnected: false,
+    };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('courses')
+      .select('*')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetchPublishedCoursesForStudent warning:', error.message);
+      const isMissing = error.code === '42P01' || error.message.includes('does not exist');
+      const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+      return {
+        courses: publishedOnly,
+        error: error.message,
+        isTableMissing: isMissing,
+        isSupabaseConnected: true,
+      };
+    }
+
+    const normalized = (data || []).map(normalizeCourseRow);
+    return { courses: normalized, error: null, isSupabaseConnected: true };
+  } catch (err: any) {
+    const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+    return {
+      courses: publishedOnly,
+      error: err?.message || 'অজানা ত্রুটি',
+      isTableMissing: true,
+      isSupabaseConnected: true,
+    };
+  }
+};
+
 // Fetch All Courses from public.courses with graceful local fallback
 export const fetchAllCourses = async (): Promise<{
   courses: Course[];
