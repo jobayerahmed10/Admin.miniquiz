@@ -96,6 +96,76 @@ export interface SupabaseConfig {
   anonKey: string;
 }
 
+export interface Course {
+  id: string;
+  title: string;
+  category: string; // 'আরবি প্রভাষক' | 'সহকারী মৌলভী' | 'ইবতেদায়ী মৌলবি' | 'জেনারেল বিষয়' | etc
+  badge: string; // 'রেকর্ড ব্যাচ' | 'এক্সাম ব্যাচ-১' | 'ফ্রি ব্যাচ'
+  badge_subtitle?: string | null;
+  instructor_name: string;
+  price: string;
+  enrolled_count: number;
+  total_classes: number;
+  total_sheets: number;
+  total_exams: number;
+  theme_color: 'emerald' | 'purple' | 'amber' | 'indigo' | 'rose' | string;
+  features: string[]; // List of key features/highlights
+  status: 'published' | 'draft' | 'archived';
+  details_button_text?: string;
+  details_button_link?: string;
+  enroll_button_text?: string;
+  enroll_button_link?: string;
+  enter_button_text?: string;
+  sheet_button_text?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CourseExam {
+  id: string;
+  course_id: string;
+  title: string;
+  subject: string;
+  question_count: number;
+  time_minutes: number;
+  total_marks: number;
+  negative_marks: number;
+  is_locked: boolean;
+  position?: number;
+  exam_id?: string | null;
+  created_at?: string;
+}
+
+export interface CourseSheet {
+  id: string;
+  course_id: string;
+  title: string;
+  pdf_url: string;
+  file_size: string;
+  page_count: string;
+  badge_text?: string;
+  is_locked: boolean;
+  position?: number;
+  created_at?: string;
+}
+
+export const COURSE_CATEGORIES = [
+  'আরবি প্রভাষক',
+  'সহকারী মৌলভী',
+  'ইবতেদায়ী মৌলবি',
+  'জেনারেল বিষয়',
+  'বিসিএস ও প্রাইমারি',
+  'অন্যান্য',
+];
+
+export const COURSE_THEMES = [
+  { id: 'emerald', label: 'এমেরাল্ড (Emerald Green)', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-400', badgeBg: 'bg-emerald-500 text-slate-950' },
+  { id: 'purple', label: 'পার্পল (Purple Royal)', border: 'border-purple-500/40', bg: 'bg-purple-500/10', text: 'text-purple-400', badgeBg: 'bg-purple-500 text-white' },
+  { id: 'amber', label: 'অ্যাম্বার (Amber Gold)', border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-300', badgeBg: 'bg-amber-500 text-slate-950' },
+  { id: 'indigo', label: 'ইন্ডিগো (Indigo Deep)', border: 'border-indigo-500/40', bg: 'bg-indigo-500/10', text: 'text-indigo-400', badgeBg: 'bg-indigo-500 text-white' },
+  { id: 'rose', label: 'রোজ (Rose Pink)', border: 'border-rose-500/40', bg: 'bg-rose-500/10', text: 'text-rose-400', badgeBg: 'bg-rose-500 text-white' },
+];
+
 export interface DashboardStats {
   totalQuestions: number;
   publishedQuestions: number;

@@ -104,6 +104,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
               <Sparkles className="w-4 h-4 fill-slate-950" />
               <span>এআই প্রশ্ন হাব</span>
             </button>
+
+            <Link
+              to="/admin/courses"
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-2xl transition-all flex items-center gap-2"
+            >
+              <Zap className="w-4 h-4 text-emerald-400" />
+              <span>কোর্স সেন্ট্রাল</span>
+            </Link>
           </div>
         </div>
       </div>

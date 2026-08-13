@@ -6,6 +6,7 @@ import { AddAiQuestionsModal } from './components/AddAiQuestionsModal';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { ExamsManagement } from './pages/ExamsManagement';
+import { CoursesManagement } from './pages/CoursesManagement';
 import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
@@ -196,6 +197,7 @@ export default function App() {
         >
           <Route path="/admin" element={<DashboardRoute />} />
           <Route path="/admin/exams" element={<ExamsManagement />} />
+          <Route path="/admin/courses" element={<CoursesManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
           <Route path="/admin/questions/create" element={<CreateQuestion />} />
           <Route path="/admin/questions/edit/:id" element={<EditQuestion />} />

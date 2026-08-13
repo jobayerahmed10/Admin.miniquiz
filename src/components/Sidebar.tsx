@@ -52,12 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'courses',
-      path: '#',
+      path: '/admin/courses',
       title: 'কোর্স ও লাইভ ব্যাচ',
       subTitle: 'COURSES & BATCHES',
       icon: GraduationCap,
-      badge: null,
-      badgeColor: '',
+      badge: 'লাইভ',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     },
     {
       id: 'questions',
