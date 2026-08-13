@@ -1007,8 +1007,13 @@ export const fetchAllCourses = async (): Promise<{
     }
 
     const normalized = (data || []).map(normalizeCourseRow);
-    setLocalCoursesCache(normalized);
-    return { courses: normalized, error: null };
+    const local = getLocalCoursesCache();
+    const supabaseIds = new Set(normalized.map((c) => c.id));
+    const localOnly = local.filter((c) => !supabaseIds.has(c.id));
+    const combined = [...normalized, ...localOnly];
+
+    setLocalCoursesCache(combined);
+    return { courses: combined, error: null };
   } catch (err: any) {
     return { courses: getLocalCoursesCache(), error: err?.message || null, isTableMissing: true };
   }
@@ -1026,10 +1031,12 @@ export const insertCourse = async (
     created_at: new Date().toISOString(),
   };
 
+  // Always save to local cache FIRST
+  const current = getLocalCoursesCache();
+  const updated = [courseData, ...current.filter((c) => c.id !== id)];
+  setLocalCoursesCache(updated);
+
   if (!client) {
-    const current = getLocalCoursesCache();
-    const updated = [courseData, ...current];
-    setLocalCoursesCache(updated);
     return { success: true, data: courseData, error: null };
   }
 
@@ -1064,21 +1071,16 @@ export const insertCourse = async (
 
     if (error) {
       console.warn('Supabase insertCourse failed, falling back to local storage cache:', error.message);
-      const current = getLocalCoursesCache();
-      const updated = [courseData, ...current];
-      setLocalCoursesCache(updated);
-      return { success: true, data: courseData, error: null };
+      return { success: true, data: courseData, error: error.message };
     }
 
     const inserted = normalizeCourseRow(data);
-    const current = getLocalCoursesCache();
-    setLocalCoursesCache([inserted, ...current]);
+    const latestLocal = getLocalCoursesCache();
+    const replaced = latestLocal.map((c) => (c.id === id ? inserted : c));
+    setLocalCoursesCache(replaced);
     return { success: true, data: inserted, error: null };
   } catch (err: any) {
-    const current = getLocalCoursesCache();
-    const updated = [courseData, ...current];
-    setLocalCoursesCache(updated);
-    return { success: true, data: courseData, error: null };
+    return { success: true, data: courseData, error: err?.message || null };
   }
 };
 

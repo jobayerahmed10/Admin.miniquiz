@@ -55,6 +55,12 @@ export const CoursesManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('সকল');
   const [isTableMissing, setIsTableMissing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Modals state
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -257,9 +263,19 @@ export const CoursesManagement: React.FC = () => {
     };
 
     if (editingCourse) {
-      await updateCourse(editingCourse.id, payload);
+      const res = await updateCourse(editingCourse.id, payload);
+      if (res.error) {
+        showToast(`সুপাবেস ওয়ার্নিং: ${res.error} (লোকাল ক্যাশে আপডেট হয়েছে)`, 'info');
+      } else {
+        showToast('কোর্সটি সফলভাবে আপডেট করা হয়েছে!', 'success');
+      }
     } else {
-      await insertCourse(payload);
+      const res = await insertCourse(payload);
+      if (res.error) {
+        showToast(`সুপাবেস ওয়ার্নিং: ${res.error} (লোকাল ক্যাশে যুক্ত হয়েছে)`, 'info');
+      } else {
+        showToast('নতুন কোর্স সফলভাবে যুক্ত ও পাবলিশ করা হয়েছে!', 'success');
+      }
     }
 
     setShowCourseModal(false);
@@ -270,6 +286,7 @@ export const CoursesManagement: React.FC = () => {
   const handleDeleteCourse = async (courseId: string, title: string) => {
     if (confirm(`আপনি কি নিশ্চিতভাবে "${title}" কোর্সটি মুছে ফেলতে চান?`)) {
       await deleteCourse(courseId);
+      showToast('কোর্সটি মুছে ফেলা হয়েছে', 'info');
       loadCourses();
     }
   };
@@ -278,6 +295,7 @@ export const CoursesManagement: React.FC = () => {
   const handleToggleCourseStatus = async (course: Course) => {
     const newStatus = course.status === 'published' ? 'draft' : 'published';
     await updateCourse(course.id, { status: newStatus });
+    showToast(newStatus === 'published' ? 'কোর্সটি পাবলিশ করা হয়েছে' : 'কোর্সটি ড্রাফট করা হয়েছে', 'success');
     loadCourses();
   };
 
@@ -1693,6 +1711,21 @@ CREATE POLICY "Allow public delete course_sheets" ON public.course_sheets FOR DE
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 border border-emerald-500/30 text-white shadow-2xl animate-in slide-in-from-bottom duration-200">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <Check className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold">{toastMessage.text}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white p-1 rounded-lg"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>
