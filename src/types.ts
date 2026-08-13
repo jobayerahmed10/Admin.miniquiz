@@ -166,6 +166,23 @@ export const COURSE_THEMES = [
   { id: 'rose', label: 'রোজ (Rose Pink)', border: 'border-rose-500/40', bg: 'bg-rose-500/10', text: 'text-rose-400', badgeBg: 'bg-rose-500 text-white' },
 ];
 
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CourseApplication {
+  id: string;
+  student_name: string;
+  phone_number: string;
+  course_title: string;
+  course_id?: string | null;
+  payment_method: string; // 'bKash' | 'Nagad' | 'Rocket' | 'Upay' etc
+  amount: number;
+  transaction_id: string;
+  status: ApplicationStatus;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface DashboardStats {
   totalQuestions: number;
   publishedQuestions: number;

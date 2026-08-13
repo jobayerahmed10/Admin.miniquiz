@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Award,
   GraduationCap,
+  CreditCard,
   Database,
   Sparkles,
   PenTool,
@@ -58,6 +59,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: GraduationCap,
       badge: 'লাইভ',
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'enrollments',
+      path: '/admin/enrollments',
+      title: 'পেমেন্ট ও এনরোলমেন্ট অনুমোদন',
+      subTitle: 'PAYMENT & ENROLLMENTS',
+      icon: CreditCard,
+      badge: 'অনুমোদন',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold',
     },
     {
       id: 'questions',

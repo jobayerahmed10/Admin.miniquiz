@@ -16,6 +16,7 @@ import {
   Users,
   TrendingUp,
   Zap,
+  CreditCard,
 } from 'lucide-react';
 import { fetchDashboardStats, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import { DashboardStats } from '../types';
@@ -111,6 +112,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
             >
               <Zap className="w-4 h-4 text-emerald-400" />
               <span>কোর্স সেন্ট্রাল</span>
+            </Link>
+
+            <Link
+              to="/admin/enrollments"
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-2xl transition-all flex items-center gap-2"
+            >
+              <CreditCard className="w-4 h-4 text-amber-400" />
+              <span>পেমেন্ট অনুমোদন</span>
             </Link>
           </div>
         </div>

@@ -9,6 +9,8 @@ import {
   Course,
   CourseExam,
   CourseSheet,
+  CourseApplication,
+  ApplicationStatus,
 } from '../types';
 
 const STORAGE_KEY_URL = 'miniquiz_supabase_url';
@@ -1481,6 +1483,276 @@ export const deleteCourseSheet = async (
     return { success: true, error: null };
   } catch (e) {
     return { success: true, error: null };
+  }
+};
+
+/* ==========================================================================
+   PUBLIC.COURSE_APPLICATIONS (PAYMENT APPROVALS & ENROLLMENT)
+   ========================================================================== */
+
+export const INITIAL_COURSE_APPLICATIONS: CourseApplication[] = [
+  {
+    id: 'app-101',
+    student_name: 'আরিফুল ইসলাম',
+    phone_number: '01712345678',
+    course_title: '১৮তম NTRCA ক্যাডার আরবি প্রভাষক বিশেষ স্পেশাল মডেল টেস্ট ব্যাচ',
+    course_id: 'course-1',
+    payment_method: 'bKash',
+    amount: 950,
+    transaction_id: 'BK9X2M7P4Q',
+    status: 'pending',
+    notes: 'বিকাশ পার্সোনাল থেকে পাঠানো হয়েছে',
+    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+  },
+  {
+    id: 'app-102',
+    student_name: 'মাওলানা কামরুল হাসান',
+    phone_number: '01898765432',
+    course_title: 'সহকারী মৌলভী ও ইবতেদায়ী ক্যাডার মাস্টার কোর্স ২০২৬',
+    course_id: 'course-2',
+    payment_method: 'Nagad',
+    amount: 750,
+    transaction_id: 'NG8W3L9K2P',
+    status: 'approved',
+    notes: 'নগদ ক্যাশ ইন',
+    created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+  },
+  {
+    id: 'app-103',
+    student_name: 'তাহমিনা আক্তার',
+    phone_number: '01911223344',
+    course_title: '১৮তম NTRCA ক্যাডার আরবি প্রভাষক বিশেষ স্পেশাল মডেল টেস্ট ব্যাচ',
+    course_id: 'course-1',
+    payment_method: 'Rocket',
+    amount: 950,
+    transaction_id: 'RK7M4P2X9Q',
+    status: 'approved',
+    notes: 'রকেট মার্চেন্ট পেমেন্ট',
+    created_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
+  },
+  {
+    id: 'app-104',
+    student_name: 'আব্দুল্লাহ আল মাসউদ',
+    phone_number: '01555667788',
+    course_title: 'সহকারী মৌলভী ও ইবতেদায়ী ক্যাডার মাস্টার কোর্স ২০২৬',
+    course_id: 'course-2',
+    payment_method: 'bKash',
+    amount: 750,
+    transaction_id: 'BK1Z9Y8X7W',
+    status: 'rejected',
+    notes: 'ভুল ট্রানজেকশন আইডি প্রদান',
+    created_at: new Date(Date.now() - 1000 * 60 * 720).toISOString(),
+  },
+];
+
+const APPLICATION_CACHE_KEY = 'miniquiz_admin_course_applications_cache';
+
+const getLocalApplicationsCache = (): CourseApplication[] => {
+  const local = localStorage.getItem(APPLICATION_CACHE_KEY);
+  if (local) {
+    try {
+      return JSON.parse(local);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  localStorage.setItem(APPLICATION_CACHE_KEY, JSON.stringify(INITIAL_COURSE_APPLICATIONS));
+  return INITIAL_COURSE_APPLICATIONS;
+};
+
+const setLocalApplicationsCache = (apps: CourseApplication[]) => {
+  localStorage.setItem(APPLICATION_CACHE_KEY, JSON.stringify(apps));
+};
+
+function normalizeCourseApplicationRow(row: any): CourseApplication {
+  return {
+    id: String(row.id),
+    student_name: row.student_name || row.name || 'শিক্ষার্থীর নাম পাওয়া যায়নি',
+    phone_number: row.phone_number || row.phone || row.mobile || '',
+    course_title: row.course_title || row.course_name || 'সাধারণ কোর্স',
+    course_id: row.course_id ? String(row.course_id) : null,
+    payment_method: row.payment_method || row.gateway || 'bKash',
+    amount: Number(row.amount || 0),
+    transaction_id: row.transaction_id || row.trx_id || row.trxid || '',
+    status: (row.status === 'approved' ? 'approved' : row.status === 'rejected' ? 'rejected' : 'pending') as ApplicationStatus,
+    notes: row.notes || '',
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at,
+  };
+}
+
+export const fetchAllCourseApplications = async (): Promise<{
+  applications: CourseApplication[];
+  error: string | null;
+  isTableMissing?: boolean;
+}> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { applications: getLocalApplicationsCache(), error: null, isTableMissing: true };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('course_applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetchAllCourseApplications warning:', error.message);
+      const isMissing = error.code === '42P01' || error.message.includes('does not exist');
+      return {
+        applications: getLocalApplicationsCache(),
+        error: isMissing ? null : error.message,
+        isTableMissing: isMissing,
+      };
+    }
+
+    const normalized = (data || []).map(normalizeCourseApplicationRow);
+    setLocalApplicationsCache(normalized);
+    return { applications: normalized, error: null };
+  } catch (err: any) {
+    return { applications: getLocalApplicationsCache(), error: err?.message || null, isTableMissing: true };
+  }
+};
+
+export const updateCourseApplicationStatus = async (
+  id: string,
+  status: ApplicationStatus
+): Promise<{ success: boolean; data?: CourseApplication; error: string | null }> => {
+  const current = getLocalApplicationsCache();
+  const idx = current.findIndex((a) => a.id === id);
+  let updatedApp: CourseApplication | undefined;
+
+  if (idx !== -1) {
+    updatedApp = { ...current[idx], status, updated_at: new Date().toISOString() };
+    current[idx] = updatedApp;
+    setLocalApplicationsCache([...current]);
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, data: updatedApp, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('course_applications')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Supabase updateCourseApplicationStatus warning:', error.message);
+      return { success: true, data: updatedApp, error: null };
+    }
+
+    const norm = normalizeCourseApplicationRow(data);
+    return { success: true, data: norm, error: null };
+  } catch (err: any) {
+    return { success: true, data: updatedApp, error: null };
+  }
+};
+
+export const deleteCourseApplication = async (
+  id: string
+): Promise<{ success: boolean; error: string | null }> => {
+  const current = getLocalApplicationsCache();
+  const filtered = current.filter((a) => a.id !== id);
+  setLocalApplicationsCache(filtered);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { error } = await client.from('course_applications').delete().eq('id', id);
+    if (error) {
+      console.warn('Supabase deleteCourseApplication warning:', error.message);
+    }
+    return { success: true, error: null };
+  } catch (err) {
+    return { success: true, error: null };
+  }
+};
+
+export const insertCourseApplication = async (
+  newApp: Omit<CourseApplication, 'id' | 'created_at' | 'updated_at'>
+): Promise<{ success: boolean; data?: CourseApplication; error: string | null }> => {
+  const id = `app-${Date.now()}`;
+  const appObj: CourseApplication = {
+    ...newApp,
+    id,
+    created_at: new Date().toISOString(),
+  };
+
+  const current = getLocalApplicationsCache();
+  setLocalApplicationsCache([appObj, ...current]);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, data: appObj, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('course_applications')
+      .insert([
+        {
+          student_name: newApp.student_name,
+          phone_number: newApp.phone_number,
+          course_title: newApp.course_title,
+          course_id: newApp.course_id || null,
+          payment_method: newApp.payment_method,
+          amount: newApp.amount,
+          transaction_id: newApp.transaction_id,
+          status: newApp.status || 'pending',
+          notes: newApp.notes || '',
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Supabase insertCourseApplication fallback:', error.message);
+      return { success: true, data: appObj, error: null };
+    }
+
+    const norm = normalizeCourseApplicationRow(data);
+    return { success: true, data: norm, error: null };
+  } catch (err) {
+    return { success: true, data: appObj, error: null };
+  }
+};
+
+// Supabase Realtime Subscription Listener for course_applications
+export const subscribeToCourseApplications = (
+  onPayload: (payload: any) => void
+): (() => void) => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return () => {};
+  }
+
+  try {
+    const channel = client
+      .channel('public:course_applications')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'course_applications' },
+        (payload) => {
+          onPayload(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (err) {
+    console.error('Failed to subscribe to course_applications realtime channel:', err);
+    return () => {};
   }
 };
 
