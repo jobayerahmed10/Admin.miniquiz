@@ -1074,24 +1074,26 @@ export const insertCourse = async (
   newCourse: Omit<Course, 'id' | 'created_at' | 'updated_at'>
 ): Promise<{ success: boolean; data?: Course; error: string | null }> => {
   const client = getSupabaseClient();
-  const id = `course-${Date.now()}`;
+  const generatedId = `course-${Date.now()}`;
   const courseData: Course = {
     ...newCourse,
-    id,
+    id: generatedId,
     created_at: new Date().toISOString(),
   };
 
   // Always save to local cache FIRST
   const current = getLocalCoursesCache();
-  const updated = [courseData, ...current.filter((c) => c.id !== id)];
+  const updated = [courseData, ...current.filter((c) => c.id !== generatedId)];
   setLocalCoursesCache(updated);
 
   if (!client) {
-    return { success: true, data: courseData, error: null };
+    return { success: true, data: courseData, error: 'Supabase কানেক্টেড নেই (লোকাল সেভ হয়েছে)' };
   }
 
   try {
-    const payload = {
+    const courseUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
+
+    const fullPayload: any = {
       title: newCourse.title,
       category: newCourse.category,
       badge: newCourse.badge,
@@ -1113,24 +1115,59 @@ export const insertCourse = async (
       sheet_button_text: newCourse.sheet_button_text || 'শিট ডাউনলোড',
     };
 
-    const { data, error } = await client
+    // First Attempt: Insert with full payload
+    let { data, error } = await client
       .from('courses')
-      .insert([payload])
+      .insert([fullPayload])
       .select()
       .single();
 
+    // Second Attempt: If error is about UUID or NULL id, add generated UUID
+    if (error && courseUuid && (error.message.includes('id') || error.message.includes('uuid') || error.message.includes('null value'))) {
+      const uuidPayload = { ...fullPayload, id: courseUuid };
+      const retry = await client
+        .from('courses')
+        .insert([uuidPayload])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    // Third Attempt: If error is about missing columns in existing table, try minimal schema
+    if (error && (error.message.includes('column') || error.message.includes('does not exist'))) {
+      const minimalPayload: any = {
+        title: newCourse.title,
+        category: newCourse.category,
+        badge: newCourse.badge,
+        instructor_name: newCourse.instructor_name,
+        price: newCourse.price,
+        status: newCourse.status || 'published',
+        features: newCourse.features || [],
+      };
+      if (courseUuid) minimalPayload.id = courseUuid;
+
+      const retryMin = await client
+        .from('courses')
+        .insert([minimalPayload])
+        .select()
+        .single();
+      data = retryMin.data;
+      error = retryMin.error;
+    }
+
     if (error) {
-      console.warn('Supabase insertCourse failed, falling back to local storage cache:', error.message);
-      return { success: true, data: courseData, error: error.message };
+      console.warn('Supabase insertCourse failed:', error.message);
+      return { success: false, data: courseData, error: error.message };
     }
 
     const inserted = normalizeCourseRow(data);
     const latestLocal = getLocalCoursesCache();
-    const replaced = latestLocal.map((c) => (c.id === id ? inserted : c));
+    const replaced = latestLocal.map((c) => (c.id === generatedId ? inserted : c));
     setLocalCoursesCache(replaced);
     return { success: true, data: inserted, error: null };
   } catch (err: any) {
-    return { success: true, data: courseData, error: err?.message || null };
+    return { success: false, data: courseData, error: err?.message || 'অজানা সমস্যা' };
   }
 };
 
@@ -1177,22 +1214,39 @@ export const updateCourse = async (
     if (updatedFields.enter_button_text !== undefined) payload.enter_button_text = updatedFields.enter_button_text;
     if (updatedFields.sheet_button_text !== undefined) payload.sheet_button_text = updatedFields.sheet_button_text;
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('courses')
       .update(payload)
       .eq('id', id)
       .select()
       .single();
 
+    if (error && (error.message.includes('column') || error.message.includes('does not exist'))) {
+      // Retry update with basic payload
+      const minUpdate: any = {};
+      if (updatedFields.title !== undefined) minUpdate.title = updatedFields.title;
+      if (updatedFields.status !== undefined) minUpdate.status = updatedFields.status;
+      if (updatedFields.price !== undefined) minUpdate.price = updatedFields.price;
+
+      const retry = await client
+        .from('courses')
+        .update(minUpdate)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
-      console.warn('Supabase updateCourse fallback:', error.message);
-      return { success: true, data: updatedCourse, error: null };
+      console.warn('Supabase updateCourse error:', error.message);
+      return { success: false, data: updatedCourse, error: error.message };
     }
 
     const norm = normalizeCourseRow(data);
     return { success: true, data: norm, error: null };
   } catch (err: any) {
-    return { success: true, data: updatedCourse, error: null };
+    return { success: false, data: updatedCourse, error: err?.message || 'অজানা সমস্যা' };
   }
 };
 

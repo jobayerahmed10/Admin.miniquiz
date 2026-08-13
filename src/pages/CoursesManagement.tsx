@@ -265,14 +265,16 @@ export const CoursesManagement: React.FC = () => {
     if (editingCourse) {
       const res = await updateCourse(editingCourse.id, payload);
       if (res.error) {
-        showToast(`সুপাবেস ওয়ার্নিং: ${res.error} (লোকাল ক্যাশে আপডেট হয়েছে)`, 'info');
+        showToast(`সুপাবেস ওয়ার্নিং: ${res.error}`, 'error');
+        setShowSqlModal(true);
       } else {
         showToast('কোর্সটি সফলভাবে আপডেট করা হয়েছে!', 'success');
       }
     } else {
       const res = await insertCourse(payload);
       if (res.error) {
-        showToast(`সুপাবেস ওয়ার্নিং: ${res.error} (লোকাল ক্যাশে যুক্ত হয়েছে)`, 'info');
+        showToast(`সুপাবেস সমস্যা: ${res.error}`, 'error');
+        setShowSqlModal(true);
       } else {
         showToast('নতুন কোর্স সফলভাবে যুক্ত ও পাবলিশ করা হয়েছে!', 'success');
       }
@@ -485,6 +487,26 @@ CREATE TABLE IF NOT EXISTS public.courses (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Safely add missing columns to existing public.courses table
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'আরবি প্রভাষক';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'রেকর্ড ব্যাচ';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge_subtitle TEXT DEFAULT '';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS instructor_name TEXT DEFAULT 'তামরীন ইনস্ট্রাক্টর টিম';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS price TEXT DEFAULT '৳৯৫০';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enrolled_count INT DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_classes INT DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_sheets INT DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_exams INT DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'emerald';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_text TEXT DEFAULT 'বিস্তারিত';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_text TEXT DEFAULT 'এখনই ভর্তি হন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enter_button_text TEXT DEFAULT 'প্রবেশ করুন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS sheet_button_text TEXT DEFAULT 'শিট ডাউনলোড';
+
 CREATE TABLE IF NOT EXISTS public.course_exams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
@@ -513,25 +535,10 @@ CREATE TABLE IF NOT EXISTS public.course_sheets (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS and add public access policies
-ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.course_exams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.course_sheets ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow public select courses" ON public.courses FOR SELECT USING (true);
-CREATE POLICY "Allow public insert courses" ON public.courses FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update courses" ON public.courses FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete courses" ON public.courses FOR DELETE USING (true);
-
-CREATE POLICY "Allow public select course_exams" ON public.course_exams FOR SELECT USING (true);
-CREATE POLICY "Allow public insert course_exams" ON public.course_exams FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update course_exams" ON public.course_exams FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete course_exams" ON public.course_exams FOR DELETE USING (true);
-
-CREATE POLICY "Allow public select course_sheets" ON public.course_sheets FOR SELECT USING (true);
-CREATE POLICY "Allow public insert course_sheets" ON public.course_sheets FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update course_sheets" ON public.course_sheets FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete course_sheets" ON public.course_sheets FOR DELETE USING (true);`;
+-- Disable RLS or set full public access policies
+ALTER TABLE public.courses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_sheets DISABLE ROW LEVEL SECURITY;`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(sqlCode);
