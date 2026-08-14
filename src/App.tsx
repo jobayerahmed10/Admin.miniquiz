@@ -11,7 +11,6 @@ import { EnrollmentsManagement } from './pages/EnrollmentsManagement';
 import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
-import { StudentPortal } from './pages/StudentPortal';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
 interface AdminContextType {
@@ -175,9 +174,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Student Portal */}
-        <Route path="/student" element={<StudentPortal />} />
-        <Route path="/" element={<StudentPortal />} />
+        {/* Root Route -> Redirect to /admin if logged in, else /login */}
+        <Route
+          path="/"
+          element={<Navigate to={isAuthenticated ? '/admin' : '/login'} replace />}
+        />
 
         {/* Login Route */}
         <Route
