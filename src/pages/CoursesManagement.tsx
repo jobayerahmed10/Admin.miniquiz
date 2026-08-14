@@ -13,6 +13,7 @@ import {
   FileText,
   Award,
   BookOpen,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Course,
@@ -100,11 +101,27 @@ export const CoursesManagement: React.FC = () => {
   // Handle Save Course (Create or Update)
   const handleSaveCourse = async (coursePayload: any) => {
     if (editingCourse) {
-      await updateCourse(editingCourse.id, coursePayload);
-      showToast('কোর্স ও বাটন কন্টেন্ট সফলভাবে আপডেট করা হয়েছে!', 'success');
+      const res = await updateCourse(editingCourse.id, coursePayload);
+      if (res.error) {
+        showToast(res.error, 'error');
+        if (res.error.includes('টেবিল তৈরি করা নেই') || res.error.includes('does not exist') || res.error.includes('courses')) {
+          setIsTableMissing(true);
+          setShowSqlModal(true);
+        }
+      } else {
+        showToast('কোর্স ও বাটন কন্টেন্ট সফলভাবে সুপাবেজে আপডেট করা হয়েছে!', 'success');
+      }
     } else {
-      await insertCourse(coursePayload);
-      showToast('নতুন কোর্স সফলভাবে যুক্ত ও পাবলিশ করা হয়েছে!', 'success');
+      const res = await insertCourse(coursePayload);
+      if (!res.success && res.error) {
+        showToast(res.error, 'error');
+        if (res.error.includes('টেবিল তৈরি করা নেই') || res.error.includes('does not exist') || res.error.includes('courses')) {
+          setIsTableMissing(true);
+          setShowSqlModal(true);
+        }
+      } else {
+        showToast('নতুন কোর্স সফলভাবে সুপাবেজ (Supabase) ডাটাবেসে সেভ হয়েছে!', 'success');
+      }
     }
     await loadCourses();
   };
@@ -121,8 +138,12 @@ export const CoursesManagement: React.FC = () => {
   // Toggle Publish Status
   const handleToggleCourseStatus = async (course: Course) => {
     const newStatus = course.status === 'published' ? 'draft' : 'published';
-    await updateCourse(course.id, { status: newStatus });
-    showToast(newStatus === 'published' ? 'কোর্সটি পাবলিশ করা হয়েছে' : 'কোর্সটি ড্রাফট করা হয়েছে', 'success');
+    const res = await updateCourse(course.id, { status: newStatus });
+    if (res.error) {
+      showToast(res.error, 'error');
+    } else {
+      showToast(newStatus === 'published' ? 'কোর্সটি পাবলিশ করা হয়েছে' : 'কোর্সটি ড্রাফট করা হয়েছে', 'success');
+    }
     await loadCourses();
   };
 
@@ -140,20 +161,28 @@ export const CoursesManagement: React.FC = () => {
 
   const handleAddCourseExam = async (examData: Omit<CourseExam, 'id' | 'created_at'>) => {
     if (!activeCourseForExams) return;
-    await insertCourseExam(examData);
-    showToast('নতুন মডেল টেস্ট পরীক্ষা সফলভাবে যুক্ত হয়েছে!', 'success');
-    const res = await fetchCourseExams(activeCourseForExams.id);
-    setCourseExams(res.exams);
-    await updateCourse(activeCourseForExams.id, { total_exams: res.exams.length });
+    const res = await insertCourseExam(examData);
+    if (!res.success && res.error) {
+      showToast(res.error, 'error');
+    } else {
+      showToast('নতুন মডেল টেস্ট পরীক্ষা সফলভাবে সুপাবেজে যুক্ত হয়েছে!', 'success');
+    }
+    const examRes = await fetchCourseExams(activeCourseForExams.id);
+    setCourseExams(examRes.exams);
+    await updateCourse(activeCourseForExams.id, { total_exams: examRes.exams.length });
     loadCourses();
   };
 
   const handleUpdateCourseExam = async (id: string, updatedFields: Partial<CourseExam>) => {
     if (!activeCourseForExams) return;
-    await updateCourseExam(id, activeCourseForExams.id, updatedFields);
-    showToast('পরীক্ষার তথ্য আপডেট হয়েছে!', 'success');
-    const res = await fetchCourseExams(activeCourseForExams.id);
-    setCourseExams(res.exams);
+    const res = await updateCourseExam(id, activeCourseForExams.id, updatedFields);
+    if (res.error) {
+      showToast(res.error, 'error');
+    } else {
+      showToast('পরীক্ষার তথ্য আপডেট হয়েছে!', 'success');
+    }
+    const examRes = await fetchCourseExams(activeCourseForExams.id);
+    setCourseExams(examRes.exams);
   };
 
   const handleToggleExamLock = async (exam: CourseExam) => {
@@ -189,20 +218,28 @@ export const CoursesManagement: React.FC = () => {
 
   const handleAddCourseSheet = async (sheetData: Omit<CourseSheet, 'id' | 'created_at'>) => {
     if (!activeCourseForSheets) return;
-    await insertCourseSheet(sheetData);
-    showToast('পিডিএফ লেকচার শিট সফলভাবে যুক্ত হয়েছে!', 'success');
-    const res = await fetchCourseSheets(activeCourseForSheets.id);
-    setCourseSheets(res.sheets);
-    await updateCourse(activeCourseForSheets.id, { total_sheets: res.sheets.length });
+    const res = await insertCourseSheet(sheetData);
+    if (!res.success && res.error) {
+      showToast(res.error, 'error');
+    } else {
+      showToast('পিডিএফ লেকচার শিট সফলভাবে সুপাবেজে যুক্ত হয়েছে!', 'success');
+    }
+    const sheetRes = await fetchCourseSheets(activeCourseForSheets.id);
+    setCourseSheets(sheetRes.sheets);
+    await updateCourse(activeCourseForSheets.id, { total_sheets: sheetRes.sheets.length });
     loadCourses();
   };
 
   const handleUpdateCourseSheet = async (id: string, updatedFields: Partial<CourseSheet>) => {
     if (!activeCourseForSheets) return;
-    await updateCourseSheet(id, activeCourseForSheets.id, updatedFields);
-    showToast('শিটের তথ্য আপডেট হয়েছে!', 'success');
-    const res = await fetchCourseSheets(activeCourseForSheets.id);
-    setCourseSheets(res.sheets);
+    const res = await updateCourseSheet(id, activeCourseForSheets.id, updatedFields);
+    if (res.error) {
+      showToast(res.error, 'error');
+    } else {
+      showToast('শিটের তথ্য আপডেট হয়েছে!', 'success');
+    }
+    const sheetRes = await fetchCourseSheets(activeCourseForSheets.id);
+    setCourseSheets(sheetRes.sheets);
   };
 
   const handleToggleSheetLock = async (sheet: CourseSheet) => {
@@ -235,8 +272,11 @@ export const CoursesManagement: React.FC = () => {
   });
 
   const sqlCode = `-- ==========================================
--- TAMREEN ACADEMY - COMPREHENSIVE COURSE SUITE
+-- TAMREEN ACADEMY - SUPABASE COURSES SQL SCHEMA
 -- ==========================================
+
+-- 0. Enable UUID Extension
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 1. COURSES TABLE
 CREATE TABLE IF NOT EXISTS public.courses (
@@ -271,7 +311,8 @@ CREATE TABLE IF NOT EXISTS public.courses (
   enroll_button_link TEXT DEFAULT '#',
   enter_button_text TEXT DEFAULT 'প্রবেশ করুন',
   sheet_button_text TEXT DEFAULT 'শিট ডাউনলোড',
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- 2. COURSE EXAMS TABLE (With Question Builder)
@@ -290,6 +331,7 @@ CREATE TABLE IF NOT EXISTS public.course_exams (
   position INTEGER DEFAULT 1,
   instructions TEXT,
   questions JSONB DEFAULT '[]'::jsonb,
+  exam_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -310,14 +352,39 @@ CREATE TABLE IF NOT EXISTS public.course_sheets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 4. COURSE APPLICATIONS TABLE (Enrollment & Payments)
+CREATE TABLE IF NOT EXISTS public.course_applications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_name TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  course_title TEXT NOT NULL,
+  course_id UUID REFERENCES public.courses(id) ON DELETE SET NULL,
+  payment_method TEXT DEFAULT 'bKash',
+  amount NUMERIC DEFAULT 0,
+  transaction_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- RLS POLICIES (Public read/write for Admin & App)
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_sheets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_applications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public all access on courses" ON public.courses;
 CREATE POLICY "Allow public all access on courses" ON public.courses FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on course_exams" ON public.course_exams;
 CREATE POLICY "Allow public all access on course_exams" ON public.course_exams FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on course_sheets" ON public.course_sheets;
 CREATE POLICY "Allow public all access on course_sheets" ON public.course_sheets FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on course_applications" ON public.course_applications;
+CREATE POLICY "Allow public all access on course_applications" ON public.course_applications FOR ALL USING (true) WITH CHECK (true);
 `;
 
   const copyToClipboard = () => {
@@ -567,14 +634,34 @@ CREATE POLICY "Allow public all access on course_sheets" ON public.course_sheets
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 border border-emerald-500/30 text-white shadow-2xl animate-in slide-in-from-bottom duration-200">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <Check className="w-4 h-4" />
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl border text-white shadow-2xl animate-in slide-in-from-bottom duration-200 ${
+            toastMessage.type === 'error'
+              ? 'bg-[#1e0a0a] border-rose-500/50 text-rose-100'
+              : toastMessage.type === 'info'
+              ? 'bg-[#0a1526] border-sky-500/50 text-sky-100'
+              : 'bg-slate-900 border-emerald-500/30 text-emerald-100'
+          }`}
+        >
+          <div
+            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              toastMessage.type === 'error'
+                ? 'bg-rose-500/20 text-rose-400'
+                : toastMessage.type === 'info'
+                ? 'bg-sky-500/20 text-sky-400'
+                : 'bg-emerald-500/20 text-emerald-400'
+            }`}
+          >
+            {toastMessage.type === 'error' ? (
+              <AlertCircle className="w-4 h-4" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
           </div>
           <span className="text-xs font-bold">{toastMessage.text}</span>
           <button
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white p-1 rounded-lg"
+            className="text-slate-400 hover:text-white p-1 rounded-lg ml-2"
           >
             <X className="w-3.5 h-3.5" />
           </button>

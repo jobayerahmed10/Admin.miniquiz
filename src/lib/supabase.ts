@@ -1112,6 +1112,22 @@ export const fetchPublishedCoursesForStudent = async (): Promise<{
   }
 };
 
+// Helper UUID generator (RFC4122 compliant)
+export const generateStandardUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // fallback
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Fetch All Courses from public.courses with graceful local fallback
 export const fetchAllCourses = async (): Promise<{
   courses: Course[];
@@ -1134,19 +1150,14 @@ export const fetchAllCourses = async (): Promise<{
       const isMissing = error.code === '42P01' || error.message.includes('does not exist');
       return {
         courses: getLocalCoursesCache(),
-        error: isMissing ? null : error.message,
+        error: isMissing ? 'সুপাবেজে "courses" টেবিল পাওয়া যায়নি' : error.message,
         isTableMissing: isMissing,
       };
     }
 
     const normalized = (data || []).map(normalizeCourseRow);
-    const local = getLocalCoursesCache();
-    const supabaseIds = new Set(normalized.map((c) => c.id));
-    const localOnly = local.filter((c) => !supabaseIds.has(c.id));
-    const combined = [...normalized, ...localOnly];
-
-    setLocalCoursesCache(combined);
-    return { courses: combined, error: null };
+    setLocalCoursesCache(normalized);
+    return { courses: normalized, error: null };
   } catch (err: any) {
     return { courses: getLocalCoursesCache(), error: err?.message || null, isTableMissing: true };
   }
@@ -1157,44 +1168,38 @@ export const insertCourse = async (
   newCourse: Omit<Course, 'id' | 'created_at' | 'updated_at'>
 ): Promise<{ success: boolean; data?: Course; error: string | null }> => {
   const client = getSupabaseClient();
-  
-  // Create a UUID for Supabase and fallback
-  const courseUuid = typeof crypto !== 'undefined' && crypto.randomUUID 
-    ? crypto.randomUUID() 
-    : `${Math.random().toString(36).slice(2, 10)}-${Date.now()}`;
-
-  const generatedId = courseUuid;
+  const fallbackId = generateStandardUUID();
 
   const courseData: Course = {
     ...newCourse,
-    id: generatedId,
+    id: fallbackId,
     created_at: new Date().toISOString(),
   };
 
-  // Always save to local cache FIRST
-  const current = getLocalCoursesCache();
-  const updated = [courseData, ...current.filter((c) => c.id !== generatedId)];
-  setLocalCoursesCache(updated);
-
   if (!client) {
-    return { success: true, data: courseData, error: 'Supabase কানেক্টেড নেই (লোকাল সেভ হয়েছে)' };
+    const current = getLocalCoursesCache();
+    setLocalCoursesCache([courseData, ...current]);
+    return {
+      success: false,
+      data: courseData,
+      error: 'সুপাবেস কনফিগার করা নেই। সেটিংস থেকে SUPABASE_URL এবং SUPABASE_ANON_KEY সেট করুন।',
+    };
   }
 
   try {
     let payload: any = {
-      id: courseUuid,
       title: newCourse.title,
-      category: newCourse.category,
-      badge: newCourse.badge,
+      category: newCourse.category || 'আরবি প্রভাষক',
+      badge: newCourse.badge || 'রেকর্ড ব্যাচ',
       badge_subtitle: newCourse.badge_subtitle || '',
-      instructor_name: newCourse.instructor_name,
-      price: newCourse.price,
-      enrolled_count: newCourse.enrolled_count || 0,
-      total_classes: newCourse.total_classes || 0,
-      total_sheets: newCourse.total_sheets || 0,
-      total_exams: newCourse.total_exams || 0,
+      instructor_name: newCourse.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+      price: newCourse.price || '৳৯৫০',
+      enrolled_count: Number(newCourse.enrolled_count) || 0,
+      total_classes: Number(newCourse.total_classes) || 0,
+      total_sheets: Number(newCourse.total_sheets) || 0,
+      total_exams: Number(newCourse.total_exams) || 0,
       theme_color: newCourse.theme_color || 'emerald',
-      features: newCourse.features || [],
+      features: Array.isArray(newCourse.features) ? newCourse.features : [],
       status: newCourse.status || 'published',
       description: newCourse.description || '',
       about_text: newCourse.about_text || '',
@@ -1204,7 +1209,7 @@ export const insertCourse = async (
       syllabus_text: newCourse.syllabus_text || '',
       syllabus_pdf_url: newCourse.syllabus_pdf_url || '',
       syllabus_pdf_name: newCourse.syllabus_pdf_name || '',
-      leaderboard_enabled: newCourse.leaderboard_enabled !== undefined ? newCourse.leaderboard_enabled : true,
+      leaderboard_enabled: newCourse.leaderboard_enabled !== undefined ? Boolean(newCourse.leaderboard_enabled) : true,
       leaderboard_info: newCourse.leaderboard_info || '',
       helpline_contact: newCourse.helpline_contact || '',
       details_button_text: newCourse.details_button_text || 'বিস্তারিত',
@@ -1236,17 +1241,28 @@ export const insertCourse = async (
 
       lastError = error;
       const errMsg = (error.message || '').toLowerCase();
-
       let stripped = false;
+
+      // If postgres requires explicit ID
+      if (errMsg.includes('null value in column "id"') || (errMsg.includes('id') && errMsg.includes('not-null'))) {
+        payload.id = generateStandardUUID();
+        stripped = true;
+      }
 
       // Extract missing column name if mentioned in Supabase error
       const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
       if (matches) {
         const colName = matches[1] || matches[2];
-        if (colName && colName !== 'id' && colName !== 'title' && colName in payload) {
+        if (colName && colName !== 'title' && colName in payload) {
           delete payload[colName];
           stripped = true;
         }
+      }
+
+      // If JSONB issue with features
+      if (errMsg.includes('features') && Array.isArray(payload.features)) {
+        payload.features = JSON.stringify(payload.features);
+        stripped = true;
       }
 
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
@@ -1267,29 +1283,34 @@ export const insertCourse = async (
         }
       }
 
-      if (!stripped && (errMsg.includes('id') || errMsg.includes('uuid') || errMsg.includes('null value'))) {
-        payload.id = courseUuid;
-        stripped = true;
-      }
-
       if (!stripped) {
         break;
       }
     }
 
     if (lastError) {
-      console.warn('Supabase insertCourse fallback:', lastError.message);
-      return { success: true, data: courseData, error: lastError.message };
+      console.error('Supabase insertCourse error:', lastError);
+      const isMissing = lastError.code === '42P01' || lastError.message.includes('does not exist');
+      const isRls = lastError.code === '42501' || lastError.message.includes('row-level security');
+      const errorMsg = isMissing
+        ? 'সুপাবেজে "public.courses" টেবিল তৈরি করা নেই! "Supabase SQL স্কিমা" বাটনে ক্লিক করে SQL কোড রান করুন।'
+        : isRls
+        ? 'সুপাবেজে RLS পারমিশন ত্রুটি! SQL স্কিমা রান করে RLS Allow All পলিসি নিশ্চিত করুন।'
+        : `সুপাবেজে সেভ হয়নি: ${lastError.message}`;
+
+      const current = getLocalCoursesCache();
+      setLocalCoursesCache([courseData, ...current.filter((c) => c.id !== courseData.id)]);
+
+      return { success: false, data: courseData, error: errorMsg };
     }
 
     const finalInserted = insertedRow || courseData;
     const latestLocal = getLocalCoursesCache();
-    const replaced = latestLocal.map((c) => (c.id === generatedId ? finalInserted : c));
-    setLocalCoursesCache(replaced);
+    setLocalCoursesCache([finalInserted, ...latestLocal.filter((c) => c.id !== finalInserted.id)]);
 
     return { success: true, data: finalInserted, error: null };
   } catch (err: any) {
-    return { success: true, data: courseData, error: err?.message || null };
+    return { success: false, data: courseData, error: err?.message || 'কোর্স তৈরি ব্যর্থ হয়েছে' };
   }
 };
 
@@ -1300,7 +1321,6 @@ export const updateCourse = async (
 ): Promise<{ success: boolean; data?: Course; error: string | null }> => {
   const client = getSupabaseClient();
 
-  // Always update local cache first
   const current = getLocalCoursesCache();
   const index = current.findIndex((c) => c.id === id);
   let updatedCourse: Course | undefined;
@@ -1322,10 +1342,10 @@ export const updateCourse = async (
     if (updatedFields.badge_subtitle !== undefined) payload.badge_subtitle = updatedFields.badge_subtitle;
     if (updatedFields.instructor_name !== undefined) payload.instructor_name = updatedFields.instructor_name;
     if (updatedFields.price !== undefined) payload.price = updatedFields.price;
-    if (updatedFields.enrolled_count !== undefined) payload.enrolled_count = updatedFields.enrolled_count;
-    if (updatedFields.total_classes !== undefined) payload.total_classes = updatedFields.total_classes;
-    if (updatedFields.total_sheets !== undefined) payload.total_sheets = updatedFields.total_sheets;
-    if (updatedFields.total_exams !== undefined) payload.total_exams = updatedFields.total_exams;
+    if (updatedFields.enrolled_count !== undefined) payload.enrolled_count = Number(updatedFields.enrolled_count) || 0;
+    if (updatedFields.total_classes !== undefined) payload.total_classes = Number(updatedFields.total_classes) || 0;
+    if (updatedFields.total_sheets !== undefined) payload.total_sheets = Number(updatedFields.total_sheets) || 0;
+    if (updatedFields.total_exams !== undefined) payload.total_exams = Number(updatedFields.total_exams) || 0;
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
@@ -1337,7 +1357,7 @@ export const updateCourse = async (
     if (updatedFields.syllabus_text !== undefined) payload.syllabus_text = updatedFields.syllabus_text;
     if (updatedFields.syllabus_pdf_url !== undefined) payload.syllabus_pdf_url = updatedFields.syllabus_pdf_url;
     if (updatedFields.syllabus_pdf_name !== undefined) payload.syllabus_pdf_name = updatedFields.syllabus_pdf_name;
-    if (updatedFields.leaderboard_enabled !== undefined) payload.leaderboard_enabled = updatedFields.leaderboard_enabled;
+    if (updatedFields.leaderboard_enabled !== undefined) payload.leaderboard_enabled = Boolean(updatedFields.leaderboard_enabled);
     if (updatedFields.leaderboard_info !== undefined) payload.leaderboard_info = updatedFields.leaderboard_info;
     if (updatedFields.helpline_contact !== undefined) payload.helpline_contact = updatedFields.helpline_contact;
     if (updatedFields.details_button_text !== undefined) payload.details_button_text = updatedFields.details_button_text;
@@ -1400,12 +1420,12 @@ export const updateCourse = async (
 
     if (lastError) {
       console.warn('Supabase updateCourse fallback:', lastError.message);
-      return { success: true, data: updatedCourse, error: lastError.message };
+      return { success: false, data: updatedCourse, error: lastError.message };
     }
 
     return { success: true, data: updatedRow || updatedCourse, error: null };
   } catch (err: any) {
-    return { success: true, data: updatedCourse, error: err?.message || null };
+    return { success: false, data: updatedCourse, error: err?.message || null };
   }
 };
 
