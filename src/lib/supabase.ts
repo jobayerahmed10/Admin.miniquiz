@@ -1223,7 +1223,7 @@ export const insertCourse = async (
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 35; attempt++) {
       const { data, error } = await client
         .from('courses')
         .insert([payload])
@@ -1243,36 +1243,57 @@ export const insertCourse = async (
       const errMsg = (error.message || '').toLowerCase();
       let stripped = false;
 
-      // If postgres requires explicit ID
+      // 1. Check if any key in payload is explicitly named in the error message
+      const payloadKeys = Object.keys(payload);
+      for (const key of payloadKeys) {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title') {
+          delete payload[key];
+          stripped = true;
+        }
+      }
+
+      // 2. If Postgres requires explicit ID
       if (errMsg.includes('null value in column "id"') || (errMsg.includes('id') && errMsg.includes('not-null'))) {
         payload.id = generateStandardUUID();
         stripped = true;
       }
 
-      // Extract missing column name if mentioned in Supabase error
-      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
-      if (matches) {
-        const colName = matches[1] || matches[2];
-        if (colName && colName !== 'title' && colName in payload) {
-          delete payload[colName];
-          stripped = true;
+      // 3. Extract column name via regex patterns
+      const regexPatterns = [
+        /find the ['"]?([a-zA-Z0-9_]+)['"]? column/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]?/i,
+      ];
+
+      for (const pattern of regexPatterns) {
+        const match = error.message.match(pattern);
+        if (match && match[1]) {
+          const colName = match[1];
+          if (colName in payload && colName !== 'title') {
+            delete payload[colName];
+            stripped = true;
+            break;
+          }
         }
       }
 
-      // If JSONB issue with features
+      // 4. If JSONB issue with features
       if (errMsg.includes('features') && Array.isArray(payload.features)) {
         payload.features = JSON.stringify(payload.features);
         stripped = true;
       }
 
+      // 5. Fallback sequential strip if generic schema cache error
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const optionalKeys = [
-          'routine_pdf_name', 'syllabus_pdf_name', 'helpline_contact', 'leaderboard_info',
-          'leaderboard_enabled', 'routine_text', 'routine_pdf_url', 'syllabus_text', 'syllabus_pdf_url',
-          'description', 'about_text', 'badge_subtitle', 'sheet_button_text', 'enter_button_text',
-          'enroll_button_link', 'enroll_button_text', 'details_button_link', 'details_button_text',
-          'features', 'theme_color', 'total_exams', 'total_sheets', 'total_classes', 'enrolled_count',
-          'instructor_name', 'badge', 'price', 'status', 'category'
+          'routine_pdf_url', 'routine_pdf_name', 'routine_text',
+          'syllabus_pdf_url', 'syllabus_pdf_name', 'syllabus_text',
+          'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
+          'details_button_text', 'details_button_link', 'enroll_button_text', 'enroll_button_link',
+          'enter_button_text', 'sheet_button_text', 'badge_subtitle', 'about_text',
+          'description', 'features', 'theme_color', 'total_exams', 'total_sheets',
+          'total_classes', 'enrolled_count', 'instructor_name', 'badge', 'price', 'status', 'category'
         ];
         for (const key of optionalKeys) {
           if (key in payload) {
@@ -1370,7 +1391,7 @@ export const updateCourse = async (
     let lastError: any = null;
     let updatedRow: any = null;
 
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 35; attempt++) {
       if (Object.keys(payload).length === 0) {
         break;
       }
@@ -1393,17 +1414,44 @@ export const updateCourse = async (
 
       lastError = error;
       const errMsg = (error.message || '').toLowerCase();
-
       let stripped = false;
-      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
-      if (matches) {
-        const colName = matches[1] || matches[2];
-        if (colName && colName in payload) {
-          delete payload[colName];
+
+      // 1. Check if any key in payload is named in error message
+      const payloadKeys = Object.keys(payload);
+      for (const key of payloadKeys) {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title') {
+          delete payload[key];
           stripped = true;
         }
       }
 
+      // 2. Extract column name via regex patterns
+      const regexPatterns = [
+        /find the ['"]?([a-zA-Z0-9_]+)['"]? column/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]?/i,
+      ];
+
+      for (const pattern of regexPatterns) {
+        const match = error.message.match(pattern);
+        if (match && match[1]) {
+          const colName = match[1];
+          if (colName in payload && colName !== 'title') {
+            delete payload[colName];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      // 3. If features is JSON or string issue
+      if (errMsg.includes('features') && Array.isArray(payload.features)) {
+        payload.features = JSON.stringify(payload.features);
+        stripped = true;
+      }
+
+      // 4. Fallback sequential strip
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const keys = Object.keys(payload);
         if (keys.length > 0) {
@@ -1579,17 +1627,36 @@ export const insertCourseExam = async (
       lastError = error;
       const errMsg = (error.message || '').toLowerCase();
       let stripped = false;
-      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
-      if (matches) {
-        const colName = matches[1] || matches[2];
-        if (colName && colName in payload) {
-          delete payload[colName];
+
+      // 1. Check if any payload key is explicitly named in error message
+      for (const key of Object.keys(payload)) {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title' && key !== 'course_id') {
+          delete payload[key];
           stripped = true;
         }
       }
 
-      if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
-        const optKeys = ['questions', 'instructions', 'pass_marks', 'topic', 'negative_marks', 'is_locked', 'position', 'exam_id'];
+      // 2. Regex match
+      const regexPatterns = [
+        /find the ['"]?([a-zA-Z0-9_]+)['"]? column/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]?/i,
+      ];
+      for (const pattern of regexPatterns) {
+        const match = error.message.match(pattern);
+        if (match && match[1]) {
+          const colName = match[1];
+          if (colName in payload && colName !== 'title' && colName !== 'course_id') {
+            delete payload[colName];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
+        const optKeys = ['questions', 'instructions', 'pass_marks', 'topic', 'negative_marks', 'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'];
         for (const k of optKeys) {
           if (k in payload) {
             delete payload[k];

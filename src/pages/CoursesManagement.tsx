@@ -273,6 +273,7 @@ export const CoursesManagement: React.FC = () => {
 
   const sqlCode = `-- ==========================================
 -- TAMREEN ACADEMY - SUPABASE COURSES SQL SCHEMA
+-- (Creates new tables AND automatically adds any missing columns)
 -- ==========================================
 
 -- 0. Enable UUID Extension
@@ -315,6 +316,38 @@ CREATE TABLE IF NOT EXISTS public.courses (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- ADD ALL MISSING COLUMNS IF 'courses' TABLE ALREADY EXISTS
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'আরবি প্রভাষক';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'রেকর্ড ব্যাচ';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge_subtitle TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS instructor_name TEXT DEFAULT 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS price TEXT DEFAULT '৳৯৫০';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enrolled_count INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_classes INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_sheets INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_exams INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'emerald';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS about_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_pdf_url TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_pdf_name TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_pdf_url TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_pdf_name TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS leaderboard_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS leaderboard_info TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS helpline_contact TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_text TEXT DEFAULT 'বিস্তারিত';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_text TEXT DEFAULT 'এখনই ভর্তি হন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enter_button_text TEXT DEFAULT 'প্রবেশ করুন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS sheet_button_text TEXT DEFAULT 'শিট ডাউনলোড';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
 -- 2. COURSE EXAMS TABLE (With Question Builder)
 CREATE TABLE IF NOT EXISTS public.course_exams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -335,22 +368,45 @@ CREATE TABLE IF NOT EXISTS public.course_exams (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- ADD ALL MISSING COLUMNS IF 'course_exams' TABLE ALREADY EXISTS
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT 'আরবি';
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS topic TEXT;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 20;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS time_minutes INTEGER DEFAULT 15;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS total_marks INTEGER DEFAULT 20;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS pass_marks INTEGER DEFAULT 10;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS negative_marks NUMERIC DEFAULT 0.25;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 1;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS instructions TEXT;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS questions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS exam_id TEXT;
+
 -- 3. COURSE SHEETS TABLE (PDF Handnotes & Lectures)
 CREATE TABLE IF NOT EXISTS public.course_sheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  subject TEXT,
-  topic TEXT,
-  pdf_url TEXT NOT NULL,
-  pdf_name TEXT,
-  file_size TEXT DEFAULT '২.৫ মেগাবাইট',
-  page_count TEXT DEFAULT '১৬ পেজ',
-  badge_text TEXT DEFAULT 'লেকচার নোট',
+  category TEXT DEFAULT 'আরবি প্রভাষক',
+  badge TEXT DEFAULT 'লেকচার শিট',
+  pdf_url TEXT,
+  file_name TEXT,
+  file_size TEXT DEFAULT '১.২ মেগাবাইট',
+  total_pages INTEGER DEFAULT 12,
   is_locked BOOLEAN DEFAULT false,
   position INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- ADD ALL MISSING COLUMNS IF 'course_sheets' TABLE ALREADY EXISTS
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'আরবি প্রভাষক';
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'লেকচার শিট';
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS file_size TEXT DEFAULT '১.২ মেগাবাইট';
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS total_pages INTEGER DEFAULT 12;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 1;
 
 -- 4. COURSE APPLICATIONS TABLE (Enrollment & Payments)
 CREATE TABLE IF NOT EXISTS public.course_applications (
@@ -368,7 +424,7 @@ CREATE TABLE IF NOT EXISTS public.course_applications (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- RLS POLICIES (Public read/write for Admin & App)
+-- 5. RLS POLICIES (Full Access)
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_sheets ENABLE ROW LEVEL SECURITY;
@@ -385,6 +441,9 @@ CREATE POLICY "Allow public all access on course_sheets" ON public.course_sheets
 
 DROP POLICY IF EXISTS "Allow public all access on course_applications" ON public.course_applications;
 CREATE POLICY "Allow public all access on course_applications" ON public.course_applications FOR ALL USING (true) WITH CHECK (true);
+
+-- 6. RELOAD POSTGREST SCHEMA CACHE
+NOTIFY pgrst, 'reload schema';
 `;
 
   const copyToClipboard = () => {
