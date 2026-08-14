@@ -39,6 +39,7 @@ import { CourseCard } from '../components/course/CourseCard';
 import { CourseModal } from '../components/course/CourseModal';
 import { CourseExamsModal } from '../components/course/CourseExamsModal';
 import { CourseSheetsModal } from '../components/course/CourseSheetsModal';
+import { CourseDetailsModal } from '../components/course/CourseDetailsModal';
 
 export const CoursesManagement: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -56,6 +57,10 @@ export const CoursesManagement: React.FC = () => {
   // Modals state
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [detailsModalCourse, setDetailsModalCourse] = useState<Course | null>(null);
+  const [detailsModalInitialTab, setDetailsModalInitialTab] = useState<'details' | 'routine' | 'syllabus' | 'exams' | 'sheets'>('details');
 
   const [showExamModal, setShowExamModal] = useState(false);
   const [activeCourseForExams, setActiveCourseForExams] = useState<Course | null>(null);
@@ -133,6 +138,16 @@ export const CoursesManagement: React.FC = () => {
       showToast('কোর্সটি মুছে ফেলা হয়েছে', 'info');
       await loadCourses();
     }
+  };
+
+  // Open Course Details Inside Modal
+  const handleOpenDetailsModal = (
+    course: Course,
+    tab: 'details' | 'routine' | 'syllabus' | 'exams' | 'sheets' = 'details'
+  ) => {
+    setDetailsModalCourse(course);
+    setDetailsModalInitialTab(tab);
+    setShowDetailsModal(true);
   };
 
   // Toggle Publish Status
@@ -587,9 +602,35 @@ NOTIFY pgrst, 'reload schema';
               onToggleStatus={handleToggleCourseStatus}
               onManageExams={handleOpenExamsModal}
               onManageSheets={handleOpenSheetsModal}
+              onViewDetails={handleOpenDetailsModal}
             />
           ))}
         </div>
+      )}
+
+      {/* Course Inside Content & Details Modal */}
+      {detailsModalCourse && (
+        <CourseDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setDetailsModalCourse(null);
+          }}
+          course={detailsModalCourse}
+          initialTab={detailsModalInitialTab}
+          onEditCourse={(course) => {
+            setShowDetailsModal(false);
+            handleOpenEditModal(course);
+          }}
+          onManageExams={(course) => {
+            setShowDetailsModal(false);
+            handleOpenExamsModal(course);
+          }}
+          onManageSheets={(course) => {
+            setShowDetailsModal(false);
+            handleOpenSheetsModal(course);
+          }}
+        />
       )}
 
       {/* Course Edit/Create Modal */}

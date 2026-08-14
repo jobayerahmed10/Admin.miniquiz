@@ -957,7 +957,7 @@ export const INITIAL_COURSE_SHEETS: Record<string, CourseSheet[]> = {
 };
 
 // Normalize Course Row from Supabase
-function normalizeCourseRow(row: any): Course {
+function normalizeCourseRow(row: any, fallbackLocalCourse?: Course): Course {
   let parsedFeatures: string[] = [];
   if (Array.isArray(row.features)) {
     parsedFeatures = row.features;
@@ -967,42 +967,44 @@ function normalizeCourseRow(row: any): Course {
     } catch (e) {
       parsedFeatures = [row.features];
     }
+  } else if (fallbackLocalCourse?.features) {
+    parsedFeatures = fallbackLocalCourse.features;
   }
 
   return {
     id: String(row.id),
-    title: row.title || 'শিরোনাম ছাড়া কোর্স',
-    category: row.category || 'আরবি প্রভাষক',
-    badge: row.badge || 'বিশেষ ব্যাচ',
-    badge_subtitle: row.badge_subtitle || '',
-    instructor_name: row.instructor_name || 'তামরীন ইনস্ট্রাক্টর টিম',
-    price: row.price || '৳০',
-    enrolled_count: Number(row.enrolled_count || 0),
-    total_classes: Number(row.total_classes || 0),
-    total_sheets: Number(row.total_sheets || 0),
-    total_exams: Number(row.total_exams || 0),
-    theme_color: row.theme_color || 'emerald',
-    features: parsedFeatures,
-    status: row.status || 'published',
-    description: row.description || row.about_text || '',
-    about_text: row.about_text || row.description || '',
-    routine_text: row.routine_text || '',
-    routine_pdf_url: row.routine_pdf_url || '',
-    routine_pdf_name: row.routine_pdf_name || '',
-    syllabus_text: row.syllabus_text || '',
-    syllabus_pdf_url: row.syllabus_pdf_url || '',
-    syllabus_pdf_name: row.syllabus_pdf_name || '',
-    leaderboard_enabled: row.leaderboard_enabled !== undefined ? Boolean(row.leaderboard_enabled) : true,
-    leaderboard_info: row.leaderboard_info || '',
-    helpline_contact: row.helpline_contact || '',
-    details_button_text: row.details_button_text || 'বিস্তারিত',
-    details_button_link: row.details_button_link || '#',
-    enroll_button_text: row.enroll_button_text || 'এখনই ভর্তি হন',
-    enroll_button_link: row.enroll_button_link || '#',
-    enter_button_text: row.enter_button_text || 'প্রবেশ করুন',
-    sheet_button_text: row.sheet_button_text || 'শিট ডাউনলোড',
-    created_at: row.created_at || new Date().toISOString(),
-    updated_at: row.updated_at,
+    title: row.title || fallbackLocalCourse?.title || 'শিরোনাম ছাড়া কোর্স',
+    category: row.category || fallbackLocalCourse?.category || 'আরবি প্রভাষক',
+    badge: row.badge || fallbackLocalCourse?.badge || 'বিশেষ ব্যাচ',
+    badge_subtitle: row.badge_subtitle || fallbackLocalCourse?.badge_subtitle || '',
+    instructor_name: row.instructor_name || fallbackLocalCourse?.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+    price: row.price || fallbackLocalCourse?.price || '৳০',
+    enrolled_count: Number(row.enrolled_count ?? fallbackLocalCourse?.enrolled_count ?? 0),
+    total_classes: Number(row.total_classes ?? fallbackLocalCourse?.total_classes ?? 0),
+    total_sheets: Number(row.total_sheets ?? fallbackLocalCourse?.total_sheets ?? 0),
+    total_exams: Number(row.total_exams ?? fallbackLocalCourse?.total_exams ?? 0),
+    theme_color: row.theme_color || fallbackLocalCourse?.theme_color || 'emerald',
+    features: parsedFeatures.length > 0 ? parsedFeatures : (fallbackLocalCourse?.features || []),
+    status: row.status || fallbackLocalCourse?.status || 'published',
+    description: row.description || row.about_text || fallbackLocalCourse?.description || fallbackLocalCourse?.about_text || '',
+    about_text: row.about_text || row.description || fallbackLocalCourse?.about_text || fallbackLocalCourse?.description || '',
+    routine_text: row.routine_text || fallbackLocalCourse?.routine_text || '',
+    routine_pdf_url: row.routine_pdf_url || fallbackLocalCourse?.routine_pdf_url || '',
+    routine_pdf_name: row.routine_pdf_name || fallbackLocalCourse?.routine_pdf_name || '',
+    syllabus_text: row.syllabus_text || fallbackLocalCourse?.syllabus_text || '',
+    syllabus_pdf_url: row.syllabus_pdf_url || fallbackLocalCourse?.syllabus_pdf_url || '',
+    syllabus_pdf_name: row.syllabus_pdf_name || fallbackLocalCourse?.syllabus_pdf_name || '',
+    leaderboard_enabled: row.leaderboard_enabled !== undefined ? Boolean(row.leaderboard_enabled) : (fallbackLocalCourse?.leaderboard_enabled ?? true),
+    leaderboard_info: row.leaderboard_info || fallbackLocalCourse?.leaderboard_info || '',
+    helpline_contact: row.helpline_contact || fallbackLocalCourse?.helpline_contact || '',
+    details_button_text: row.details_button_text || fallbackLocalCourse?.details_button_text || 'বিস্তারিত',
+    details_button_link: row.details_button_link || fallbackLocalCourse?.details_button_link || '#',
+    enroll_button_text: row.enroll_button_text || fallbackLocalCourse?.enroll_button_text || 'এখনই ভর্তি হন',
+    enroll_button_link: row.enroll_button_link || fallbackLocalCourse?.enroll_button_link || '#',
+    enter_button_text: row.enter_button_text || fallbackLocalCourse?.enter_button_text || 'প্রবেশ করুন',
+    sheet_button_text: row.sheet_button_text || fallbackLocalCourse?.sheet_button_text || 'শিট ডাউনলোড',
+    created_at: row.created_at || fallbackLocalCourse?.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || fallbackLocalCourse?.updated_at,
   };
 }
 
@@ -1070,8 +1072,10 @@ export const fetchPublishedCoursesForStudent = async (): Promise<{
   isSupabaseConnected: boolean;
 }> => {
   const client = getSupabaseClient();
+  const localList = getLocalCoursesCache();
+
   if (!client) {
-    const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+    const publishedOnly = localList.filter((c) => c.status === 'published');
     return {
       courses: publishedOnly,
       error: 'Supabase URL & Anon Key কানেক্ট করা নেই। কেবল এডমিনের স্থানীয় ব্রাউজার ডাটা ফিল্টার করা হয়েছে।',
@@ -1090,7 +1094,7 @@ export const fetchPublishedCoursesForStudent = async (): Promise<{
     if (error) {
       console.warn('Supabase fetchPublishedCoursesForStudent warning:', error.message);
       const isMissing = error.code === '42P01' || error.message.includes('does not exist');
-      const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+      const publishedOnly = localList.filter((c) => c.status === 'published');
       return {
         courses: publishedOnly,
         error: error.message,
@@ -1099,10 +1103,19 @@ export const fetchPublishedCoursesForStudent = async (): Promise<{
       };
     }
 
-    const normalized = (data || []).map(normalizeCourseRow);
+    if (!data || data.length === 0) {
+      const publishedOnly = localList.filter((c) => c.status === 'published');
+      return { courses: publishedOnly, error: null, isSupabaseConnected: true };
+    }
+
+    const normalized = data.map((row) => {
+      const localCourse = localList.find((c) => String(c.id) === String(row.id));
+      return normalizeCourseRow(row, localCourse);
+    });
+
     return { courses: normalized, error: null, isSupabaseConnected: true };
   } catch (err: any) {
-    const publishedOnly = getLocalCoursesCache().filter((c) => c.status === 'published');
+    const publishedOnly = localList.filter((c) => c.status === 'published');
     return {
       courses: publishedOnly,
       error: err?.message || 'অজানা ত্রুটি',
@@ -1135,8 +1148,10 @@ export const fetchAllCourses = async (): Promise<{
   isTableMissing?: boolean;
 }> => {
   const client = getSupabaseClient();
+  const localList = getLocalCoursesCache();
+
   if (!client) {
-    return { courses: getLocalCoursesCache(), error: null, isTableMissing: true };
+    return { courses: localList, error: null, isTableMissing: true };
   }
 
   try {
@@ -1149,17 +1164,32 @@ export const fetchAllCourses = async (): Promise<{
       console.warn('Supabase fetchAllCourses warning:', error.message);
       const isMissing = error.code === '42P01' || error.message.includes('does not exist');
       return {
-        courses: getLocalCoursesCache(),
+        courses: localList,
         error: isMissing ? 'সুপাবেজে "courses" টেবিল পাওয়া যায়নি' : error.message,
         isTableMissing: isMissing,
       };
     }
 
-    const normalized = (data || []).map(normalizeCourseRow);
-    setLocalCoursesCache(normalized);
-    return { courses: normalized, error: null };
+    if (!data || data.length === 0) {
+      return { courses: localList, error: null };
+    }
+
+    const normalized = data.map((row) => {
+      const localCourse = localList.find((c) => String(c.id) === String(row.id));
+      return normalizeCourseRow(row, localCourse);
+    });
+
+    // Merge any purely local courses that might not yet be in Supabase
+    const supabaseIds = new Set(normalized.map((c) => c.id));
+    const merged = [
+      ...normalized,
+      ...localList.filter((c) => !supabaseIds.has(c.id)),
+    ];
+
+    setLocalCoursesCache(merged);
+    return { courses: merged, error: null };
   } catch (err: any) {
-    return { courses: getLocalCoursesCache(), error: err?.message || null, isTableMissing: true };
+    return { courses: localList, error: err?.message || null, isTableMissing: true };
   }
 };
 
@@ -1561,9 +1591,15 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
       };
     });
 
-    localMap[courseId] = norm;
+    const supabaseExamIds = new Set((data || []).map((r) => String(r.id)));
+    const mergedExams = [
+      ...norm,
+      ...defaultList.filter((e) => !supabaseExamIds.has(e.id)),
+    ];
+
+    localMap[courseId] = mergedExams;
     setLocalCourseExamsCache(localMap);
-    return { exams: norm, error: null };
+    return { exams: mergedExams, error: null };
   } catch (e: any) {
     return { exams: defaultList, error: null };
   }
@@ -1780,9 +1816,15 @@ export const fetchCourseSheets = async (courseId: string): Promise<{ sheets: Cou
       };
     });
 
-    localMap[courseId] = norm;
+    const supabaseSheetIds = new Set((data || []).map((r) => String(r.id)));
+    const mergedSheets = [
+      ...norm,
+      ...defaultList.filter((s) => !supabaseSheetIds.has(s.id)),
+    ];
+
+    localMap[courseId] = mergedSheets;
     setLocalCourseSheetsCache(localMap);
-    return { sheets: norm, error: null };
+    return { sheets: mergedSheets, error: null };
   } catch (e: any) {
     return { sheets: defaultList, error: null };
   }

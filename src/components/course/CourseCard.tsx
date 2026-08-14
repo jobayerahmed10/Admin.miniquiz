@@ -12,6 +12,7 @@ import {
   Sparkles,
   ExternalLink,
   Info,
+  Eye,
 } from 'lucide-react';
 import { Course, COURSE_THEMES } from '../../types';
 
@@ -22,6 +23,7 @@ interface CourseCardProps {
   onToggleStatus: (course: Course) => void;
   onManageExams: (course: Course) => void;
   onManageSheets: (course: Course) => void;
+  onViewDetails?: (course: Course, tab?: 'details' | 'routine' | 'syllabus' | 'exams' | 'sheets') => void;
 }
 
 export const CourseCard: React.FC<CourseCardProps> = ({
@@ -31,6 +33,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   onToggleStatus,
   onManageExams,
   onManageSheets,
+  onViewDetails,
 }) => {
   const themeObj =
     COURSE_THEMES.find((t) => t.id === course.theme_color) || COURSE_THEMES[0];
@@ -145,35 +148,56 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
         {/* Quick Button Content Status Indicators */}
         <div className="grid grid-cols-2 gap-2 mb-5 text-[11px]">
-          <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300">
-            <div className="flex items-center gap-1.5 text-emerald-400 font-bold mb-0.5">
-              <Info className="w-3 h-3" />
-              <span>বিস্তারিত কন্টেন্ট</span>
+          <button
+            type="button"
+            onClick={() => onViewDetails && onViewDetails(course, 'details')}
+            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+          >
+            <div className="flex items-center justify-between text-emerald-400 font-bold mb-0.5">
+              <span className="flex items-center gap-1.5">
+                <Info className="w-3 h-3" />
+                <span>বিস্তারিত কন্টেন্ট</span>
+              </span>
+              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.about_text ? '✓ টেক্সট যুক্ত আছে' : 'টেক্সট খালি'}
+              {course.about_text ? '✓ টেক্সট যুক্ত আছে' : 'টেক্সট খালি (ক্লিক)'}
             </span>
-          </div>
+          </button>
 
-          <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300">
-            <div className="flex items-center gap-1.5 text-amber-400 font-bold mb-0.5">
-              <Calendar className="w-3 h-3" />
-              <span>রুটিন কন্টেন্ট</span>
+          <button
+            type="button"
+            onClick={() => onViewDetails && onViewDetails(course, 'routine')}
+            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+          >
+            <div className="flex items-center justify-between text-amber-400 font-bold mb-0.5">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3 h-3" />
+                <span>রুটিন কন্টেন্ট</span>
+              </span>
+              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.routine_pdf_url ? '✓ PDF যুক্ত' : course.routine_text ? '✓ টেক্সট যুক্ত' : 'খালি'}
+              {course.routine_pdf_url ? '✓ PDF যুক্ত' : course.routine_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক)'}
             </span>
-          </div>
+          </button>
 
-          <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300">
-            <div className="flex items-center gap-1.5 text-indigo-400 font-bold mb-0.5">
-              <BookOpen className="w-3 h-3" />
-              <span>সিলেবাস কন্টেন্ট</span>
+          <button
+            type="button"
+            onClick={() => onViewDetails && onViewDetails(course, 'syllabus')}
+            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+          >
+            <div className="flex items-center justify-between text-indigo-400 font-bold mb-0.5">
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-3 h-3" />
+                <span>সিলেবাস কন্টেন্ট</span>
+              </span>
+              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.syllabus_pdf_url ? '✓ PDF যুক্ত' : course.syllabus_text ? '✓ টেক্সট যুক্ত' : 'খালি'}
+              {course.syllabus_pdf_url ? '✓ PDF যুক্ত' : course.syllabus_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক)'}
             </span>
-          </div>
+          </button>
 
           <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300">
             <div className="flex items-center gap-1.5 text-teal-400 font-bold mb-0.5">
@@ -189,6 +213,18 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
       {/* Card Bottom Actions */}
       <div className="space-y-2 pt-3 border-t border-slate-800/80">
+        {/* Full View / Enter Inside Button */}
+        {onViewDetails && (
+          <button
+            type="button"
+            onClick={() => onViewDetails(course, 'details')}
+            className="w-full py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-slate-700/80"
+          >
+            <Eye className="w-4 h-4 text-emerald-400" />
+            <span>ভিতরে প্রবেশ &bull; বিস্তারিত, রুটিন ও পরীক্ষা প্রিভিউ</span>
+          </button>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => onManageExams(course)}

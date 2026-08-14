@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, CheckCircle, RefreshCw, X, HelpCircle, Layers, BookOpen, Award, Video, FileText } from 'lucide-react';
+import { Smartphone, CheckCircle, RefreshCw, X, HelpCircle, Layers, BookOpen, Award, Video, FileText, ChevronRight, Eye } from 'lucide-react';
 import { getSupabaseClient, fetchPublishedCoursesForStudent } from '../lib/supabase';
 import { Question, Course } from '../types';
+import { CourseDetailsModal } from './course/CourseDetailsModal';
 
 interface StudentPreviewModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [coursesError, setCoursesError] = useState<string | null>(null);
+  const [selectedCourseForDetails, setSelectedCourseForDetails] = useState<Course | null>(null);
 
   const fetchStudentView = async () => {
     setLoading(true);
@@ -187,11 +189,21 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
                       </div>
                     </div>
 
-                    <div className="pt-1 flex items-center justify-between">
+                    <div className="pt-1 flex items-center justify-between gap-2">
                       <span className="text-[11px] text-slate-500">শিক্ষক: {c.instructor_name}</span>
-                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-extrabold text-[11px]">
-                        {c.enroll_button_text || 'ভর্তি হন'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCourseForDetails(c)}
+                          className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-[11px] border border-slate-700 flex items-center gap-1 transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>বিস্তারিত</span>
+                        </button>
+                        <span className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-extrabold text-[11px]">
+                          {c.enroll_button_text || 'ভর্তি হন'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -316,6 +328,16 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
           )}
         </div>
       </div>
+
+      {/* Course Details Inside Preview Modal */}
+      {selectedCourseForDetails && (
+        <CourseDetailsModal
+          isOpen={!!selectedCourseForDetails}
+          onClose={() => setSelectedCourseForDetails(null)}
+          course={selectedCourseForDetails}
+          initialTab="details"
+        />
+      )}
     </div>
   );
 };
