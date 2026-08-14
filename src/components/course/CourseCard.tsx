@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { Course, COURSE_THEMES } from '../../types';
+import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 
 interface CourseCardProps {
   course: Course;
@@ -24,6 +25,8 @@ interface CourseCardProps {
   onManageExams: (course: Course) => void;
   onManageSheets: (course: Course) => void;
   onViewDetails?: (course: Course, tab?: 'details' | 'routine' | 'syllabus' | 'exams' | 'sheets') => void;
+  onSyncCourse?: (course: Course) => void;
+  isSyncing?: boolean;
 }
 
 export const CourseCard: React.FC<CourseCardProps> = ({
@@ -34,6 +37,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   onManageExams,
   onManageSheets,
   onViewDetails,
+  onSyncCourse,
+  isSyncing = false,
 }) => {
   const themeObj =
     COURSE_THEMES.find((t) => t.id === course.theme_color) || COURSE_THEMES[0];
@@ -49,29 +54,59 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
       {/* Card Top Section */}
       <div>
-        {/* Category & Status Bar */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px] font-bold border border-slate-700/80 flex items-center gap-1">
-            <Tag className="w-3 h-3 text-slate-400" />
-            {course.category}
-          </span>
+        {/* Category, Sync Status & Status Bar */}
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px] font-bold border border-slate-700/80 flex items-center gap-1">
+              <Tag className="w-3 h-3 text-slate-400" />
+              {course.category}
+            </span>
 
-          <button
-            onClick={() => onToggleStatus(course)}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold tracking-wider uppercase transition-colors flex items-center gap-1 ${
-              course.status === 'published'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-            }`}
-            title="পাবলিশ স্ট্যাটাস পরিবর্তন করুন"
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                course.status === 'published' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+            {/* Supabase Live Sync Indicator */}
+            {course.is_synced_to_supabase !== false ? (
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+                <Cloud className="w-3 h-3 text-emerald-400" />
+                <span>সুপাবেজে লাইভ</span>
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1 animate-pulse">
+                <CloudOff className="w-3 h-3 text-amber-400" />
+                <span>লোকাল মেমোরি (সিঙ্ক করুন)</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {course.is_synced_to_supabase === false && onSyncCourse && (
+              <button
+                type="button"
+                onClick={() => onSyncCourse(course)}
+                disabled={isSyncing}
+                className="px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black flex items-center gap-1 transition-all shadow-sm shadow-emerald-500/20"
+                title="সুপাবেজ ডাটাবেসে আপলোড করুন"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>সুপাবেজে সিঙ্ক</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => onToggleStatus(course)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold tracking-wider uppercase transition-colors flex items-center gap-1 ${
+                course.status === 'published'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
               }`}
-            />
-            {course.status === 'published' ? 'পাবলিশড' : 'ড্রাফট'}
-          </button>
+              title="পাবলিশ স্ট্যাটাস পরিবর্তন করুন"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  course.status === 'published' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                }`}
+              />
+              {course.status === 'published' ? 'পাবলিশড' : 'ড্রাফট'}
+            </button>
+          </div>
         </div>
 
         {/* Main Title & Badge */}

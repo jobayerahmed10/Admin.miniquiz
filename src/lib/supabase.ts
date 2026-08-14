@@ -1146,12 +1146,14 @@ export const fetchAllCourses = async (): Promise<{
   courses: Course[];
   error: string | null;
   isTableMissing?: boolean;
+  isSupabaseConnected?: boolean;
 }> => {
   const client = getSupabaseClient();
   const localList = getLocalCoursesCache();
 
   if (!client) {
-    return { courses: localList, error: null, isTableMissing: true };
+    const unflagged = localList.map((c) => ({ ...c, is_synced_to_supabase: false }));
+    return { courses: unflagged, error: null, isTableMissing: true, isSupabaseConnected: false };
   }
 
   try {
@@ -1163,33 +1165,43 @@ export const fetchAllCourses = async (): Promise<{
     if (error) {
       console.warn('Supabase fetchAllCourses warning:', error.message);
       const isMissing = error.code === '42P01' || error.message.includes('does not exist');
+      const unflagged = localList.map((c) => ({ ...c, is_synced_to_supabase: false }));
       return {
-        courses: localList,
+        courses: unflagged,
         error: isMissing ? 'সুপাবেজে "courses" টেবিল পাওয়া যায়নি' : error.message,
         isTableMissing: isMissing,
+        isSupabaseConnected: true,
       };
     }
 
     if (!data || data.length === 0) {
-      return { courses: localList, error: null };
+      const unflagged = localList.map((c) => ({ ...c, is_synced_to_supabase: false }));
+      return { courses: unflagged, error: null, isSupabaseConnected: true };
     }
 
     const normalized = data.map((row) => {
       const localCourse = localList.find((c) => String(c.id) === String(row.id));
-      return normalizeCourseRow(row, localCourse);
+      const norm = normalizeCourseRow(row, localCourse);
+      return {
+        ...norm,
+        is_synced_to_supabase: true,
+      };
     });
 
     // Merge any purely local courses that might not yet be in Supabase
     const supabaseIds = new Set(normalized.map((c) => c.id));
     const merged = [
       ...normalized,
-      ...localList.filter((c) => !supabaseIds.has(c.id)),
+      ...localList
+        .filter((c) => !supabaseIds.has(c.id))
+        .map((c) => ({ ...c, is_synced_to_supabase: false })),
     ];
 
     setLocalCoursesCache(merged);
-    return { courses: merged, error: null };
+    return { courses: merged, error: null, isSupabaseConnected: true };
   } catch (err: any) {
-    return { courses: localList, error: err?.message || null, isTableMissing: true };
+    const unflagged = localList.map((c) => ({ ...c, is_synced_to_supabase: false }));
+    return { courses: unflagged, error: err?.message || null, isTableMissing: true, isSupabaseConnected: true };
   }
 };
 
@@ -1527,6 +1539,267 @@ export const deleteCourse = async (id: string): Promise<{ success: boolean; erro
   } catch (e) {
     return { success: true, error: null };
   }
+};
+
+// Sync a single Course to Supabase
+export const syncSingleCourseToSupabase = async (
+  course: Course
+): Promise<{ success: boolean; data?: Course; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      error: 'Supabase URL ও Anon Key পাওয়া যায়নি। সেটিংস পেজে গিয়ে যুক্ত করুন।',
+    };
+  }
+
+  try {
+    let payload: any = {
+      id: course.id,
+      title: course.title,
+      category: course.category || 'আরবি প্রভাষক',
+      badge: course.badge || 'রেকর্ড ব্যাচ',
+      badge_subtitle: course.badge_subtitle || '',
+      instructor_name: course.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+      price: course.price || '৳৯৫০',
+      enrolled_count: Number(course.enrolled_count) || 0,
+      total_classes: Number(course.total_classes) || 0,
+      total_sheets: Number(course.total_sheets) || 0,
+      total_exams: Number(course.total_exams) || 0,
+      theme_color: course.theme_color || 'emerald',
+      features: Array.isArray(course.features) ? course.features : [],
+      status: course.status || 'published',
+      description: course.description || '',
+      about_text: course.about_text || '',
+      routine_text: course.routine_text || '',
+      routine_pdf_url: course.routine_pdf_url || '',
+      routine_pdf_name: course.routine_pdf_name || '',
+      syllabus_text: course.syllabus_text || '',
+      syllabus_pdf_url: course.syllabus_pdf_url || '',
+      syllabus_pdf_name: course.syllabus_pdf_name || '',
+      leaderboard_enabled: course.leaderboard_enabled !== undefined ? Boolean(course.leaderboard_enabled) : true,
+      leaderboard_info: course.leaderboard_info || '',
+      helpline_contact: course.helpline_contact || '',
+      details_button_text: course.details_button_text || 'বিস্তারিত',
+      details_button_link: course.details_button_link || '#',
+      enroll_button_text: course.enroll_button_text || 'এখনই ভর্তি হন',
+      enroll_button_link: course.enroll_button_link || '#',
+      enter_button_text: course.enter_button_text || 'প্রবেশ করুন',
+      sheet_button_text: course.sheet_button_text || 'শিট ডাউনলোড',
+      updated_at: new Date().toISOString(),
+    };
+
+    let lastError: any = null;
+    let insertedRow: any = null;
+
+    for (let attempt = 0; attempt < 35; attempt++) {
+      const { data, error } = await client
+        .from('courses')
+        .upsert([payload], { onConflict: 'id' })
+        .select();
+
+      if (!error) {
+        if (data && data.length > 0) {
+          insertedRow = normalizeCourseRow(data[0]);
+        } else {
+          insertedRow = { ...course, is_synced_to_supabase: true };
+        }
+        lastError = null;
+        break;
+      }
+
+      lastError = error;
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+
+      // Strip missing columns if old schema
+      const payloadKeys = Object.keys(payload);
+      for (const key of payloadKeys) {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title' && key !== 'id') {
+          delete payload[key];
+          stripped = true;
+        }
+      }
+
+      if (errMsg.includes('features') && Array.isArray(payload.features)) {
+        payload.features = JSON.stringify(payload.features);
+        stripped = true;
+      }
+
+      if (!stripped) {
+        const optionalKeys = [
+          'routine_pdf_url', 'routine_pdf_name', 'routine_text',
+          'syllabus_pdf_url', 'syllabus_pdf_name', 'syllabus_text',
+          'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
+          'details_button_text', 'details_button_link', 'enroll_button_text', 'enroll_button_link',
+          'enter_button_text', 'sheet_button_text', 'badge_subtitle', 'about_text',
+          'description', 'features', 'theme_color', 'total_exams', 'total_sheets',
+          'total_classes', 'enrolled_count', 'instructor_name', 'badge', 'price', 'status', 'category'
+        ];
+        for (const key of optionalKeys) {
+          if (key in payload) {
+            delete payload[key];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+
+    if (lastError) {
+      return { success: false, error: lastError.message };
+    }
+
+    // Update local cache
+    const current = getLocalCoursesCache();
+    const updated = current.map((c) =>
+      c.id === course.id ? { ...c, is_synced_to_supabase: true } : c
+    );
+    setLocalCoursesCache(updated);
+
+    return {
+      success: true,
+      data: insertedRow || { ...course, is_synced_to_supabase: true },
+      error: null,
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'সিঙ্ক ব্যর্থ হয়েছে' };
+  }
+};
+
+// Sync All Local Courses to Supabase
+export const syncAllCoursesToSupabase = async (): Promise<{
+  total: number;
+  synced: number;
+  failed: number;
+  errors: string[];
+}> => {
+  const localList = getLocalCoursesCache();
+  let synced = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const course of localList) {
+    const res = await syncSingleCourseToSupabase(course);
+    if (res.success) {
+      synced++;
+    } else {
+      failed++;
+      if (res.error && !errors.includes(res.error)) {
+        errors.push(`"${course.title}": ${res.error}`);
+      }
+    }
+  }
+
+  return {
+    total: localList.length,
+    synced,
+    failed,
+    errors,
+  };
+};
+
+// Check Full Supabase Health and Tables existence
+export const checkSupabaseHealth = async (): Promise<{
+  isConnected: boolean;
+  coursesTableExists: boolean;
+  courseExamsTableExists: boolean;
+  courseSheetsTableExists: boolean;
+  questionsTableExists: boolean;
+  examsTableExists: boolean;
+  totalLiveCourses: number;
+  totalLiveQuestions: number;
+  totalLiveExams: number;
+  error: string | null;
+}> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      isConnected: false,
+      coursesTableExists: false,
+      courseExamsTableExists: false,
+      courseSheetsTableExists: false,
+      questionsTableExists: false,
+      examsTableExists: false,
+      totalLiveCourses: 0,
+      totalLiveQuestions: 0,
+      totalLiveExams: 0,
+      error: 'Supabase credentials missing',
+    };
+  }
+
+  let coursesTableExists = false;
+  let courseExamsTableExists = false;
+  let courseSheetsTableExists = false;
+  let questionsTableExists = false;
+  let examsTableExists = false;
+
+  let totalLiveCourses = 0;
+  let totalLiveQuestions = 0;
+  let totalLiveExams = 0;
+  let lastError: string | null = null;
+
+  // 1. Check courses
+  try {
+    const { count, error } = await client.from('courses').select('*', { count: 'exact', head: true });
+    if (!error) {
+      coursesTableExists = true;
+      totalLiveCourses = count || 0;
+    } else {
+      lastError = error.message;
+    }
+  } catch (e: any) {
+    lastError = e?.message;
+  }
+
+  // 2. Check course_exams
+  try {
+    const { error } = await client.from('course_exams').select('*', { count: 'exact', head: true });
+    if (!error) {
+      courseExamsTableExists = true;
+    }
+  } catch (e: any) {}
+
+  // 3. Check course_sheets
+  try {
+    const { error } = await client.from('course_sheets').select('*', { count: 'exact', head: true });
+    if (!error) {
+      courseSheetsTableExists = true;
+    }
+  } catch (e: any) {}
+
+  // 4. Check questions
+  try {
+    const { count, error } = await client.from('questions').select('*', { count: 'exact', head: true });
+    if (!error) {
+      questionsTableExists = true;
+      totalLiveQuestions = count || 0;
+    }
+  } catch (e: any) {}
+
+  // 5. Check exams
+  try {
+    const { count, error } = await client.from('exams').select('*', { count: 'exact', head: true });
+    if (!error) {
+      examsTableExists = true;
+      totalLiveExams = count || 0;
+    }
+  } catch (e: any) {}
+
+  return {
+    isConnected: true,
+    coursesTableExists,
+    courseExamsTableExists,
+    courseSheetsTableExists,
+    questionsTableExists,
+    examsTableExists,
+    totalLiveCourses,
+    totalLiveQuestions,
+    totalLiveExams,
+    error: lastError,
+  };
 };
 
 /* ==========================================================================

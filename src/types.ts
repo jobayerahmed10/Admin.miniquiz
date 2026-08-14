@@ -152,6 +152,7 @@ export interface Course {
   sheet_button_text?: string;
   helpline_contact?: string;
 
+  is_synced_to_supabase?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -172,6 +173,7 @@ export interface CourseExam {
   exam_id?: string | null;
   questions?: CourseExamQuestion[];
   instructions?: string;
+  is_synced_to_supabase?: boolean;
   created_at?: string;
 }
 
@@ -188,6 +190,7 @@ export interface CourseSheet {
   badge_text?: string;
   is_locked: boolean;
   position?: number;
+  is_synced_to_supabase?: boolean;
   created_at?: string;
 }
 

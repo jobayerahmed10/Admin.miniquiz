@@ -34,12 +34,16 @@ import {
   insertCourseSheet,
   updateCourseSheet,
   deleteCourseSheet,
+  syncAllCoursesToSupabase,
+  syncSingleCourseToSupabase,
+  checkSupabaseHealth,
 } from '../lib/supabase';
 import { CourseCard } from '../components/course/CourseCard';
 import { CourseModal } from '../components/course/CourseModal';
 import { CourseExamsModal } from '../components/course/CourseExamsModal';
 import { CourseSheetsModal } from '../components/course/CourseSheetsModal';
 import { CourseDetailsModal } from '../components/course/CourseDetailsModal';
+import { Cloud, CloudOff, Database, CheckCircle2, ShieldCheck, Smartphone } from 'lucide-react';
 
 export const CoursesManagement: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -47,7 +51,12 @@ export const CoursesManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('সকল');
   const [isTableMissing, setIsTableMissing] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Sync state
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncingCourseId, setSyncingCourseId] = useState<string | null>(null);
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -79,17 +88,50 @@ export const CoursesManagement: React.FC = () => {
     setLoading(true);
     const result = await fetchAllCourses();
     setCourses(result.courses);
-    if (result.isTableMissing) {
-      setIsTableMissing(true);
-    } else {
-      setIsTableMissing(false);
-    }
+    setIsTableMissing(!!result.isTableMissing);
+    setIsSupabaseConnected(result.isSupabaseConnected !== false);
     setLoading(false);
   };
 
   useEffect(() => {
     loadCourses();
   }, []);
+
+  // Sync all courses to Supabase
+  const handleSyncAllCourses = async () => {
+    setIsSyncingAll(true);
+    const res = await syncAllCoursesToSupabase();
+    setIsSyncingAll(false);
+
+    if (res.failed === 0) {
+      showToast(`অভিনন্দন! মোট ${res.synced} টি কোর্স সফলভাবে সুপাবেজ ক্লাউডে আপলোড ও সিঙ্ক হয়েছে! এখন স্টুডেন্ট অ্যাপে দেখা যাবে।`, 'success');
+    } else if (res.synced > 0) {
+      showToast(`${res.synced} টি কোর্স সিঙ্ক হয়েছে, তবে ${res.failed} টি ব্যর্থ হয়েছে। SQL কোড চেক করুন।`, 'info');
+      if (res.errors.length > 0) {
+        setIsTableMissing(true);
+      }
+    } else {
+      showToast(`সুপাবেজে সিঙ্ক ব্যর্থ: ${res.errors[0] || 'SQL স্কিমা চেক করুন'}`, 'error');
+      setIsTableMissing(true);
+      setShowSqlModal(true);
+    }
+    await loadCourses();
+  };
+
+  // Sync a single course to Supabase
+  const handleSyncSingleCourse = async (course: Course) => {
+    setSyncingCourseId(course.id);
+    const res = await syncSingleCourseToSupabase(course);
+    setSyncingCourseId(null);
+
+    if (res.success) {
+      showToast(`"${course.title}" কোর্সটি সফলভাবে সুপাবেজে আপলোড হয়েছে! স্টুডেন্ট অ্যাপে এখন দেখা যাবে।`, 'success');
+    } else {
+      showToast(`সিঙ্ক ব্যর্থ: ${res.error || 'SQL স্কিমা চেক করুন'}`, 'error');
+      setShowSqlModal(true);
+    }
+    await loadCourses();
+  };
 
   // Open Course Create Modal
   const handleOpenCreateModal = () => {
@@ -500,6 +542,16 @@ NOTIFY pgrst, 'reload schema';
           </button>
 
           <button
+            onClick={handleSyncAllCourses}
+            disabled={isSyncingAll}
+            className="px-4 py-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10"
+            title="সব কোর্স সুপাবেজে আপলোড ও সিঙ্ক করুন"
+          >
+            <Cloud className={`w-4 h-4 text-emerald-400 ${isSyncingAll ? 'animate-bounce' : ''}`} />
+            <span>{isSyncingAll ? 'সুপাবেজে সিঙ্ক হচ্ছে...' : 'সব কোর্স সুপাবেজে সিঙ্ক করুন'}</span>
+          </button>
+
+          <button
             onClick={loadCourses}
             disabled={loading}
             className="p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all"
@@ -518,25 +570,79 @@ NOTIFY pgrst, 'reload schema';
         </div>
       </div>
 
+      {/* Supabase Live App Sync Diagnostic Banner */}
+      <div className="bg-[#0b1322] border border-slate-800/80 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0">
+            <Smartphone className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-white">স্টুডেন্ট অ্যাপ ও সুপাবেজ ক্লাউড সংযোগ:</span>
+              {isSupabaseConnected && !isTableMissing ? (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  সুপাবেজ ক্লাউড সংযুক্ত
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-black flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  সুপাবেজে টেবিল তৈরি বা কানেকশন প্রয়োজন
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              মোট কোর্স: <strong className="text-white">{courses.length}</strong> টি &bull;{' '}
+              সুপাবেজ ক্লাউডে সক্রিয়: <strong className="text-emerald-400">{courses.filter((c) => c.is_synced_to_supabase !== false).length}</strong> টি &bull;{' '}
+              লোকাল ব্রাউজারে: <strong className="text-amber-400">{courses.filter((c) => c.is_synced_to_supabase === false).length}</strong> টি
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          {courses.some((c) => c.is_synced_to_supabase === false) && (
+            <button
+              onClick={handleSyncAllCourses}
+              disabled={isSyncingAll}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors flex items-center gap-2 shadow-md shadow-amber-500/20"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
+              <span>লোকাল কোর্সগুলো অ্যাপে সিঙ্ক করুন</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Database Setup Notice if tables missing */}
       {isTableMissing && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 sm:p-6 text-amber-200 text-xs space-y-3">
           <div className="flex items-center gap-3 font-bold text-amber-300 text-sm">
-            <span>⚠️ Supabase-এ কোর্স টেবিল তৈরি করা প্রয়োজন</span>
+            <span>⚠️ Supabase-এ কোর্স টেবিল তৈরি করা প্রয়োজন (অ্যাপে ডাটা না যাওয়ার কারণ)</span>
           </div>
           <p className="text-slate-300 leading-relaxed">
-            আপনার Supabase ডেটাবেসে <code className="text-amber-400 font-mono">public.courses</code>,{' '}
+            এডমিন প্যানেলে তৈরি করা কোর্স মোবাইল অ্যাপে প্রদর্শিত হওয়ার জন্য আপনার Supabase ডাটাবেসে{' '}
+            <code className="text-amber-400 font-mono">public.courses</code>,{' '}
             <code className="text-amber-400 font-mono">public.course_exams</code> এবং{' '}
-            <code className="text-amber-400 font-mono">public.course_sheets</code> টেবিল তৈরি করা নেই।
-            নিচের বাটনে ক্লিক করে প্রস্তুতকৃত SQL কোডটি কপি করে Supabase SQL Editor এ রান করুন।
+            <code className="text-amber-400 font-mono">public.course_sheets</code> টেবিল তৈরি থাকতে হবে।
+            নিচের বাটনে ক্লিক করে প্রস্তুতকৃত SQL কোডটি কপি করে Supabase ড্যাশবোর্ডের <strong>SQL Editor</strong> এ গিয়ে <strong>Run</strong> বাটনে চাপ দিন।
           </p>
-          <button
-            onClick={() => setShowSqlModal(true)}
-            className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors flex items-center gap-2"
-          >
-            <Code className="w-4 h-4" />
-            SQL কোড দেখুন ও কপি করুন
-          </button>
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <button
+              onClick={() => setShowSqlModal(true)}
+              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors flex items-center gap-2"
+            >
+              <Code className="w-4 h-4" />
+              SQL কোড দেখুন ও কপি করুন
+            </button>
+            <button
+              onClick={handleSyncAllCourses}
+              disabled={isSyncingAll}
+              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-700"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin text-emerald-400' : ''}`} />
+              SQL রান করার পর এখানে ক্লিক করুন
+            </button>
+          </div>
         </div>
       )}
 
@@ -603,6 +709,8 @@ NOTIFY pgrst, 'reload schema';
               onManageExams={handleOpenExamsModal}
               onManageSheets={handleOpenSheetsModal}
               onViewDetails={handleOpenDetailsModal}
+              onSyncCourse={handleSyncSingleCourse}
+              isSyncing={syncingCourseId === course.id}
             />
           ))}
         </div>
