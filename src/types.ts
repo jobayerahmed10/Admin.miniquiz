@@ -96,6 +96,19 @@ export interface SupabaseConfig {
   anonKey: string;
 }
 
+export interface CourseExamQuestion {
+  id?: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: string;
+  explanation?: string | null;
+  subject?: string;
+  topic?: string;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -111,12 +124,34 @@ export interface Course {
   theme_color: 'emerald' | 'purple' | 'amber' | 'indigo' | 'rose' | string;
   features: string[]; // List of key features/highlights
   status: 'published' | 'draft' | 'archived';
+
+  // 1. কোর্স সম্পর্কে বিস্তারিত (Course Details & Description)
+  description?: string;
+  about_text?: string;
+
+  // 2. রুটিন (Routine - Text & PDF)
+  routine_text?: string;
+  routine_pdf_url?: string;
+  routine_pdf_name?: string;
+
+  // 3. সিলেবাস (Syllabus - Text & PDF)
+  syllabus_text?: string;
+  syllabus_pdf_url?: string;
+  syllabus_pdf_name?: string;
+
+  // 4. লিডারবোর্ড ও অন্যান্য সেটিংস
+  leaderboard_enabled?: boolean;
+  leaderboard_info?: string;
+
+  // বাটন ও লিংকসমূহ
   details_button_text?: string;
   details_button_link?: string;
   enroll_button_text?: string;
   enroll_button_link?: string;
   enter_button_text?: string;
   sheet_button_text?: string;
+  helpline_contact?: string;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -126,13 +161,17 @@ export interface CourseExam {
   course_id: string;
   title: string;
   subject: string;
+  topic?: string;
   question_count: number;
   time_minutes: number;
   total_marks: number;
+  pass_marks?: number;
   negative_marks: number;
   is_locked: boolean;
   position?: number;
   exam_id?: string | null;
+  questions?: CourseExamQuestion[];
+  instructions?: string;
   created_at?: string;
 }
 
@@ -140,7 +179,10 @@ export interface CourseSheet {
   id: string;
   course_id: string;
   title: string;
+  subject?: string;
+  topic?: string;
   pdf_url: string;
+  pdf_name?: string;
   file_size: string;
   page_count: string;
   badge_text?: string;

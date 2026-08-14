@@ -746,84 +746,117 @@ export const deleteExam = async (id: string): Promise<{ success: boolean; error:
 export const INITIAL_COURSES: Course[] = [
   {
     id: 'course-1',
-    title: '১৮তম NTRCA ক্যাডার আরবি প্রভাষক বিশেষ স্পেশাল মডেল টেস্ট ব্যাচ',
+    title: 'আরবি প্রভাষক স্পেশাল কোর্স',
     category: 'আরবি প্রভাষক',
-    badge: 'এক্সাম ও প্রাকটিস ব্যাচ',
-    badge_subtitle: 'প্রিলি ও লিখিত পূর্ণাঙ্গ প্রস্তুতি',
-    instructor_name: 'মুফতি শফিক উল্লাহ ও NTRCA প্যানেল',
-    price: '৳৯৫০',
-    enrolled_count: 1450,
-    total_classes: 48,
-    total_sheets: 35,
+    badge: 'প্রিলিমিনারি ব্যাচ',
+    badge_subtitle: '৯ম শিক্ষক নিয়োগ • ওস্তাদ আহমেদ',
+    instructor_name: 'ওস্তাদ আহমেদ ও তামরীন টিম',
+    price: '৳৮৫০',
+    enrolled_count: 500,
+    total_classes: 45,
+    total_sheets: 45,
     total_exams: 30,
     theme_color: 'emerald',
     features: [
-      'সম্পূর্ণ লিখিত ও প্রিলি সিলেবাস কভারিং',
+      'সম্পূর্ণ আরবি সিলেবাস কাভারেজ',
       'অধ্যায়ভিত্তিক ৩০টি স্পেশাল মডেল টেস্ট',
-      'পিডিএফ সাজেশন ও হ্যান্ডনোট ডাউনলোড',
-      'উত্তরপত্র পর্যালোচনা ও লাইভ সাপোর্ট',
+      '৪৫টি প্রিমিয়াম পিডিএফ লেকচার শিট',
+      '৭টি পূর্ণাঙ্গ লাইভ ফুল মডেল টেস্ট',
+      'লাইভ ও রেকর্ডেড ক্লাস সুবিধা',
     ],
     status: 'published',
-    details_button_text: 'কোর্স বিবরণী দেখুন',
+    description: `আরবি প্রভাষক স্পেশাল কোর্স পদ মূলত এনটিআরসিএ এবং শিক্ষক নিয়োগ পরীক্ষার জন্য অত্যন্ত গুরুত্বপূর্ণ কোর্স। এই পদের জন্য একটি পূর্ণাঙ্গ কোর্সে নিচের বিষয়গুলো থাকলে পরীক্ষা ও চাকরি—দুই ক্ষেত্রেই সর্বোচ্চ কার্যকারিতা পাওয়া যাবে।
+
+১. বিষয়ভিত্তিক মূল বিষয়াদি
+• অধ্যায়ভিত্তিক বিস্তারিত আলোচনা ও কুইজ
+• আল কুরআন ও হাদিসের প্রয়োজনীয় ব্যাখ্যা
+• আরবি ব্যাকরণ: নহু ও সরফ এর খুঁটিনাটি নিয়ম
+• আরবি সাহিত্য ও ইতিহাসের গুরুত্বপূর্ণ অধ্যায়সমূহ
+
+২. পরীক্ষার প্রস্তুতি ও বিশেষ কৌশল
+• বিগত বছরের প্রশ্নের বিশদ সমাধান ও বিশ্লেষণ
+• সময় সচেতন পরীক্ষা গ্রহণ পদ্ধতি
+• নেগেটিভ মার্কিং এড়ানোর শর্টকাট টেকনিক
+• বিষয়ভিত্তিক নিয়মিত লাইভ ও মেগা মডেল টেস্ট
+
+৩. স্পেশাল শিট ও সাপোর্টিং মেটেরিয়ালস
+• প্রতিটি ক্লাসের সাথে গোছানো রঙিন পিডিএফ শিট
+• সাজেস্টিভ প্রশ্ন ও ব্যাখ্যা সংবলিত নোট
+• গুরুত্বপূর্ণ পরিভাষা ও শব্দার্থ তালিকা`,
+    about_text: `আরবি প্রভাষক স্পেশাল কোর্স পদ মূলত এনটিআরসিএ এবং শিক্ষক নিয়োগ পরীক্ষার জন্য অত্যন্ত গুরুত্বপূর্ণ কোর্স।`,
+    routine_text: `সাপ্তাহিক ক্লাস ও পরীক্ষা রুটিন:
+
+📅 শনি ও সোমবার:
+• রাত ৮:৩০ - আরবি ব্যাকরণ (নহু ও সরফ) লাইভ ক্লাস
+• রাত ৯:৪৫ - অধ্যায়ভিত্তিক কুইজ ও প্রশ্ন সমাধান
+
+📅 বুধ ও শুক্রবার:
+• রাত ৮:৩০ - আল কুরআন, হাদিস ও আরবি সাহিত্য
+• রাত ৯:৪৫ - স্পেশাল প্রিলিমিনারি মডেল টেস্ট
+
+📅 প্রতি মাসের শেষ শুক্রবার:
+• রাত ৯:০০ - মেগা লাইভ ফুল মডেল টেস্ট ও লিডারবোর্ড র‍্যাঙ্কিং`,
+    routine_pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    routine_pdf_name: 'Arabic_Lecturer_Routine.pdf',
+    syllabus_text: `আরবি প্রভাষক পদের পূর্ণাঙ্গ সিলেবাস ও মানবন্টন:
+
+১. আরবি ভাষা ও ব্যাকরণ (নহু ও সরফ) — ৩৫ নম্বর
+• তারিফে ইলমে নহু ও সরফ, কালিমার প্রকারভেদ
+• এরাব ও মাবনি, মারফুআত, মানসুবাত, মাজরুরাত
+• বাহাস, সিগাহ, বাবের পরিচয় ও তারকিব
+
+২. আল কুরআন ও উলুমুল কুরআন — ২৫ নম্বর
+• সূরা আল বাকারাহ ও নির্বাচিত আয়াতসমূহের শানে নুযুল ও তাফসির
+
+৩. হাদিস ও উলুমুল হাদিস — ২০ নম্বর
+• মিশকাতুল মাসাবিহ ও নির্বাচিত সহিহ হাদিস
+• মুস্তালাহুল হাদিস ও সনদের প্রকারভেদ
+
+৪. আরবি সাহিত্য ও ইসলামের ইতিহাস — ২০ নম্বর
+• জাহেলি ও ইসলামি যুগের বিখ্যাত কবি ও সাহিত্যিক
+• খিলাফতে রাশেদা ও উমাইয়া-আব্বাসীয় ইতিহাস`,
+    syllabus_pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    syllabus_pdf_name: 'Arabic_Lecturer_Syllabus.pdf',
+    leaderboard_enabled: true,
+    leaderboard_info: 'সকল মডেল টেস্টের প্রাপ্ত নম্বরের ভিত্তিতে সাপ্তাহিক ও মাসিক লিডারবোর্ড তৈরি হবে।',
+    details_button_text: 'বিস্তারিত',
     details_button_link: 'https://t.me/tamreen_academy',
-    enroll_button_text: 'এখনই ভর্তি হন',
-    enroll_button_link: 'https://tamreen.academy/enroll/arabic-lecturer',
-    enter_button_text: 'ক্লাসরুমে প্রবেশ করুন',
-    sheet_button_text: 'সকল শিট ডাউনলোড',
+    enroll_button_text: 'ভর্তি হন (৳৮৫০)',
+    enroll_button_link: '#',
+    enter_button_text: 'প্রবেশ করুন',
+    sheet_button_text: 'শিট ডাউনলোড',
+    helpline_contact: '018XXXXXXXX',
     created_at: new Date().toISOString(),
   },
   {
     id: 'course-2',
-    title: 'সহকারী মৌলভী ও ইবতেদায়ী ক্যাডার মাস্টার কোর্স ২০২৬',
+    title: 'সহকারী মৌলভী ও ইবতেদায়ী ক্যাডার মাস্টার কোর্স',
     category: 'সহকারী মৌলভী',
-    badge: 'রেকর্ড ব্যাচ-২',
+    badge: 'রেকর্ড ব্যাচ',
     badge_subtitle: 'মাদ্রাসা ও ইবতেদায়ী কারিকুলাম',
-    instructor_name: 'হাফেজ মাওলানা তানভীর আহমেদ',
+    instructor_name: 'মাওলানা আব্দুল্লাহ আল-মামুন',
     price: '৳৭৫০',
-    enrolled_count: 980,
+    enrolled_count: 380,
     total_classes: 36,
-    total_sheets: 25,
-    total_exams: 20,
+    total_sheets: 30,
+    total_exams: 25,
     theme_color: 'purple',
     features: [
-      'ফিকাহ ও আরবি ব্যাকরণ স্পেশাল ক্লাস',
-      '২০টি অধ্যায়ভিত্তিক প্রাকটিস পরীক্ষা',
-      'প্রিমিয়াম টাইপকৃত পিডিএফ লেকচার শিট',
+      'সহকারী মৌলভী পদের শতভাগ সিলেবাস',
+      '৩০টি এক্সক্লুসিভ হ্যান্ডনোট',
+      '২৫টি অধ্যায়ভিত্তিক পরীক্ষা',
+      'স্পেশাল লাইভ সলভ ক্লাস',
     ],
     status: 'published',
-    details_button_text: 'বিস্তারিত জানুন',
-    details_button_link: 'https://t.me/tamreen_academy',
-    enroll_button_text: 'ভর্তি নিশ্চিত করুন',
-    enroll_button_link: 'https://tamreen.academy/enroll/assistant-moulvi',
-    enter_button_text: 'পড়াশোনা শুরু করুন',
-    sheet_button_text: 'শিট সংগ্রহ করুন',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'course-3',
-    title: 'NTRCA সাধারণ বিষয় (বাংলা, ইংরেজি, গণিত, জেন নলেজ) ফ্রি ব্যাচ',
-    category: 'জেনারেল বিষয়',
-    badge: 'ফ্রি অলিম্পিয়াড ব্যাচ',
-    badge_subtitle: 'সকল ক্যাডারের জন্য প্রযোজ্য',
-    instructor_name: 'বিসিএস ও শিক্ষক নিবন্ধন গবেষক টিম',
-    price: '৳০ (ফ্রি)',
-    enrolled_count: 3200,
-    total_classes: 24,
-    total_sheets: 20,
-    total_exams: 15,
-    theme_color: 'amber',
-    features: [
-      'শর্টকাট ম্যাথ টেকনিক',
-      'ইংরেজি ব্যাকরণ সুপার ট্রিকস',
-      'ফ্রি এক্সাম ও পিডিএফ নোটস',
-    ],
-    status: 'published',
-    details_button_text: 'ফ্রি কোর্সটি দেখুন',
+    description: `সহকারী মৌলভী পদের জন্য এনটিআরসিএ ও মাদ্রাসা শিক্ষক নিয়োগ পরীক্ষার পূর্ণাঙ্গ প্রস্তুতি কোর্স।`,
+    routine_text: `রবি, মঙ্গল, বৃহস্পতি রাত ৯:০০ টায় ক্লাস ও পরীক্ষা।`,
+    syllabus_text: `কুরআন মাজিদ, হাদিস শরিফ, ফিকহুল ইসলাম ও আরবি ব্যাকরণ।`,
+    details_button_text: 'বিস্তারিত',
     details_button_link: '#',
-    enroll_button_text: 'ফ্রি যুক্ত হন',
+    enroll_button_text: 'ভর্তি হন (৳৭৫০)',
     enroll_button_link: '#',
-    enter_button_text: 'পরীক্ষা দিন',
-    sheet_button_text: 'ফ্রি শিট নিন',
+    enter_button_text: 'প্রবেশ করুন',
+    sheet_button_text: 'শিট ডাউনলোড',
     created_at: new Date().toISOString(),
   },
 ];
@@ -833,26 +866,59 @@ export const INITIAL_COURSE_EXAMS: Record<string, CourseExam[]> = {
     {
       id: 'ce-101',
       course_id: 'course-1',
-      title: 'মডেল টেস্ট ০১: আল কুরআন ও তাফসির বিশেষ পরীক্ষা',
+      title: 'মডেল টেস্ট ০১: আল কুরআন ও উলুমুল কুরআন বিশেষ পরীক্ষা',
       subject: 'আল কুরআন',
+      topic: 'সূরা আল বাকারাহ ও উলুমুল কুরআন',
       question_count: 25,
       time_minutes: 20,
       total_marks: 25,
+      pass_marks: 10,
       negative_marks: 0.25,
       is_locked: false,
       position: 1,
+      instructions: 'প্রতিটি সঠিক উত্তরের জন্য ১ নম্বর এবং ভুল উত্তরের জন্য ০.২৫ কাটা যাবে।',
+      questions: [
+        {
+          id: 'q-1',
+          question: 'কুরআন মজিদের সবচেয়ে বড় সূরার নাম কী?',
+          option_a: 'সূরা আল ইমরান',
+          option_b: 'সূরা আল বাকারাহ',
+          option_c: 'সূরা আন নিসা',
+          option_d: 'সূরা আল মায়িদাহ',
+          correct_answer: 'option_b',
+          explanation: 'সূরা আল বাকারাহ কুরআন মজিদের দীর্ঘতম সূরা, যাতে মোট ২৮৬টি আয়াত রয়েছে।',
+          subject: 'আল কুরআন',
+          topic: 'সূরা আল বাকারাহ',
+        },
+        {
+          id: 'q-2',
+          question: 'কোন সূরায় বিসমিল্লাহ দুইবার এসেছে?',
+          option_a: 'সূরা আন-নামল',
+          option_b: 'সূরা আত-তাওবাহ',
+          option_c: 'সূরা আর-রহমান',
+          option_d: 'সূরা আল-ইখলাস',
+          correct_answer: 'option_a',
+          explanation: 'সূরা আন-নামল এর ৩০ নম্বর আয়াতে সুলাইমান (আঃ) এর চিঠির শুরুতে বিসমিল্লাহ উল্লেখ থাকায় এই সূরায় দুইবার বিসমিল্লাহ এসেছে।',
+          subject: 'আল কুরআন',
+          topic: 'উলুমুল কুরআন',
+        },
+      ],
     },
     {
       id: 'ce-102',
       course_id: 'course-1',
-      title: 'মডেল টেস্ট ০২: আরবি ভাষা ও নহু-সরফ স্পেশাল',
-      subject: 'আরবি ভাষা',
+      title: 'মডেল টেস্ট ০২: আরবি ব্যাকরণ (নহু ও সরফ) স্পেশাল টেস্ট',
+      subject: 'আরবি ব্যাকরণ',
+      topic: 'কালিমার প্রকারভেদ ও এরাব',
       question_count: 30,
       time_minutes: 25,
       total_marks: 30,
+      pass_marks: 12,
       negative_marks: 0.25,
       is_locked: true,
       position: 2,
+      instructions: 'লকড টেস্ট: শুধুমাত্র ভর্তি হওয়া শিক্ষার্থীরা এই পরীক্ষা দিতে পারবে।',
+      questions: [],
     },
   ],
 };
@@ -863,10 +929,13 @@ export const INITIAL_COURSE_SHEETS: Record<string, CourseSheet[]> = {
       id: 'cs-101',
       course_id: 'course-1',
       title: 'অধ্যায় ১: আল কুরআন ও তাফসির স্পেশাল হ্যান্ডনোট',
+      subject: 'আল কুরআন',
+      topic: 'উলুমুল কুরআন',
       pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      pdf_name: 'Chapter_1_Al_Quran_Notes.pdf',
       file_size: '৩.৫ মেগাবাইট',
       page_count: '২৪ পেজ',
-      badge_text: 'লেকচার নোট-০১',
+      badge_text: 'ফ্রি ডেমো শিট',
       is_locked: false,
       position: 1,
     },
@@ -874,10 +943,13 @@ export const INITIAL_COURSE_SHEETS: Record<string, CourseSheet[]> = {
       id: 'cs-102',
       course_id: 'course-1',
       title: 'অধ্যায় ২: আরবি নহু-সরফ গুরুত্বপূর্ণ কায়দা ও উদাহরণ',
+      subject: 'আরবি ব্যাকরণ',
+      topic: 'নহু ও সরফ',
       pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      pdf_name: 'Chapter_2_Nahu_Saraf_Rules.pdf',
       file_size: '৪.২ মেগাবাইট',
       page_count: '৩২ পেজ',
-      badge_text: 'লেকচার নোট-০২',
+      badge_text: 'ভিআইপি লেকচার নোট',
       is_locked: true,
       position: 2,
     },
@@ -912,6 +984,17 @@ function normalizeCourseRow(row: any): Course {
     theme_color: row.theme_color || 'emerald',
     features: parsedFeatures,
     status: row.status || 'published',
+    description: row.description || row.about_text || '',
+    about_text: row.about_text || row.description || '',
+    routine_text: row.routine_text || '',
+    routine_pdf_url: row.routine_pdf_url || '',
+    routine_pdf_name: row.routine_pdf_name || '',
+    syllabus_text: row.syllabus_text || '',
+    syllabus_pdf_url: row.syllabus_pdf_url || '',
+    syllabus_pdf_name: row.syllabus_pdf_name || '',
+    leaderboard_enabled: row.leaderboard_enabled !== undefined ? Boolean(row.leaderboard_enabled) : true,
+    leaderboard_info: row.leaderboard_info || '',
+    helpline_contact: row.helpline_contact || '',
     details_button_text: row.details_button_text || 'বিস্তারিত',
     details_button_link: row.details_button_link || '#',
     enroll_button_text: row.enroll_button_text || 'এখনই ভর্তি হন',
@@ -1113,6 +1196,17 @@ export const insertCourse = async (
       theme_color: newCourse.theme_color || 'emerald',
       features: newCourse.features || [],
       status: newCourse.status || 'published',
+      description: newCourse.description || '',
+      about_text: newCourse.about_text || '',
+      routine_text: newCourse.routine_text || '',
+      routine_pdf_url: newCourse.routine_pdf_url || '',
+      routine_pdf_name: newCourse.routine_pdf_name || '',
+      syllabus_text: newCourse.syllabus_text || '',
+      syllabus_pdf_url: newCourse.syllabus_pdf_url || '',
+      syllabus_pdf_name: newCourse.syllabus_pdf_name || '',
+      leaderboard_enabled: newCourse.leaderboard_enabled !== undefined ? newCourse.leaderboard_enabled : true,
+      leaderboard_info: newCourse.leaderboard_info || '',
+      helpline_contact: newCourse.helpline_contact || '',
       details_button_text: newCourse.details_button_text || 'বিস্তারিত',
       details_button_link: newCourse.details_button_link || '#',
       enroll_button_text: newCourse.enroll_button_text || 'এখনই ভর্তি হন',
@@ -1157,9 +1251,11 @@ export const insertCourse = async (
 
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const optionalKeys = [
-          'badge_subtitle', 'sheet_button_text', 'enter_button_text', 'enroll_button_link',
-          'enroll_button_text', 'details_button_link', 'details_button_text', 'features',
-          'theme_color', 'total_exams', 'total_sheets', 'total_classes', 'enrolled_count',
+          'routine_pdf_name', 'syllabus_pdf_name', 'helpline_contact', 'leaderboard_info',
+          'leaderboard_enabled', 'routine_text', 'routine_pdf_url', 'syllabus_text', 'syllabus_pdf_url',
+          'description', 'about_text', 'badge_subtitle', 'sheet_button_text', 'enter_button_text',
+          'enroll_button_link', 'enroll_button_text', 'details_button_link', 'details_button_text',
+          'features', 'theme_color', 'total_exams', 'total_sheets', 'total_classes', 'enrolled_count',
           'instructor_name', 'badge', 'price', 'status', 'category'
         ];
         for (const key of optionalKeys) {
@@ -1233,6 +1329,17 @@ export const updateCourse = async (
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.description !== undefined) payload.description = updatedFields.description;
+    if (updatedFields.about_text !== undefined) payload.about_text = updatedFields.about_text;
+    if (updatedFields.routine_text !== undefined) payload.routine_text = updatedFields.routine_text;
+    if (updatedFields.routine_pdf_url !== undefined) payload.routine_pdf_url = updatedFields.routine_pdf_url;
+    if (updatedFields.routine_pdf_name !== undefined) payload.routine_pdf_name = updatedFields.routine_pdf_name;
+    if (updatedFields.syllabus_text !== undefined) payload.syllabus_text = updatedFields.syllabus_text;
+    if (updatedFields.syllabus_pdf_url !== undefined) payload.syllabus_pdf_url = updatedFields.syllabus_pdf_url;
+    if (updatedFields.syllabus_pdf_name !== undefined) payload.syllabus_pdf_name = updatedFields.syllabus_pdf_name;
+    if (updatedFields.leaderboard_enabled !== undefined) payload.leaderboard_enabled = updatedFields.leaderboard_enabled;
+    if (updatedFields.leaderboard_info !== undefined) payload.leaderboard_info = updatedFields.leaderboard_info;
+    if (updatedFields.helpline_contact !== undefined) payload.helpline_contact = updatedFields.helpline_contact;
     if (updatedFields.details_button_text !== undefined) payload.details_button_text = updatedFields.details_button_text;
     if (updatedFields.details_button_link !== undefined) payload.details_button_link = updatedFields.details_button_link;
     if (updatedFields.enroll_button_text !== undefined) payload.enroll_button_text = updatedFields.enroll_button_text;
@@ -1348,20 +1455,43 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
       return { exams: defaultList, error: null };
     }
 
-    const norm: CourseExam[] = (data || []).map((row) => ({
-      id: String(row.id),
-      course_id: String(row.course_id),
-      title: row.title || '',
-      subject: row.subject || 'আরবি',
-      question_count: Number(row.question_count || 0),
-      time_minutes: Number(row.time_minutes || 0),
-      total_marks: Number(row.total_marks || 0),
-      negative_marks: Number(row.negative_marks || 0),
-      is_locked: Boolean(row.is_locked),
-      position: Number(row.position || 1),
-      exam_id: row.exam_id ? String(row.exam_id) : null,
-      created_at: row.created_at || new Date().toISOString(),
-    }));
+    const norm: CourseExam[] = (data || []).map((row) => {
+      let parsedQuestions: any[] = [];
+      if (Array.isArray(row.questions)) {
+        parsedQuestions = row.questions;
+      } else if (typeof row.questions === 'string') {
+        try {
+          parsedQuestions = JSON.parse(row.questions);
+        } catch (e) {
+          parsedQuestions = [];
+        }
+      }
+
+      // Check if local cache has questions for this exam
+      const localExam = defaultList.find((e) => e.id === String(row.id));
+      if (parsedQuestions.length === 0 && localExam?.questions && localExam.questions.length > 0) {
+        parsedQuestions = localExam.questions;
+      }
+
+      return {
+        id: String(row.id),
+        course_id: String(row.course_id),
+        title: row.title || '',
+        subject: row.subject || 'আরবি',
+        topic: row.topic || localExam?.topic || '',
+        question_count: Number(row.question_count || parsedQuestions.length || 0),
+        time_minutes: Number(row.time_minutes || 15),
+        total_marks: Number(row.total_marks || 20),
+        pass_marks: Number(row.pass_marks || 10),
+        negative_marks: Number(row.negative_marks || 0.25),
+        is_locked: Boolean(row.is_locked),
+        position: Number(row.position || 1),
+        exam_id: row.exam_id ? String(row.exam_id) : null,
+        instructions: row.instructions || localExam?.instructions || '',
+        questions: parsedQuestions,
+        created_at: row.created_at || new Date().toISOString(),
+      };
+    });
 
     localMap[courseId] = norm;
     setLocalCourseExamsCache(localMap);
@@ -1392,43 +1522,75 @@ export const insertCourseExam = async (
   }
 
   try {
-    const payload = {
+    const payload: any = {
       course_id: newExam.course_id,
       title: newExam.title,
       subject: newExam.subject,
+      topic: newExam.topic || '',
       question_count: newExam.question_count,
       time_minutes: newExam.time_minutes,
       total_marks: newExam.total_marks,
+      pass_marks: newExam.pass_marks || 10,
       negative_marks: newExam.negative_marks,
       is_locked: newExam.is_locked,
       position: newExam.position || existing.length + 1,
+      instructions: newExam.instructions || '',
+      questions: newExam.questions || [],
       ...(newExam.exam_id ? { exam_id: newExam.exam_id } : {}),
     };
 
-    const { data, error } = await client
-      .from('course_exams')
-      .insert([payload])
-      .select()
-      .single();
+    let lastError: any = null;
+    let insertedRow: any = null;
 
-    if (error) {
-      console.warn('Supabase insertCourseExam fallback:', error.message);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const { data, error } = await client
+        .from('course_exams')
+        .insert([payload])
+        .select();
+
+      if (!error) {
+        if (data && data.length > 0) {
+          insertedRow = data[0];
+        }
+        lastError = null;
+        break;
+      }
+
+      lastError = error;
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
+      if (matches) {
+        const colName = matches[1] || matches[2];
+        if (colName && colName in payload) {
+          delete payload[colName];
+          stripped = true;
+        }
+      }
+
+      if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
+        const optKeys = ['questions', 'instructions', 'pass_marks', 'topic', 'negative_marks', 'is_locked', 'position', 'exam_id'];
+        for (const k of optKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+
+    if (lastError) {
+      console.warn('Supabase insertCourseExam fallback:', lastError.message);
       return { success: true, data: examObj, error: null };
     }
 
     const inserted: CourseExam = {
-      id: String(data.id),
-      course_id: String(data.course_id),
-      title: data.title,
-      subject: data.subject,
-      question_count: Number(data.question_count),
-      time_minutes: Number(data.time_minutes),
-      total_marks: Number(data.total_marks),
-      negative_marks: Number(data.negative_marks),
-      is_locked: Boolean(data.is_locked),
-      position: Number(data.position || 1),
-      exam_id: data.exam_id ? String(data.exam_id) : null,
-      created_at: data.created_at,
+      ...examObj,
+      id: insertedRow?.id ? String(insertedRow.id) : examObj.id,
+      title: insertedRow?.title || examObj.title,
     };
 
     return { success: true, data: inserted, error: null };
@@ -1455,9 +1617,10 @@ export const updateCourseExam = async (
   if (!client) return { success: true, error: null };
 
   try {
+    const payload: any = { ...updatedFields };
     const { error } = await client
       .from('course_exams')
-      .update(updatedFields)
+      .update(payload)
       .eq('id', id);
 
     if (error) console.warn('Supabase updateCourseExam warning:', error.message);
@@ -1511,18 +1674,24 @@ export const fetchCourseSheets = async (courseId: string): Promise<{ sheets: Cou
       return { sheets: defaultList, error: null };
     }
 
-    const norm: CourseSheet[] = (data || []).map((row) => ({
-      id: String(row.id),
-      course_id: String(row.course_id),
-      title: row.title || '',
-      pdf_url: row.pdf_url || '#',
-      file_size: row.file_size || '১.৫ মেগাবাইট',
-      page_count: row.page_count || '১০ পেজ',
-      badge_text: row.badge_text || 'লেকচার নোট',
-      is_locked: Boolean(row.is_locked),
-      position: Number(row.position || 1),
-      created_at: row.created_at || new Date().toISOString(),
-    }));
+    const norm: CourseSheet[] = (data || []).map((row) => {
+      const localSheet = defaultList.find((s) => s.id === String(row.id));
+      return {
+        id: String(row.id),
+        course_id: String(row.course_id),
+        title: row.title || '',
+        subject: row.subject || localSheet?.subject || 'আরবি',
+        topic: row.topic || localSheet?.topic || '',
+        pdf_url: row.pdf_url || '#',
+        pdf_name: row.pdf_name || localSheet?.pdf_name || '',
+        file_size: row.file_size || '১.৫ মেগাবাইট',
+        page_count: row.page_count || '১০ পেজ',
+        badge_text: row.badge_text || 'লেকচার নোট',
+        is_locked: Boolean(row.is_locked),
+        position: Number(row.position || 1),
+        created_at: row.created_at || new Date().toISOString(),
+      };
+    });
 
     localMap[courseId] = norm;
     setLocalCourseSheetsCache(localMap);
@@ -1553,10 +1722,13 @@ export const insertCourseSheet = async (
   }
 
   try {
-    const payload = {
+    const payload: any = {
       course_id: newSheet.course_id,
       title: newSheet.title,
+      subject: newSheet.subject || 'আরবি',
+      topic: newSheet.topic || '',
       pdf_url: newSheet.pdf_url,
+      pdf_name: newSheet.pdf_name || '',
       file_size: newSheet.file_size,
       page_count: newSheet.page_count,
       badge_text: newSheet.badge_text || 'লেকচার নোট',
@@ -1564,28 +1736,58 @@ export const insertCourseSheet = async (
       position: newSheet.position || existing.length + 1,
     };
 
-    const { data, error } = await client
-      .from('course_sheets')
-      .insert([payload])
-      .select()
-      .single();
+    let lastError: any = null;
+    let insertedRow: any = null;
 
-    if (error) {
-      console.warn('Supabase insertCourseSheet fallback:', error.message);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const { data, error } = await client
+        .from('course_sheets')
+        .insert([payload])
+        .select();
+
+      if (!error) {
+        if (data && data.length > 0) {
+          insertedRow = data[0];
+        }
+        lastError = null;
+        break;
+      }
+
+      lastError = error;
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
+      if (matches) {
+        const colName = matches[1] || matches[2];
+        if (colName && colName in payload) {
+          delete payload[colName];
+          stripped = true;
+        }
+      }
+
+      if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
+        const optKeys = ['pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'];
+        for (const k of optKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+
+    if (lastError) {
+      console.warn('Supabase insertCourseSheet fallback:', lastError.message);
       return { success: true, data: sheetObj, error: null };
     }
 
     const inserted: CourseSheet = {
-      id: String(data.id),
-      course_id: String(data.course_id),
-      title: data.title,
-      pdf_url: data.pdf_url,
-      file_size: data.file_size,
-      page_count: data.page_count,
-      badge_text: data.badge_text,
-      is_locked: Boolean(data.is_locked),
-      position: Number(data.position || 1),
-      created_at: data.created_at,
+      ...sheetObj,
+      id: insertedRow?.id ? String(insertedRow.id) : sheetObj.id,
+      title: insertedRow?.title || sheetObj.title,
     };
 
     return { success: true, data: inserted, error: null };
