@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, CheckCircle, RefreshCw, X, HelpCircle, Layers, BookOpen, Award, Video, FileText, ChevronRight, Eye } from 'lucide-react';
+import {
+  Smartphone,
+  CheckCircle,
+  RefreshCw,
+  X,
+  HelpCircle,
+  Layers,
+  BookOpen,
+  Award,
+  Video,
+  FileText,
+  ChevronRight,
+  Eye,
+  Calendar,
+} from 'lucide-react';
 import { getSupabaseClient, fetchPublishedCoursesForStudent } from '../lib/supabase';
 import { Question, Course } from '../types';
 import { CourseDetailsModal } from './course/CourseDetailsModal';
@@ -19,6 +33,9 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
   const [showAnswer, setShowAnswer] = useState(false);
   const [coursesError, setCoursesError] = useState<string | null>(null);
   const [selectedCourseForDetails, setSelectedCourseForDetails] = useState<Course | null>(null);
+  const [selectedTabForDetails, setSelectedTabForDetails] = useState<
+    'details' | 'routine' | 'syllabus' | 'exams' | 'sheets'
+  >('details');
 
   const fetchStudentView = async () => {
     setLoading(true);
@@ -174,6 +191,69 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
 
                     <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">{c.title}</h4>
 
+                    {/* Quick Button Tabs in Mobile App */}
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseForDetails(c);
+                          setSelectedTabForDetails('routine');
+                        }}
+                        className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                          <span>রুটিন</span>
+                        </span>
+                        <span className="text-[10px] opacity-80">&rarr;</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseForDetails(c);
+                          setSelectedTabForDetails('syllabus');
+                        }}
+                        className="p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>সিলেবাস</span>
+                        </span>
+                        <span className="text-[10px] opacity-80">&rarr;</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseForDetails(c);
+                          setSelectedTabForDetails('exams');
+                        }}
+                        className="p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-[11px] font-bold flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Award className="w-3.5 h-3.5 text-purple-500" />
+                          <span>মডেল টেস্ট ({c.total_exams}টি)</span>
+                        </span>
+                        <span className="text-[10px] opacity-80">&rarr;</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseForDetails(c);
+                          setSelectedTabForDetails('sheets');
+                        }}
+                        className="p-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-600 dark:text-teal-400 text-[11px] font-bold flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-teal-500" />
+                          <span>পিডিএফ শিট ({c.total_sheets}টি)</span>
+                        </span>
+                        <span className="text-[10px] opacity-80">&rarr;</span>
+                      </button>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 py-2 px-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-center text-[10px]">
                       <div>
                         <span className="block font-bold text-slate-800 dark:text-slate-200">{c.total_classes}টি</span>
@@ -190,19 +270,27 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
                     </div>
 
                     <div className="pt-1 flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-slate-500">শিক্ষক: {c.instructor_name}</span>
-                      <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-slate-500 truncate">শিক্ষক: {c.instructor_name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => setSelectedCourseForDetails(c)}
-                          className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-[11px] border border-slate-700 flex items-center gap-1 transition-colors"
+                          onClick={() => {
+                            setSelectedCourseForDetails(c);
+                            setSelectedTabForDetails('details');
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-[11px] border border-slate-700 flex items-center gap-1 transition-colors"
                         >
                           <Eye className="w-3 h-3" />
-                          <span>বিস্তারিত</span>
+                          <span>{c.details_button_text || 'বিস্তারিত'}</span>
                         </button>
-                        <span className="px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 font-extrabold text-[11px]">
+                        <a
+                          href={c.enroll_button_link || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] transition-colors"
+                        >
                           {c.enroll_button_text || 'ভর্তি হন'}
-                        </span>
+                        </a>
                       </div>
                     </div>
                   </div>
@@ -335,7 +423,7 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
           isOpen={!!selectedCourseForDetails}
           onClose={() => setSelectedCourseForDetails(null)}
           course={selectedCourseForDetails}
-          initialTab="details"
+          initialTab={selectedTabForDetails}
         />
       )}
     </div>
