@@ -2230,8 +2230,8 @@ export const insertCourseExam = async (
       title: newExam.title,
       subject: newExam.subject || 'আরবি',
       topic: newExam.topic || '',
-      question_count: Number(newExam.question_count) || 20,
-      total_questions: Number(newExam.question_count) || 20,
+      question_count: Number(newExam.question_count) || (Array.isArray(newExam.questions) ? newExam.questions.length : 20),
+      total_questions: Number(newExam.question_count) || (Array.isArray(newExam.questions) ? newExam.questions.length : 20),
       time_minutes: Number(newExam.time_minutes) || 15,
       duration_minutes: Number(newExam.time_minutes) || 15,
       duration: Number(newExam.time_minutes) || 15,
@@ -2256,10 +2256,10 @@ export const insertCourseExam = async (
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 35; attempt++) {
       const { data, error } = await client
         .from('course_exams')
-        .insert([payload])
+        .upsert([payload], { onConflict: 'id' })
         .select();
 
       if (!error) {
@@ -2325,6 +2325,15 @@ export const insertCourseExam = async (
       if (!stripped) break;
     }
 
+    // Update parent course total_exams in Supabase
+    try {
+      const allForCourse = localMap[newExam.course_id] || [];
+      await client
+        .from('courses')
+        .update({ total_exams: allForCourse.length })
+        .eq('id', newExam.course_id);
+    } catch (e) {}
+
     if (lastError) {
       console.warn('Supabase insertCourseExam fallback:', lastError.message);
       return { success: true, data: examObj, error: null };
@@ -2350,8 +2359,10 @@ export const updateCourseExam = async (
   const localMap = getLocalCourseExamsCache();
   const list = localMap[courseId] || [];
   const idx = list.findIndex((e) => e.id === id);
+  let currentExam = list[idx];
   if (idx !== -1) {
     list[idx] = { ...list[idx], ...updatedFields };
+    currentExam = list[idx];
     localMap[courseId] = [...list];
     setLocalCourseExamsCache(localMap);
   }
@@ -2361,38 +2372,69 @@ export const updateCourseExam = async (
 
   try {
     const payload: any = {
-      ...updatedFields,
-      ...(updatedFields.question_count !== undefined
-        ? { question_count: Number(updatedFields.question_count), total_questions: Number(updatedFields.question_count) }
-        : {}),
-      ...(updatedFields.time_minutes !== undefined
-        ? { time_minutes: Number(updatedFields.time_minutes), duration_minutes: Number(updatedFields.time_minutes), duration: Number(updatedFields.time_minutes) }
-        : {}),
-      ...(updatedFields.total_marks !== undefined
-        ? { total_marks: Number(updatedFields.total_marks), full_marks: Number(updatedFields.total_marks) }
-        : {}),
-      ...(updatedFields.pass_marks !== undefined
-        ? { pass_marks: Number(updatedFields.pass_marks), pass_mark: Number(updatedFields.pass_marks) }
-        : {}),
-      ...(updatedFields.negative_marks !== undefined
-        ? { negative_marks: Number(updatedFields.negative_marks), negative_mark: Number(updatedFields.negative_marks) }
-        : {}),
-      ...(updatedFields.is_locked !== undefined
-        ? { is_locked: Boolean(updatedFields.is_locked), locked: Boolean(updatedFields.is_locked) }
-        : {}),
-      ...(updatedFields.position !== undefined
-        ? { position: Number(updatedFields.position), order: Number(updatedFields.position), serial: Number(updatedFields.position) }
-        : {}),
+      id,
+      course_id: courseId,
+      title: currentExam?.title || updatedFields.title,
+      subject: currentExam?.subject || updatedFields.subject || 'আরবি',
+      topic: currentExam?.topic || updatedFields.topic || '',
+      question_count: Number(updatedFields.question_count ?? currentExam?.question_count ?? 20),
+      total_questions: Number(updatedFields.question_count ?? currentExam?.question_count ?? 20),
+      time_minutes: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
+      duration_minutes: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
+      duration: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
+      total_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? 20),
+      full_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? 20),
+      pass_marks: Number(updatedFields.pass_marks ?? currentExam?.pass_marks ?? 10),
+      pass_mark: Number(updatedFields.pass_marks ?? currentExam?.pass_marks ?? 10),
+      negative_marks: Number(updatedFields.negative_marks ?? currentExam?.negative_marks ?? 0.25),
+      negative_mark: Number(updatedFields.negative_marks ?? currentExam?.negative_marks ?? 0.25),
+      is_locked: Boolean(updatedFields.is_locked ?? currentExam?.is_locked),
+      locked: Boolean(updatedFields.is_locked ?? currentExam?.is_locked),
+      instructions: updatedFields.instructions ?? currentExam?.instructions ?? '',
+      ...(updatedFields.questions ? { questions: updatedFields.questions } : currentExam?.questions ? { questions: currentExam.questions } : {}),
     };
-    delete payload.id;
-    delete payload.created_at;
 
-    const { error } = await client
-      .from('course_exams')
-      .update(payload)
-      .eq('id', id);
+    for (let attempt = 0; attempt < 35; attempt++) {
+      const { error } = await client
+        .from('course_exams')
+        .upsert([payload], { onConflict: 'id' });
 
-    if (error) console.warn('Supabase updateCourseExam warning:', error.message);
+      if (!error) break;
+
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+
+      for (const k of Object.keys(payload)) {
+        if (errMsg.includes(k.toLowerCase()) && k !== 'title' && k !== 'course_id' && k !== 'id') {
+          delete payload[k];
+          stripped = true;
+        }
+      }
+
+      if (errMsg.includes('questions') && Array.isArray(payload.questions)) {
+        payload.questions = JSON.stringify(payload.questions);
+        stripped = true;
+      }
+
+      if (!stripped) {
+        const optKeys = [
+          'is_published', 'status', 'serial', 'order', 'locked', 'negative_mark',
+          'pass_mark', 'full_marks', 'duration', 'duration_minutes', 'total_questions',
+          'questions', 'instructions', 'pass_marks', 'topic', 'negative_marks',
+          'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'
+        ];
+        for (const k of optKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+
     return { success: true, error: null };
   } catch (e) {
     return { success: true, error: null };
@@ -2413,10 +2455,118 @@ export const deleteCourseExam = async (
 
   try {
     await client.from('course_exams').delete().eq('id', id);
+    try {
+      await client
+        .from('courses')
+        .update({ total_exams: localMap[courseId].length })
+        .eq('id', courseId);
+    } catch (e) {}
     return { success: true, error: null };
   } catch (e) {
     return { success: true, error: null };
   }
+};
+
+// Sync All Exams for a specific Course directly to Supabase
+export const syncCourseExamsToSupabase = async (
+  courseId: string,
+  customList?: CourseExam[]
+): Promise<{ success: boolean; count: number; error: string | null }> => {
+  const client = getSupabaseClient();
+  const localMap = getLocalCourseExamsCache();
+  const list = customList || localMap[courseId] || [];
+
+  if (!client) {
+    return { success: true, count: list.length, error: null };
+  }
+
+  let synced = 0;
+  let lastErr: string | null = null;
+
+  for (const exam of list) {
+    const payload: any = {
+      id: exam.id,
+      course_id: courseId,
+      title: exam.title,
+      subject: exam.subject || 'আরবি',
+      topic: exam.topic || '',
+      question_count: Number(exam.question_count) || (Array.isArray(exam.questions) ? exam.questions.length : 20),
+      total_questions: Number(exam.question_count) || (Array.isArray(exam.questions) ? exam.questions.length : 20),
+      time_minutes: Number(exam.time_minutes) || 15,
+      duration_minutes: Number(exam.time_minutes) || 15,
+      duration: Number(exam.time_minutes) || 15,
+      total_marks: Number(exam.total_marks) || 20,
+      full_marks: Number(exam.total_marks) || 20,
+      pass_marks: Number(exam.pass_marks) || 10,
+      pass_mark: Number(exam.pass_marks) || 10,
+      negative_marks: Number(exam.negative_marks) || 0.25,
+      negative_mark: Number(exam.negative_marks) || 0.25,
+      is_locked: Boolean(exam.is_locked),
+      locked: Boolean(exam.is_locked),
+      position: Number(exam.position) || 1,
+      order: Number(exam.position) || 1,
+      serial: Number(exam.position) || 1,
+      instructions: exam.instructions || '',
+      questions: Array.isArray(exam.questions) ? exam.questions : [],
+      status: 'published',
+      is_published: true,
+      ...(exam.exam_id ? { exam_id: exam.exam_id } : {}),
+    };
+
+    for (let att = 0; att < 35; att++) {
+      const { error } = await client
+        .from('course_exams')
+        .upsert([payload], { onConflict: 'id' });
+
+      if (!error) {
+        synced++;
+        break;
+      }
+
+      lastErr = error.message;
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+
+      for (const k of Object.keys(payload)) {
+        if (errMsg.includes(k.toLowerCase()) && k !== 'title' && k !== 'course_id' && k !== 'id') {
+          delete payload[k];
+          stripped = true;
+        }
+      }
+
+      if (errMsg.includes('questions') && Array.isArray(payload.questions)) {
+        payload.questions = JSON.stringify(payload.questions);
+        stripped = true;
+      }
+
+      if (!stripped) {
+        const optExKeys = [
+          'is_published', 'status', 'serial', 'order', 'locked', 'negative_mark',
+          'pass_mark', 'full_marks', 'duration', 'duration_minutes', 'total_questions',
+          'questions', 'instructions', 'pass_marks', 'topic', 'negative_marks',
+          'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'
+        ];
+        for (const k of optExKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+  }
+
+  try {
+    await client
+      .from('courses')
+      .update({ total_exams: list.length })
+      .eq('id', courseId);
+  } catch (e) {}
+
+  return { success: true, count: synced, error: lastErr };
 };
 
 /* ==========================================================================
@@ -2522,10 +2672,10 @@ export const insertCourseSheet = async (
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 12; attempt++) {
+    for (let attempt = 0; attempt < 35; attempt++) {
       const { data, error } = await client
         .from('course_sheets')
-        .insert([payload])
+        .upsert([payload], { onConflict: 'id' })
         .select();
 
       if (!error) {
@@ -2565,6 +2715,15 @@ export const insertCourseSheet = async (
       if (!stripped) break;
     }
 
+    // Update parent course total_sheets in Supabase
+    try {
+      const allForCourse = localMap[newSheet.course_id] || [];
+      await client
+        .from('courses')
+        .update({ total_sheets: allForCourse.length })
+        .eq('id', newSheet.course_id);
+    } catch (e) {}
+
     if (lastError) {
       console.warn('Supabase insertCourseSheet fallback:', lastError.message);
       return { success: true, data: sheetObj, error: null };
@@ -2590,8 +2749,10 @@ export const updateCourseSheet = async (
   const localMap = getLocalCourseSheetsCache();
   const list = localMap[courseId] || [];
   const idx = list.findIndex((s) => s.id === id);
+  let currentSheet = list[idx];
   if (idx !== -1) {
     list[idx] = { ...list[idx], ...updatedFields };
+    currentSheet = list[idx];
     localMap[courseId] = [...list];
     setLocalCourseSheetsCache(localMap);
   }
@@ -2600,12 +2761,63 @@ export const updateCourseSheet = async (
   if (!client) return { success: true, error: null };
 
   try {
-    const { error } = await client
-      .from('course_sheets')
-      .update(updatedFields)
-      .eq('id', id);
+    const payload: any = {
+      id,
+      course_id: courseId,
+      title: currentSheet?.title || updatedFields.title,
+      subject: currentSheet?.subject || updatedFields.subject || 'আরবি',
+      topic: currentSheet?.topic || updatedFields.topic || '',
+      pdf_url: currentSheet?.pdf_url || updatedFields.pdf_url || '#',
+      file_url: currentSheet?.pdf_url || updatedFields.pdf_url || '#',
+      pdf_link: currentSheet?.pdf_url || updatedFields.pdf_url || '#',
+      pdf_name: currentSheet?.pdf_name || updatedFields.pdf_name || '',
+      file_size: currentSheet?.file_size || updatedFields.file_size || '১.৫ মেগাবাইট',
+      page_count: currentSheet?.page_count || updatedFields.page_count || '১০ পেজ',
+      total_pages: currentSheet?.page_count || updatedFields.page_count || '১০ পেজ',
+      badge_text: currentSheet?.badge_text || updatedFields.badge_text || 'লেকচার নোট',
+      badge: currentSheet?.badge_text || updatedFields.badge_text || 'লেকচার নোট',
+      is_locked: Boolean(updatedFields.is_locked ?? currentSheet?.is_locked),
+      locked: Boolean(updatedFields.is_locked ?? currentSheet?.is_locked),
+      position: Number(updatedFields.position ?? currentSheet?.position ?? 1),
+      order: Number(updatedFields.position ?? currentSheet?.position ?? 1),
+      serial: Number(updatedFields.position ?? currentSheet?.position ?? 1),
+    };
 
-    if (error) console.warn('Supabase updateCourseSheet warning:', error.message);
+    for (let attempt = 0; attempt < 35; attempt++) {
+      const { error } = await client
+        .from('course_sheets')
+        .upsert([payload], { onConflict: 'id' });
+
+      if (!error) break;
+
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
+      if (matches) {
+        const colName = matches[1] || matches[2];
+        if (colName && colName in payload && colName !== 'title' && colName !== 'course_id' && colName !== 'id') {
+          delete payload[colName];
+          stripped = true;
+        }
+      }
+
+      if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
+        const optKeys = [
+          'serial', 'order', 'locked', 'badge', 'total_pages', 'pdf_link', 'file_url',
+          'pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'
+        ];
+        for (const k of optKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+
     return { success: true, error: null };
   } catch (e) {
     return { success: true, error: null };
@@ -2626,10 +2838,105 @@ export const deleteCourseSheet = async (
 
   try {
     await client.from('course_sheets').delete().eq('id', id);
+    try {
+      await client
+        .from('courses')
+        .update({ total_sheets: localMap[courseId].length })
+        .eq('id', courseId);
+    } catch (e) {}
     return { success: true, error: null };
   } catch (e) {
     return { success: true, error: null };
   }
+};
+
+// Sync All Sheets for a specific Course directly to Supabase
+export const syncCourseSheetsToSupabase = async (
+  courseId: string,
+  customList?: CourseSheet[]
+): Promise<{ success: boolean; count: number; error: string | null }> => {
+  const client = getSupabaseClient();
+  const localMap = getLocalCourseSheetsCache();
+  const list = customList || localMap[courseId] || [];
+
+  if (!client) {
+    return { success: true, count: list.length, error: null };
+  }
+
+  let synced = 0;
+  let lastErr: string | null = null;
+
+  for (const sheet of list) {
+    const payload: any = {
+      id: sheet.id,
+      course_id: courseId,
+      title: sheet.title,
+      subject: sheet.subject || 'আরবি',
+      topic: sheet.topic || '',
+      pdf_url: sheet.pdf_url,
+      file_url: sheet.pdf_url,
+      pdf_link: sheet.pdf_url,
+      pdf_name: sheet.pdf_name || '',
+      file_size: sheet.file_size || '১.৫ মেগাবাইট',
+      page_count: sheet.page_count || '১০ পেজ',
+      total_pages: sheet.page_count || '১০ পেজ',
+      badge_text: sheet.badge_text || 'লেকচার নোট',
+      badge: sheet.badge_text || 'লেকচার নোট',
+      is_locked: Boolean(sheet.is_locked),
+      locked: Boolean(sheet.is_locked),
+      position: Number(sheet.position) || 1,
+      order: Number(sheet.position) || 1,
+      serial: Number(sheet.position) || 1,
+    };
+
+    for (let att = 0; att < 35; att++) {
+      const { error } = await client
+        .from('course_sheets')
+        .upsert([payload], { onConflict: 'id' });
+
+      if (!error) {
+        synced++;
+        break;
+      }
+
+      lastErr = error.message;
+      const errMsg = (error.message || '').toLowerCase();
+      let stripped = false;
+      const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
+      if (matches) {
+        const colName = matches[1] || matches[2];
+        if (colName && colName in payload && colName !== 'title' && colName !== 'course_id' && colName !== 'id') {
+          delete payload[colName];
+          stripped = true;
+        }
+      }
+
+      if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
+        const optKeys = [
+          'serial', 'order', 'locked', 'badge', 'total_pages', 'pdf_link', 'file_url',
+          'pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'
+        ];
+        for (const k of optKeys) {
+          if (k in payload) {
+            delete payload[k];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
+      if (!stripped) break;
+    }
+  }
+
+  try {
+    await client
+      .from('courses')
+      .update({ total_sheets: list.length })
+      .eq('id', courseId);
+  } catch (e) {}
+
+  return { success: true, count: synced, error: lastErr };
 };
 
 /* ==========================================================================
