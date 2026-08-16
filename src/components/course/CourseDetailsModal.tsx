@@ -28,7 +28,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Course, CourseExam, CourseSheet, CourseExamQuestion, COURSE_THEMES } from '../../types';
-import { fetchCourseExams, fetchCourseSheets, updateCourse } from '../../lib/supabase';
+import { fetchCourseExams, fetchCourseSheets, updateCourse, fetchQuestionsForCourseExam } from '../../lib/supabase';
 
 interface CourseDetailsModalProps {
   isOpen: boolean;
@@ -86,6 +86,7 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [examTimeLeft, setExamTimeLeft] = useState<number>(0);
+  const [loadingExamId, setLoadingExamId] = useState<string | null>(null);
 
   useEffect(() => {
     setCourse(initialCourseData);
@@ -224,11 +225,34 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
 
   const themeObj = COURSE_THEMES.find((t) => t.id === course.theme_color) || COURSE_THEMES[0];
 
-  const handleStartExam = (exam: CourseExam) => {
-    setTakingExam(exam);
+  const handleStartExam = async (exam: CourseExam) => {
+    let examObj = { ...exam };
+
+    if (!examObj.questions || examObj.questions.length === 0) {
+      setLoadingExamId(exam.id);
+      try {
+        const res = await fetchQuestionsForCourseExam(exam.id, course.id, exam.subject, exam.topic);
+        if (res.questions && res.questions.length > 0) {
+          examObj.questions = res.questions;
+          examObj.question_count = res.questions.length;
+          examObj.total_marks = res.questions.length;
+
+          // Update local exams list state too
+          setExams((prev) =>
+            prev.map((e) => (e.id === exam.id ? { ...e, questions: res.questions, question_count: res.questions.length } : e))
+          );
+        }
+      } catch (err) {
+        console.warn('Error fetching questions for exam:', err);
+      } finally {
+        setLoadingExamId(null);
+      }
+    }
+
+    setTakingExam(examObj);
     setSelectedAnswers({});
     setExamSubmitted(false);
-    setExamTimeLeft((exam.time_minutes || 15) * 60);
+    setExamTimeLeft((examObj.time_minutes || 15) * 60);
   };
 
   const handleSelectOption = (qId: string, optKey: string) => {
@@ -1280,10 +1304,20 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
 
                       <button
                         onClick={() => handleStartExam(exam)}
-                        className="w-full py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-purple-500/30"
+                        disabled={loadingExamId === exam.id}
+                        className="w-full py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500 disabled:opacity-50 text-purple-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-purple-500/30"
                       >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                        পরীক্ষা শুরু করুন
+                        {loadingExamId === exam.id ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            প্রশ্ন লোড হচ্ছে...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            পরীক্ষা শুরু করুন
+                          </>
+                        )}
                       </button>
                     </div>
                   ))}

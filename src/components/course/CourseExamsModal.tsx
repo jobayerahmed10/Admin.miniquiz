@@ -28,8 +28,8 @@ import {
   Edit3,
   ArrowLeft,
 } from 'lucide-react';
-import { Course, CourseExam, CourseExamQuestion, Question } from '../../types';
-import { fetchAllQuestions } from '../../lib/supabase';
+import { Course, CourseExam, CourseExamQuestion, Question, Exam } from '../../types';
+import { fetchAllQuestions, fetchAllExams, fetchQuestionsByExamId, fetchQuestionsForCourseExam } from '../../lib/supabase';
 import { isArabicText } from '../AddAiQuestionsModal';
 
 interface CourseExamsModalProps {
@@ -59,7 +59,13 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
   const [activeExamForQuestions, setActiveExamForQuestions] = useState<CourseExam | null>(null);
 
   // Active question adding tab inside an exam
-  const [questionTab, setQuestionTab] = useState<'manual' | 'copypaste' | 'aitopic' | 'bank'>('copypaste');
+  const [questionTab, setQuestionTab] = useState<'manual' | 'copypaste' | 'aitopic' | 'bank' | 'import_exam'>('copypaste');
+
+  // Model Exams Library State
+  const [allModelExams, setAllModelExams] = useState<Exam[]>([]);
+  const [loadingModelExams, setLoadingModelExams] = useState(false);
+  const [importingExamId, setImportingExamId] = useState<string | null>(null);
+  const [showDirectExamImport, setShowDirectExamImport] = useState(false);
 
   // Exam Form State (for creating/editing an exam)
   const [examForm, setExamForm] = useState({
@@ -132,6 +138,25 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
       if (activeExamForQuestions.question_count) {
         setTopicQuestionCount(activeExamForQuestions.question_count);
       }
+
+      // If active exam has no questions loaded in state, dynamically fetch from Supabase
+      if (!activeExamForQuestions.questions || activeExamForQuestions.questions.length === 0) {
+        fetchQuestionsForCourseExam(
+          activeExamForQuestions.id,
+          course.id,
+          activeExamForQuestions.subject,
+          activeExamForQuestions.topic
+        ).then((res) => {
+          if (res.questions && res.questions.length > 0) {
+            onUpdateExam(activeExamForQuestions.id, {
+              questions: res.questions,
+              question_count: res.questions.length,
+              total_marks: res.questions.length,
+            });
+            setActiveExamForQuestions((prev) => (prev ? { ...prev, questions: res.questions, question_count: res.questions.length } : null));
+          }
+        });
+      }
     }
   }, [exams]);
 
@@ -140,7 +165,16 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
     if (activeExamForQuestions && questionTab === 'bank' && bankQuestions.length === 0) {
       loadQuestionBank();
     }
+    if (activeExamForQuestions && questionTab === 'import_exam' && allModelExams.length === 0) {
+      loadModelExams();
+    }
   }, [activeExamForQuestions, questionTab]);
+
+  useEffect(() => {
+    if (showDirectExamImport && allModelExams.length === 0) {
+      loadModelExams();
+    }
+  }, [showDirectExamImport]);
 
   const loadQuestionBank = async () => {
     setLoadingBank(true);
@@ -149,6 +183,132 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
       setBankQuestions(res.questions);
     }
     setLoadingBank(false);
+  };
+
+  const loadModelExams = async () => {
+    setLoadingModelExams(true);
+    const res = await fetchAllExams();
+    if (!res.error && res.exams) {
+      setAllModelExams(res.exams);
+    }
+    setLoadingModelExams(false);
+  };
+
+  // Import all questions from an Admin Model Test into the currently active Course Exam
+  const handleImportQuestionsFromModelExam = async (modelExam: Exam) => {
+    if (!activeExamForQuestions) return;
+    setImportingExamId(modelExam.id);
+    try {
+      let qList: CourseExamQuestion[] = [];
+      const qRes = await fetchQuestionsByExamId(modelExam.id);
+      if (qRes.questions && qRes.questions.length > 0) {
+        qList = qRes.questions.map((q, idx) => ({
+          id: `q-exam-${modelExam.id}-${Date.now()}-${idx}`,
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          subject: q.subject || modelExam.subject || activeExamForQuestions.subject,
+          topic: q.topic || activeExamForQuestions.topic,
+        }));
+      } else {
+        // Fallback: fetch questions matching subject
+        const allQ = await fetchAllQuestions();
+        const matching = (allQ.questions || []).filter(
+          (q) => !modelExam.subject || q.subject === modelExam.subject || q.topic === modelExam.title
+        );
+        qList = matching.slice(0, modelExam.question_count || 20).map((q, idx) => ({
+          id: `q-fallback-${Date.now()}-${idx}`,
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          subject: q.subject || modelExam.subject,
+          topic: q.topic,
+        }));
+      }
+
+      if (qList.length > 0) {
+        await handleBatchAddQuestionsToActiveExam(qList);
+        showSuccessBanner(`"${modelExam.title}" থেকে সফলভাবে ${qList.length}টি প্রশ্ন যুক্ত হয়েছে!`);
+      } else {
+        showSuccessBanner(`"${modelExam.title}"-এ কোনো প্রশ্ন পাওয়া যায়নি।`);
+      }
+    } catch (err: any) {
+      console.error('Error importing questions from model exam:', err);
+    } finally {
+      setImportingExamId(null);
+    }
+  };
+
+  // Direct 1-Click Import an Admin Model Test as a new Course Exam in this Course
+  const handleDirectImportModelExamAsCourseExam = async (modelExam: Exam) => {
+    setImportingExamId(modelExam.id);
+    try {
+      let qList: CourseExamQuestion[] = [];
+      const qRes = await fetchQuestionsByExamId(modelExam.id);
+      if (qRes.questions && qRes.questions.length > 0) {
+        qList = qRes.questions.map((q, idx) => ({
+          id: `q-direct-${modelExam.id}-${Date.now()}-${idx}`,
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          subject: q.subject || modelExam.subject,
+          topic: q.topic,
+        }));
+      } else {
+        // Fallback: match by subject from question bank
+        const allQ = await fetchAllQuestions();
+        const matching = (allQ.questions || []).filter(
+          (q) => !modelExam.subject || q.subject === modelExam.subject || q.topic === modelExam.title
+        );
+        qList = matching.slice(0, modelExam.question_count || 20).map((q, idx) => ({
+          id: `q-direct-${Date.now()}-${idx}`,
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          subject: q.subject || modelExam.subject,
+          topic: q.topic,
+        }));
+      }
+
+      await onAddExam({
+        course_id: course.id,
+        title: modelExam.title,
+        subject: modelExam.subject || course.category || 'আরবি',
+        topic: modelExam.badge || '',
+        question_count: qList.length > 0 ? qList.length : (modelExam.question_count || 20),
+        time_minutes: modelExam.time_minutes || 15,
+        total_marks: qList.length > 0 ? qList.length : (modelExam.total_marks || 20),
+        pass_marks: Math.round((modelExam.total_marks || 20) * 0.5),
+        negative_marks: modelExam.negative_marks || 0.25,
+        is_locked: false,
+        position: exams.length + 1,
+        instructions: modelExam.description || 'মডেল টেস্ট পরীক্ষা',
+        questions: qList,
+      });
+
+      showSuccessBanner(`মডেল টেস্ট "${modelExam.title}" (${qList.length}টি প্রশ্নসহ) সফলভাবে কোর্সে যুক্ত হয়েছে!`);
+      setShowDirectExamImport(false);
+    } catch (err: any) {
+      console.error('Error importing direct exam:', err);
+    } finally {
+      setImportingExamId(null);
+    }
   };
 
   const showSuccessBanner = (msg: string) => {
@@ -714,26 +874,38 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
 
                   <button
                     onClick={() => setQuestionTab('bank')}
-                    className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                    className={`flex-1 min-w-[140px] py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
                       questionTab === 'bank'
                         ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20'
                         : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
                     }`}
                   >
                     <Database className="w-4 h-4" />
-                    মাস্টার প্রশ্ন ব্যাংক থেকে নির্বাচন
+                    প্রশ্ন ব্যাংক
+                  </button>
+
+                  <button
+                    onClick={() => setQuestionTab('import_exam')}
+                    className={`flex-1 min-w-[140px] py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                      questionTab === 'import_exam'
+                        ? 'bg-sky-600 text-white border-sky-500 shadow-md shadow-sky-600/20'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    মডেল টেস্ট থেকে ইমপোর্ট
                   </button>
 
                   <button
                     onClick={() => setQuestionTab('manual')}
-                    className={`flex-1 min-w-[150px] py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                    className={`flex-1 min-w-[140px] py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
                       questionTab === 'manual'
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 font-black'
                         : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
                     }`}
                   >
                     <Plus className="w-4 h-4" />
-                    ম্যানুয়ালি একটি একটি করে
+                    ম্যানুয়ালি তৈরি
                   </button>
                 </div>
 
@@ -1229,7 +1401,90 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
                   </div>
                 )}
 
-                {/* TAB 4: MANUAL SINGLE QUESTION ADD */}
+                {/* TAB 4: IMPORT QUESTIONS FROM ADMIN MODEL TEST */}
+                {questionTab === 'import_exam' && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="font-bold flex items-center gap-1.5 mb-1 text-sky-200">
+                          <BookOpen className="w-4 h-4 text-sky-400" /> এডমিন মডেল টেস্ট লাইব্রেরি:
+                        </span>
+                        এডমিন প্যানেলে তৈরি করা যেকোনো মডেল টেস্টের প্রশ্নসমূহ ১-ক্লিকে এই কোর্স পরীক্ষায় যুক্ত করুন।
+                      </div>
+                      <button
+                        type="button"
+                        onClick={loadModelExams}
+                        disabled={loadingModelExams}
+                        className="px-3.5 py-1.5 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 text-xs font-bold border border-sky-500/40 flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+                      >
+                        <Loader2 className={`w-3.5 h-3.5 ${loadingModelExams ? 'animate-spin' : ''}`} />
+                        রিফ্রেশ করুন
+                      </button>
+                    </div>
+
+                    {loadingModelExams ? (
+                      <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                        মডেল টেস্ট তালিকা লোড হচ্ছে...
+                      </div>
+                    ) : allModelExams.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800">
+                        কোনো মডেল টেস্ট পাওয়া যায়নি।
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-1">
+                        {allModelExams.map((mExam) => (
+                          <div
+                            key={mExam.id}
+                            className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-sky-500/40 transition-all flex flex-col justify-between space-y-3"
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[10px]">
+                                  {mExam.subject || 'সাধারণ'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  {mExam.time_minutes} মি.
+                                </span>
+                              </div>
+                              <h5 className="font-bold text-white text-xs line-clamp-2">{mExam.title}</h5>
+                              <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-1">
+                                <span>
+                                  প্রশ্ন: <b className="text-sky-300">{mExam.question_count || 0} টি</b>
+                                </span>
+                                <span>
+                                  পূর্ণমান: <b className="text-slate-200">{mExam.total_marks || 20}</b>
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={importingExamId === mExam.id}
+                              onClick={() => handleImportQuestionsFromModelExam(mExam)}
+                              className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-sky-600/20 transition-colors"
+                            >
+                              {importingExamId === mExam.id ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  প্রশ্ন ইমপোর্ট হচ্ছে...
+                                </>
+                              ) : (
+                                <>
+                                  <PlusCircle className="w-3.5 h-3.5" />
+                                  এই মডেল টেস্টের প্রশ্ন যোগ করুন
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 5: MANUAL SINGLE QUESTION ADD */}
                 {questionTab === 'manual' && (
                   <form
                     onSubmit={handleAddManualQuestionToExam}
@@ -1587,6 +1842,103 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
                   </button>
                 </div>
               </form>
+
+              {/* Direct Model Test Library Import Banner */}
+              <div className="bg-sky-950/30 border border-sky-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-white text-xs">এডমিন মডেল টেস্ট লাইব্রেরি থেকে সরাসরি যুক্ত করুন</h5>
+                    <p className="text-[11px] text-slate-400">
+                      পূর্বের তৈরি করা মডেল টেস্ট ও তার সকল প্রশ্ন ১-ক্লিকে এই কোর্সে পরীক্ষা হিসেবে যুক্ত করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDirectExamImport(!showDirectExamImport)}
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-md shadow-sky-600/20 transition-all self-start sm:self-auto"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {showDirectExamImport ? 'লাইব্রেরি লুকান' : 'মডেল টেস্ট ব্রাউজ করুন'}
+                </button>
+              </div>
+
+              {/* Direct Model Test Selection Grid */}
+              {showDirectExamImport && (
+                <div className="bg-slate-900/90 border border-sky-500/40 rounded-2xl p-4 sm:p-5 space-y-4 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h5 className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-sky-400" />
+                      উপলব্ধ মডেল টেস্টসমূহ ({allModelExams.length} টি)
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={loadModelExams}
+                      disabled={loadingModelExams}
+                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+                    >
+                      <Loader2 className={`w-3 h-3 ${loadingModelExams ? 'animate-spin' : ''}`} />
+                      রিফ্রেশ
+                    </button>
+                  </div>
+
+                  {loadingModelExams ? (
+                    <div className="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                      মডেল টেস্ট তালিকা লোড হচ্ছে...
+                    </div>
+                  ) : allModelExams.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-500 bg-slate-950 rounded-xl">
+                      কোনো মডেল টেস্ট পাওয়া যায়নি।
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                      {allModelExams.map((mEx) => (
+                        <div
+                          key={mEx.id}
+                          className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex flex-col justify-between space-y-2.5 hover:border-sky-500/40"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[9px]">
+                                {mEx.subject || 'সাধারণ'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">{mEx.time_minutes} মি.</span>
+                            </div>
+                            <h6 className="font-bold text-white text-xs line-clamp-2">{mEx.title}</h6>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              প্রশ্ন: <b className="text-sky-300">{mEx.question_count || 0} টি</b>
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={importingExamId === mEx.id}
+                            onClick={() => handleDirectImportModelExamAsCourseExam(mEx)}
+                            className="w-full py-2 rounded-lg bg-sky-600/80 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            {importingExamId === mEx.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                কোর্সে যুক্ত হচ্ছে...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                কোর্সে যুক্ত করুন
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* List of Exams */}
               <div className="space-y-3">

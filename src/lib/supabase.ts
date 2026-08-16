@@ -8,6 +8,7 @@ import {
   ExamStatus,
   Course,
   CourseExam,
+  CourseExamQuestion,
   CourseSheet,
   CourseApplication,
   ApplicationStatus,
@@ -2241,6 +2242,62 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
       };
     });
 
+    // Automatically check public.questions table for questions linked by exam_id or id
+    const examIdsToCheck = Array.from(new Set([
+      ...norm.map((e) => String(e.id)),
+      ...norm.filter((e) => e.exam_id).map((e) => String(e.exam_id)),
+    ]));
+
+    if (examIdsToCheck.length > 0 && client) {
+      try {
+        const { data: qData } = await client
+          .from('questions')
+          .select('*')
+          .in('exam_id', examIdsToCheck);
+
+        if (qData && qData.length > 0) {
+          const questionsByExamId: Record<string, CourseExamQuestion[]> = {};
+          qData.forEach((qRow) => {
+            const eid = String(qRow.exam_id);
+            if (!questionsByExamId[eid]) questionsByExamId[eid] = [];
+            questionsByExamId[eid].push({
+              id: String(qRow.id),
+              question: qRow.question || '',
+              option_a: qRow.option_a || 'ক. অপশন ১',
+              option_b: qRow.option_b || 'খ. অপশন ২',
+              option_c: qRow.option_c || 'গ. অপশন ৩',
+              option_d: qRow.option_d || 'ঘ. অপশন ৪',
+              correct_answer: (qRow.correct_answer || 'option_a') as any,
+              explanation: qRow.explanation || undefined,
+              subject: qRow.subject || '',
+              topic: qRow.topic || '',
+            });
+          });
+
+          norm.forEach((ex) => {
+            const matchedQs = questionsByExamId[ex.id] || (ex.exam_id ? questionsByExamId[String(ex.exam_id)] : []);
+            if (matchedQs && matchedQs.length > 0) {
+              if (!ex.questions || ex.questions.length === 0) {
+                ex.questions = matchedQs;
+              } else {
+                const existingText = new Set(ex.questions.map((q) => q.question.trim()));
+                for (const mq of matchedQs) {
+                  if (!existingText.has(mq.question.trim())) {
+                    ex.questions.push(mq);
+                    existingText.add(mq.question.trim());
+                  }
+                }
+              }
+              ex.question_count = ex.questions.length;
+              ex.total_marks = ex.questions.length;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Could not batch fetch questions for course exams:', err);
+      }
+    }
+
     const supabaseExamIds = new Set((data || []).map((r) => String(r.id)));
     const mergedExams = [
       ...norm,
@@ -2252,6 +2309,124 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
     return { exams: mergedExams, error: null };
   } catch (e: any) {
     return { exams: defaultList, error: null };
+  }
+};
+
+// Fetch questions for a specific course exam with multi-tier fallback
+export const fetchQuestionsForCourseExam = async (
+  examId: string,
+  courseId?: string,
+  subject?: string,
+  topic?: string
+): Promise<{ questions: CourseExamQuestion[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  const localMap = getLocalCourseExamsCache();
+
+  // 1. Check local cache
+  if (courseId && localMap[courseId]) {
+    const cachedExam = localMap[courseId].find((e) => e.id === examId || e.exam_id === examId);
+    if (cachedExam && cachedExam.questions && cachedExam.questions.length > 0) {
+      return { questions: cachedExam.questions, error: null };
+    }
+  }
+
+  if (!client) {
+    return { questions: [], error: null };
+  }
+
+  try {
+    // 2. Query public.questions by exam_id
+    const { data: qData, error: qErr } = await client
+      .from('questions')
+      .select('*')
+      .eq('exam_id', examId)
+      .order('created_at', { ascending: true });
+
+    if (!qErr && qData && qData.length > 0) {
+      const qs: CourseExamQuestion[] = qData.map((qRow) => ({
+        id: String(qRow.id),
+        question: qRow.question || '',
+        option_a: qRow.option_a || 'ক. অপশন ১',
+        option_b: qRow.option_b || 'খ. অপশন ২',
+        option_c: qRow.option_c || 'গ. অপশন ৩',
+        option_d: qRow.option_d || 'ঘ. অপশন ৪',
+        correct_answer: (qRow.correct_answer || 'option_a') as any,
+        explanation: qRow.explanation || undefined,
+        subject: qRow.subject || subject || '',
+        topic: qRow.topic || topic || '',
+      }));
+      return { questions: qs, error: null };
+    }
+
+    // 3. Check course_exams row directly
+    const { data: examRow } = await client
+      .from('course_exams')
+      .select('questions, exam_id')
+      .eq('id', examId)
+      .maybeSingle();
+
+    if (examRow) {
+      let parsed: any[] = [];
+      if (Array.isArray(examRow.questions)) parsed = examRow.questions;
+      else if (typeof examRow.questions === 'string') {
+        try {
+          parsed = JSON.parse(examRow.questions);
+        } catch (e) {}
+      }
+      if (parsed.length > 0) {
+        return { questions: parsed, error: null };
+      }
+      if (examRow.exam_id) {
+        const { data: linkedQData } = await client
+          .from('questions')
+          .select('*')
+          .eq('exam_id', examRow.exam_id);
+        if (linkedQData && linkedQData.length > 0) {
+          const qs: CourseExamQuestion[] = linkedQData.map((qRow) => ({
+            id: String(qRow.id),
+            question: qRow.question || '',
+            option_a: qRow.option_a || 'ক. অপশন ১',
+            option_b: qRow.option_b || 'খ. অপশন ২',
+            option_c: qRow.option_c || 'গ. অপশন ৩',
+            option_d: qRow.option_d || 'ঘ. অপশন ৪',
+            correct_answer: (qRow.correct_answer || 'option_a') as any,
+            explanation: qRow.explanation || undefined,
+            subject: qRow.subject || subject || '',
+            topic: qRow.topic || topic || '',
+          }));
+          return { questions: qs, error: null };
+        }
+      }
+    }
+
+    // 4. Fallback by Subject if specified
+    if (subject && subject !== 'সকল') {
+      const { data: subjectQuestions } = await client
+        .from('questions')
+        .select('*')
+        .eq('subject', subject)
+        .limit(20);
+
+      if (subjectQuestions && subjectQuestions.length > 0) {
+        const qs: CourseExamQuestion[] = subjectQuestions.map((qRow) => ({
+          id: String(qRow.id),
+          question: qRow.question || '',
+          option_a: qRow.option_a || 'ক. অপশন ১',
+          option_b: qRow.option_b || 'খ. অপশন ২',
+          option_c: qRow.option_c || 'গ. অপশন ৩',
+          option_d: qRow.option_d || 'ঘ. অপশন ৪',
+          correct_answer: (qRow.correct_answer || 'option_a') as any,
+          explanation: qRow.explanation || undefined,
+          subject: qRow.subject || subject || '',
+          topic: qRow.topic || topic || '',
+        }));
+        return { questions: qs, error: null };
+      }
+    }
+
+    return { questions: [], error: null };
+  } catch (err: any) {
+    return { questions: [], error: err?.message || null };
   }
 };
 
@@ -2377,6 +2552,28 @@ export const insertCourseExam = async (
       if (!stripped) break;
     }
 
+    // Also persist questions into public.questions table for guaranteed redundancy
+    if (Array.isArray(newExam.questions) && newExam.questions.length > 0) {
+      try {
+        const qPayload = newExam.questions.map((q) => ({
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          status: 'published',
+          subject: q.subject || newExam.subject || 'আরবি',
+          topic: q.topic || newExam.topic || '',
+          exam_id: id,
+        }));
+        await client.from('questions').insert(qPayload);
+      } catch (qErr) {
+        console.warn('Could not insert course exam questions to questions table:', qErr);
+      }
+    }
+
     // Update parent course total_exams in Supabase
     try {
       const allForCourse = localMap[newExam.course_id] || [];
@@ -2429,13 +2626,13 @@ export const updateCourseExam = async (
       title: currentExam?.title || updatedFields.title,
       subject: currentExam?.subject || updatedFields.subject || 'আরবি',
       topic: currentExam?.topic || updatedFields.topic || '',
-      question_count: Number(updatedFields.question_count ?? currentExam?.question_count ?? 20),
-      total_questions: Number(updatedFields.question_count ?? currentExam?.question_count ?? 20),
+      question_count: Number(updatedFields.question_count ?? currentExam?.question_count ?? (Array.isArray(updatedFields.questions) ? updatedFields.questions.length : 20)),
+      total_questions: Number(updatedFields.question_count ?? currentExam?.question_count ?? (Array.isArray(updatedFields.questions) ? updatedFields.questions.length : 20)),
       time_minutes: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
       duration_minutes: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
       duration: Number(updatedFields.time_minutes ?? currentExam?.time_minutes ?? 15),
-      total_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? 20),
-      full_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? 20),
+      total_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? (Array.isArray(updatedFields.questions) ? updatedFields.questions.length : 20)),
+      full_marks: Number(updatedFields.total_marks ?? currentExam?.total_marks ?? (Array.isArray(updatedFields.questions) ? updatedFields.questions.length : 20)),
       pass_marks: Number(updatedFields.pass_marks ?? currentExam?.pass_marks ?? 10),
       pass_mark: Number(updatedFields.pass_marks ?? currentExam?.pass_marks ?? 10),
       negative_marks: Number(updatedFields.negative_marks ?? currentExam?.negative_marks ?? 0.25),
@@ -2485,6 +2682,28 @@ export const updateCourseExam = async (
       }
 
       if (!stripped) break;
+    }
+
+    // Also sync questions to public.questions table for persistence
+    if (Array.isArray(updatedFields.questions) && updatedFields.questions.length > 0) {
+      try {
+        const qPayload = updatedFields.questions.map((q) => ({
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          status: 'published',
+          subject: q.subject || currentExam?.subject || 'আরবি',
+          topic: q.topic || currentExam?.topic || '',
+          exam_id: id,
+        }));
+        await client.from('questions').insert(qPayload);
+      } catch (qErr) {
+        console.warn('Could not insert course exam questions to questions table:', qErr);
+      }
     }
 
     return { success: true, error: null };
