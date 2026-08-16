@@ -1205,6 +1205,83 @@ export const fetchAllCourses = async (): Promise<{
   }
 };
 
+// Helper to sync course sub-tables (course_details, course_routines, course_syllabus)
+export const syncCourseSubTables = async (course: Partial<Course> & { id: string }) => {
+  const client = getSupabaseClient();
+  if (!client || !course.id) return;
+
+  const desc = course.about_text || course.description || '';
+  const rout = course.routine_text || '';
+  const routPdf = course.routine_pdf_url || '';
+  const syll = course.syllabus_text || '';
+  const syllPdf = course.syllabus_pdf_url || '';
+
+  // 1. Sync to course_details if table exists
+  try {
+    const detailsPayload: any = {
+      id: course.id,
+      course_id: course.id,
+      title: course.title || '',
+      about_text: desc,
+      description: desc,
+      about: desc,
+      details: desc,
+      features: Array.isArray(course.features) ? course.features : [],
+      helpline_contact: course.helpline_contact || '',
+      details_button_link: course.details_button_link || '',
+      enroll_button_link: course.enroll_button_link || '',
+      updated_at: new Date().toISOString(),
+    };
+    await client.from('course_details').upsert([detailsPayload], { onConflict: 'id' });
+  } catch (e) {
+    // Graceful silent fallback if table not created
+  }
+
+  // 2. Sync to course_routines if table exists
+  try {
+    const routinePayload: any = {
+      id: course.id,
+      course_id: course.id,
+      title: course.title ? `${course.title} - রুটিন` : 'রুটিন',
+      routine_text: rout,
+      routine_description: rout,
+      routine: rout,
+      routine_pdf_url: routPdf,
+      pdf_url: routPdf,
+      pdf_link: routPdf,
+      file_url: routPdf,
+      routine_pdf_name: course.routine_pdf_name || '',
+      file_name: course.routine_pdf_name || '',
+      updated_at: new Date().toISOString(),
+    };
+    await client.from('course_routines').upsert([routinePayload], { onConflict: 'id' });
+  } catch (e) {
+    // Graceful silent fallback
+  }
+
+  // 3. Sync to course_syllabus if table exists
+  try {
+    const syllabusPayload: any = {
+      id: course.id,
+      course_id: course.id,
+      title: course.title ? `${course.title} - সিলেবাস` : 'সিলেবাস',
+      syllabus_text: syll,
+      syllabus_description: syll,
+      syllabus: syll,
+      syllabus_pdf_url: syllPdf,
+      pdf_url: syllPdf,
+      pdf_link: syllPdf,
+      file_url: syllPdf,
+      syllabus_pdf_name: course.syllabus_pdf_name || '',
+      file_name: course.syllabus_pdf_name || '',
+      updated_at: new Date().toISOString(),
+    };
+    await client.from('course_syllabus').upsert([syllabusPayload], { onConflict: 'id' });
+  } catch (e) {
+    // Graceful silent fallback
+  }
+};
+
 // Insert New Course
 export const insertCourse = async (
   newCourse: Omit<Course, 'id' | 'created_at' | 'updated_at'>
@@ -1391,6 +1468,9 @@ export const insertCourse = async (
     const finalInserted = insertedRow || courseData;
     const latestLocal = getLocalCoursesCache();
     setLocalCoursesCache([finalInserted, ...latestLocal.filter((c) => c.id !== finalInserted.id)]);
+
+    // Also sync sub-tables (course_details, course_routines, course_syllabus)
+    syncCourseSubTables(finalInserted).catch(() => {});
 
     return { success: true, data: finalInserted, error: null };
   } catch (err: any) {
@@ -1591,7 +1671,12 @@ export const updateCourse = async (
       return { success: false, data: updatedCourse, error: lastError.message };
     }
 
-    return { success: true, data: updatedRow || updatedCourse, error: null };
+    const finalCourse = updatedRow || updatedCourse;
+    if (finalCourse) {
+      syncCourseSubTables(finalCourse).catch(() => {});
+    }
+
+    return { success: true, data: finalCourse, error: null };
   } catch (err: any) {
     return { success: false, data: updatedCourse, error: err?.message || null };
   }
@@ -1762,6 +1847,13 @@ export const syncSingleCourseToSupabase = async (
       c.id === course.id ? { ...c, is_synced_to_supabase: true } : c
     );
     setLocalCoursesCache(updated);
+
+    // Sync sub-tables (course_details, course_routines, course_syllabus)
+    try {
+      await syncCourseSubTables(course);
+    } catch (e) {
+      console.warn('Sync sub-tables warning:', e);
+    }
 
     // 2. Also Sync Related course_exams to Supabase
     try {

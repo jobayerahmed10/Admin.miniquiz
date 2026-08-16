@@ -66,6 +66,7 @@ export const CoursesManagement: React.FC = () => {
   // Modals state
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [courseModalInitialTab, setCourseModalInitialTab] = useState<'basic' | 'details' | 'routine' | 'syllabus' | 'buttons'>('basic');
 
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [detailsModalCourse, setDetailsModalCourse] = useState<Course | null>(null);
@@ -136,12 +137,17 @@ export const CoursesManagement: React.FC = () => {
   // Open Course Create Modal
   const handleOpenCreateModal = () => {
     setEditingCourse(null);
+    setCourseModalInitialTab('basic');
     setShowCourseModal(true);
   };
 
   // Open Course Edit Modal
-  const handleOpenEditModal = (course: Course) => {
+  const handleOpenEditModal = (
+    course: Course,
+    tab: 'basic' | 'details' | 'routine' | 'syllabus' | 'buttons' = 'basic'
+  ) => {
     setEditingCourse(course);
+    setCourseModalInitialTab(tab);
     setShowCourseModal(true);
   };
 
@@ -770,6 +776,11 @@ NOTIFY pgrst, 'reload schema';
             setShowDetailsModal(false);
             handleOpenEditModal(course);
           }}
+          onEditCourseTab={(course, tab) => {
+            setShowDetailsModal(false);
+            handleOpenEditModal(course, tab);
+          }}
+          onCourseUpdated={loadCourses}
           onManageExams={(course) => {
             setShowDetailsModal(false);
             handleOpenExamsModal(course);
@@ -787,6 +798,7 @@ NOTIFY pgrst, 'reload schema';
         onClose={() => setShowCourseModal(false)}
         onSave={handleSaveCourse}
         editingCourse={editingCourse}
+        initialTab={courseModalInitialTab}
       />
 
       {/* Exams Management & Question Builder Modal */}

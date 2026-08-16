@@ -20,6 +20,7 @@ import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 interface CourseCardProps {
   course: Course;
   onEditCourse: (course: Course) => void;
+  onEditCourseTab?: (course: Course, tab: 'basic' | 'details' | 'routine' | 'syllabus' | 'buttons') => void;
   onDeleteCourse: (courseId: string, title: string) => void;
   onToggleStatus: (course: Course) => void;
   onManageExams: (course: Course) => void;
@@ -32,6 +33,7 @@ interface CourseCardProps {
 export const CourseCard: React.FC<CourseCardProps> = ({
   course,
   onEditCourse,
+  onEditCourseTab,
   onDeleteCourse,
   onToggleStatus,
   onManageExams,
@@ -42,6 +44,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 }) => {
   const themeObj =
     COURSE_THEMES.find((t) => t.id === course.theme_color) || COURSE_THEMES[0];
+
+  const handleOpenTab = (tab: 'basic' | 'details' | 'routine' | 'syllabus' | 'buttons') => {
+    if (onEditCourseTab) {
+      onEditCourseTab(course, tab);
+    } else {
+      onEditCourse(course);
+    }
+  };
 
   return (
     <div
@@ -182,72 +192,109 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         )}
 
         {/* Quick Button Content Status Indicators */}
-        <div className="grid grid-cols-2 gap-2 mb-5 text-[11px]">
+        <div className="grid grid-cols-2 gap-2 mb-4 text-[11px]">
           <button
             type="button"
-            onClick={() => onViewDetails && onViewDetails(course, 'details')}
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+            onClick={() => handleOpenTab('details')}
+            className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-left transition-all cursor-pointer group/btn"
           >
             <div className="flex items-center justify-between text-emerald-400 font-bold mb-0.5">
               <span className="flex items-center gap-1.5">
-                <Info className="w-3 h-3" />
-                <span>বিস্তারিত কন্টেন্ট</span>
+                <Info className="w-3.5 h-3.5" />
+                <span>১. বিস্তারিত বাটন</span>
               </span>
-              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+              <Edit className="w-3 h-3 opacity-60 group-hover/btn:opacity-100 group-hover/btn:text-emerald-300 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.about_text ? '✓ টেক্সট যুক্ত আছে' : 'টেক্সট খালি (ক্লিক)'}
+              {course.about_text || course.description ? '✓ বিবরণ যুক্ত (এডিট)' : 'খালি (ক্লিক করে লিখুন)'}
             </span>
           </button>
 
           <button
             type="button"
-            onClick={() => onViewDetails && onViewDetails(course, 'routine')}
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+            onClick={() => handleOpenTab('routine')}
+            className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 text-left transition-all cursor-pointer group/btn"
           >
             <div className="flex items-center justify-between text-amber-400 font-bold mb-0.5">
               <span className="flex items-center gap-1.5">
-                <Calendar className="w-3 h-3" />
-                <span>রুটিন কন্টেন্ট</span>
+                <Calendar className="w-3.5 h-3.5" />
+                <span>২. রুটিন বাটন</span>
               </span>
-              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+              <Edit className="w-3 h-3 opacity-60 group-hover/btn:opacity-100 group-hover/btn:text-amber-300 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.routine_pdf_url ? '✓ PDF যুক্ত' : course.routine_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক)'}
+              {course.routine_pdf_url ? '✓ PDF যুক্ত (এডিট)' : course.routine_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক করে যুক্ত)'}
             </span>
           </button>
 
           <button
             type="button"
-            onClick={() => onViewDetails && onViewDetails(course, 'syllabus')}
-            className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-left transition-colors cursor-pointer group/btn"
+            onClick={() => handleOpenTab('syllabus')}
+            className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-left transition-all cursor-pointer group/btn"
           >
             <div className="flex items-center justify-between text-indigo-400 font-bold mb-0.5">
               <span className="flex items-center gap-1.5">
-                <BookOpen className="w-3 h-3" />
-                <span>সিলেবাস কন্টেন্ট</span>
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>৩. সিলেবাস বাটন</span>
               </span>
-              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+              <Edit className="w-3 h-3 opacity-60 group-hover/btn:opacity-100 group-hover/btn:text-indigo-300 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.syllabus_pdf_url ? '✓ PDF যুক্ত' : course.syllabus_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক)'}
+              {course.syllabus_pdf_url ? '✓ PDF যুক্ত (এডিট)' : course.syllabus_text ? '✓ টেক্সট যুক্ত' : 'খালি (ক্লিক করে যুক্ত)'}
             </span>
           </button>
 
-          <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300">
-            <div className="flex items-center gap-1.5 text-teal-400 font-bold mb-0.5">
-              <ExternalLink className="w-3 h-3" />
-              <span>ভর্তি বাটন</span>
+          <button
+            type="button"
+            onClick={() => handleOpenTab('buttons')}
+            className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-teal-500/40 text-left transition-all cursor-pointer group/btn"
+          >
+            <div className="flex items-center justify-between text-teal-400 font-bold mb-0.5">
+              <span className="flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>৪. বাটন লিংক</span>
+              </span>
+              <Edit className="w-3 h-3 opacity-60 group-hover/btn:opacity-100 group-hover/btn:text-teal-300 transition-opacity" />
             </div>
             <span className="text-[10px] text-slate-400 block truncate">
-              {course.enroll_button_text || 'ভর্তি হন'}
+              {course.enroll_button_text || 'ভর্তি বাটন এডিট'}
             </span>
-          </div>
+          </button>
         </div>
       </div>
 
       {/* Card Bottom Actions */}
       <div className="space-y-2 pt-3 border-t border-slate-800/80">
+        {/* Quick Direct Button Row */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleOpenTab('details')}
+            className="py-1.5 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition-all flex items-center justify-center gap-1"
+          >
+            <Info className="w-3 h-3 text-emerald-400" />
+            <span>বিস্তারিত</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenTab('routine')}
+            className="py-1.5 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition-all flex items-center justify-center gap-1"
+          >
+            <Calendar className="w-3 h-3 text-amber-400" />
+            <span>রুটিন</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenTab('syllabus')}
+            className="py-1.5 px-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold transition-all flex items-center justify-center gap-1"
+          >
+            <BookOpen className="w-3 h-3 text-indigo-400" />
+            <span>সিলেবাস</span>
+          </button>
+        </div>
+
         {/* Full View / Enter Inside Button */}
         {onViewDetails && (
           <button
@@ -256,7 +303,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             className="w-full py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-slate-700/80"
           >
             <Eye className="w-4 h-4 text-emerald-400" />
-            <span>ভিতরে প্রবেশ &bull; বিস্তারিত, রুটিন ও পরীক্ষা প্রিভিউ</span>
+            <span>ভিতরে প্রবেশ &bull; প্রিভিউ ও লাইভ স্টুডেন্ট ভিউ</span>
           </button>
         )}
 

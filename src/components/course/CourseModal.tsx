@@ -25,6 +25,7 @@ interface CourseModalProps {
   onClose: () => void;
   onSave: (courseData: any) => Promise<void>;
   editingCourse: Course | null;
+  initialTab?: 'basic' | 'details' | 'routine' | 'syllabus' | 'buttons';
 }
 
 export const CourseModal: React.FC<CourseModalProps> = ({
@@ -32,14 +33,21 @@ export const CourseModal: React.FC<CourseModalProps> = ({
   onClose,
   onSave,
   editingCourse,
+  initialTab = 'basic',
 }) => {
   const [activeTab, setActiveTab] = useState<
     'basic' | 'details' | 'routine' | 'syllabus' | 'buttons'
-  >('basic');
+  >(initialTab);
   const [isSaving, setIsSaving] = useState(false);
 
   const routineFileInputRef = useRef<HTMLInputElement>(null);
   const syllabusFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   const [formData, setFormData] = useState({
     title: '',
