@@ -1229,37 +1229,61 @@ export const insertCourse = async (
   }
 
   try {
+    const descText = newCourse.about_text || newCourse.description || '';
+    const routText = newCourse.routine_text || '';
+    const syllText = newCourse.syllabus_text || '';
+
     let payload: any = {
+      id: fallbackId,
       title: newCourse.title,
       category: newCourse.category || 'আরবি প্রভাষক',
       badge: newCourse.badge || 'রেকর্ড ব্যাচ',
+      badge_title: newCourse.badge || 'রেকর্ড ব্যাচ',
       badge_subtitle: newCourse.badge_subtitle || '',
       instructor_name: newCourse.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+      instructor: newCourse.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
       price: newCourse.price || '৳৯৫০',
       enrolled_count: Number(newCourse.enrolled_count) || 0,
       total_classes: Number(newCourse.total_classes) || 0,
+      classes_count: Number(newCourse.total_classes) || 0,
       total_sheets: Number(newCourse.total_sheets) || 0,
+      sheets_count: Number(newCourse.total_sheets) || 0,
       total_exams: Number(newCourse.total_exams) || 0,
+      exams_count: Number(newCourse.total_exams) || 0,
       theme_color: newCourse.theme_color || 'emerald',
       features: Array.isArray(newCourse.features) ? newCourse.features : [],
       status: newCourse.status || 'published',
-      description: newCourse.description || '',
-      about_text: newCourse.about_text || '',
-      routine_text: newCourse.routine_text || '',
+      description: descText,
+      about_text: descText,
+      about: descText,
+      details: descText,
+      routine_text: routText,
+      routine: routText,
+      routine_description: routText,
       routine_pdf_url: newCourse.routine_pdf_url || '',
+      routine_pdf: newCourse.routine_pdf_url || '',
       routine_pdf_name: newCourse.routine_pdf_name || '',
-      syllabus_text: newCourse.syllabus_text || '',
+      syllabus_text: syllText,
+      syllabus: syllText,
+      syllabus_description: syllText,
       syllabus_pdf_url: newCourse.syllabus_pdf_url || '',
+      syllabus_pdf: newCourse.syllabus_pdf_url || '',
       syllabus_pdf_name: newCourse.syllabus_pdf_name || '',
       leaderboard_enabled: newCourse.leaderboard_enabled !== undefined ? Boolean(newCourse.leaderboard_enabled) : true,
       leaderboard_info: newCourse.leaderboard_info || '',
       helpline_contact: newCourse.helpline_contact || '',
       details_button_text: newCourse.details_button_text || 'বিস্তারিত',
+      details_text: newCourse.details_button_text || 'বিস্তারিত',
       details_button_link: newCourse.details_button_link || '#',
+      details_link: newCourse.details_button_link || '#',
       enroll_button_text: newCourse.enroll_button_text || 'এখনই ভর্তি হন',
+      enroll_text: newCourse.enroll_button_text || 'এখনই ভর্তি হন',
       enroll_button_link: newCourse.enroll_button_link || '#',
+      enroll_link: newCourse.enroll_button_link || '#',
       enter_button_text: newCourse.enter_button_text || 'প্রবেশ করুন',
+      enter_text: newCourse.enter_button_text || 'প্রবেশ করুন',
       sheet_button_text: newCourse.sheet_button_text || 'শিট ডাউনলোড',
+      sheet_text: newCourse.sheet_button_text || 'শিট ডাউনলোড',
     };
 
     let lastError: any = null;
@@ -1288,19 +1312,13 @@ export const insertCourse = async (
       // 1. Check if any key in payload is explicitly named in the error message
       const payloadKeys = Object.keys(payload);
       for (const key of payloadKeys) {
-        if (errMsg.includes(key.toLowerCase()) && key !== 'title') {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title' && key !== 'id') {
           delete payload[key];
           stripped = true;
         }
       }
 
-      // 2. If Postgres requires explicit ID
-      if (errMsg.includes('null value in column "id"') || (errMsg.includes('id') && errMsg.includes('not-null'))) {
-        payload.id = generateStandardUUID();
-        stripped = true;
-      }
-
-      // 3. Extract column name via regex patterns
+      // 2. Extract column name via regex patterns
       const regexPatterns = [
         /find the ['"]?([a-zA-Z0-9_]+)['"]? column/i,
         /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/i,
@@ -1312,7 +1330,7 @@ export const insertCourse = async (
         const match = error.message.match(pattern);
         if (match && match[1]) {
           const colName = match[1];
-          if (colName in payload && colName !== 'title') {
+          if (colName in payload && colName !== 'title' && colName !== 'id') {
             delete payload[colName];
             stripped = true;
             break;
@@ -1320,22 +1338,25 @@ export const insertCourse = async (
         }
       }
 
-      // 4. If JSONB issue with features
+      // 3. If JSONB issue with features
       if (errMsg.includes('features') && Array.isArray(payload.features)) {
         payload.features = JSON.stringify(payload.features);
         stripped = true;
       }
 
-      // 5. Fallback sequential strip if generic schema cache error
+      // 4. Fallback sequential strip if generic schema cache error
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const optionalKeys = [
-          'routine_pdf_url', 'routine_pdf_name', 'routine_text',
-          'syllabus_pdf_url', 'syllabus_pdf_name', 'syllabus_text',
+          'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
+          'syllabus_pdf_url', 'syllabus_pdf', 'syllabus_pdf_name', 'syllabus_text', 'syllabus', 'syllabus_description',
           'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
-          'details_button_text', 'details_button_link', 'enroll_button_text', 'enroll_button_link',
-          'enter_button_text', 'sheet_button_text', 'badge_subtitle', 'about_text',
-          'description', 'features', 'theme_color', 'total_exams', 'total_sheets',
-          'total_classes', 'enrolled_count', 'instructor_name', 'badge', 'price', 'status', 'category'
+          'details_button_text', 'details_text', 'details_button_link', 'details_link',
+          'enroll_button_text', 'enroll_text', 'enroll_button_link', 'enroll_link',
+          'enter_button_text', 'enter_text', 'sheet_button_text', 'sheet_text',
+          'badge_subtitle', 'badge_title', 'about_text', 'about', 'details',
+          'description', 'features', 'theme_color', 'total_exams', 'exams_count',
+          'total_sheets', 'sheets_count', 'total_classes', 'classes_count',
+          'enrolled_count', 'instructor_name', 'instructor', 'badge', 'price', 'status', 'category'
         ];
         for (const key of optionalKeys) {
           if (key in payload) {
@@ -1398,37 +1419,94 @@ export const updateCourse = async (
   }
 
   try {
+    const descText = updatedFields.about_text ?? updatedFields.description;
+    const routText = updatedFields.routine_text;
+    const syllText = updatedFields.syllabus_text;
+
     let payload: any = {};
     if (updatedFields.title !== undefined) payload.title = updatedFields.title;
     if (updatedFields.category !== undefined) payload.category = updatedFields.category;
-    if (updatedFields.badge !== undefined) payload.badge = updatedFields.badge;
+    if (updatedFields.badge !== undefined) {
+      payload.badge = updatedFields.badge;
+      payload.badge_title = updatedFields.badge;
+    }
     if (updatedFields.badge_subtitle !== undefined) payload.badge_subtitle = updatedFields.badge_subtitle;
-    if (updatedFields.instructor_name !== undefined) payload.instructor_name = updatedFields.instructor_name;
+    if (updatedFields.instructor_name !== undefined) {
+      payload.instructor_name = updatedFields.instructor_name;
+      payload.instructor = updatedFields.instructor_name;
+    }
     if (updatedFields.price !== undefined) payload.price = updatedFields.price;
     if (updatedFields.enrolled_count !== undefined) payload.enrolled_count = Number(updatedFields.enrolled_count) || 0;
-    if (updatedFields.total_classes !== undefined) payload.total_classes = Number(updatedFields.total_classes) || 0;
-    if (updatedFields.total_sheets !== undefined) payload.total_sheets = Number(updatedFields.total_sheets) || 0;
-    if (updatedFields.total_exams !== undefined) payload.total_exams = Number(updatedFields.total_exams) || 0;
+    if (updatedFields.total_classes !== undefined) {
+      payload.total_classes = Number(updatedFields.total_classes) || 0;
+      payload.classes_count = Number(updatedFields.total_classes) || 0;
+    }
+    if (updatedFields.total_sheets !== undefined) {
+      payload.total_sheets = Number(updatedFields.total_sheets) || 0;
+      payload.sheets_count = Number(updatedFields.total_sheets) || 0;
+    }
+    if (updatedFields.total_exams !== undefined) {
+      payload.total_exams = Number(updatedFields.total_exams) || 0;
+      payload.exams_count = Number(updatedFields.total_exams) || 0;
+    }
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
-    if (updatedFields.description !== undefined) payload.description = updatedFields.description;
-    if (updatedFields.about_text !== undefined) payload.about_text = updatedFields.about_text;
-    if (updatedFields.routine_text !== undefined) payload.routine_text = updatedFields.routine_text;
-    if (updatedFields.routine_pdf_url !== undefined) payload.routine_pdf_url = updatedFields.routine_pdf_url;
+    if (descText !== undefined) {
+      payload.description = descText;
+      payload.about_text = descText;
+      payload.about = descText;
+      payload.details = descText;
+    }
+    if (routText !== undefined) {
+      payload.routine_text = routText;
+      payload.routine = routText;
+      payload.routine_description = routText;
+    }
+    if (updatedFields.routine_pdf_url !== undefined) {
+      payload.routine_pdf_url = updatedFields.routine_pdf_url;
+      payload.routine_pdf = updatedFields.routine_pdf_url;
+    }
     if (updatedFields.routine_pdf_name !== undefined) payload.routine_pdf_name = updatedFields.routine_pdf_name;
-    if (updatedFields.syllabus_text !== undefined) payload.syllabus_text = updatedFields.syllabus_text;
-    if (updatedFields.syllabus_pdf_url !== undefined) payload.syllabus_pdf_url = updatedFields.syllabus_pdf_url;
+    if (syllText !== undefined) {
+      payload.syllabus_text = syllText;
+      payload.syllabus = syllText;
+      payload.syllabus_description = syllText;
+    }
+    if (updatedFields.syllabus_pdf_url !== undefined) {
+      payload.syllabus_pdf_url = updatedFields.syllabus_pdf_url;
+      payload.syllabus_pdf = updatedFields.syllabus_pdf_url;
+    }
     if (updatedFields.syllabus_pdf_name !== undefined) payload.syllabus_pdf_name = updatedFields.syllabus_pdf_name;
     if (updatedFields.leaderboard_enabled !== undefined) payload.leaderboard_enabled = Boolean(updatedFields.leaderboard_enabled);
     if (updatedFields.leaderboard_info !== undefined) payload.leaderboard_info = updatedFields.leaderboard_info;
     if (updatedFields.helpline_contact !== undefined) payload.helpline_contact = updatedFields.helpline_contact;
-    if (updatedFields.details_button_text !== undefined) payload.details_button_text = updatedFields.details_button_text;
-    if (updatedFields.details_button_link !== undefined) payload.details_button_link = updatedFields.details_button_link;
-    if (updatedFields.enroll_button_text !== undefined) payload.enroll_button_text = updatedFields.enroll_button_text;
-    if (updatedFields.enroll_button_link !== undefined) payload.enroll_button_link = updatedFields.enroll_button_link;
-    if (updatedFields.enter_button_text !== undefined) payload.enter_button_text = updatedFields.enter_button_text;
-    if (updatedFields.sheet_button_text !== undefined) payload.sheet_button_text = updatedFields.sheet_button_text;
+    if (updatedFields.details_button_text !== undefined) {
+      payload.details_button_text = updatedFields.details_button_text;
+      payload.details_text = updatedFields.details_button_text;
+    }
+    if (updatedFields.details_button_link !== undefined) {
+      payload.details_button_link = updatedFields.details_button_link;
+      payload.details_link = updatedFields.details_button_link;
+    }
+    if (updatedFields.enroll_button_text !== undefined) {
+      payload.enroll_button_text = updatedFields.enroll_button_text;
+      payload.enroll_text = updatedFields.enroll_button_text;
+    }
+    if (updatedFields.enroll_button_link !== undefined) {
+      payload.enroll_button_link = updatedFields.enroll_button_link;
+      payload.enroll_link = updatedFields.enroll_button_link;
+    }
+    if (updatedFields.enter_button_text !== undefined) {
+      payload.enter_button_text = updatedFields.enter_button_text;
+      payload.enter_text = updatedFields.enter_button_text;
+    }
+    if (updatedFields.sheet_button_text !== undefined) {
+      payload.sheet_button_text = updatedFields.sheet_button_text;
+      payload.sheet_text = updatedFields.sheet_button_text;
+    }
+
+    payload.updated_at = new Date().toISOString();
 
     let lastError: any = null;
     let updatedRow: any = null;
@@ -1554,38 +1632,61 @@ export const syncSingleCourseToSupabase = async (
   }
 
   try {
+    const descText = course.about_text || course.description || '';
+    const routText = course.routine_text || '';
+    const syllText = course.syllabus_text || '';
+
     let payload: any = {
       id: course.id,
       title: course.title,
       category: course.category || 'আরবি প্রভাষক',
       badge: course.badge || 'রেকর্ড ব্যাচ',
+      badge_title: course.badge || 'রেকর্ড ব্যাচ',
       badge_subtitle: course.badge_subtitle || '',
       instructor_name: course.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+      instructor: course.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
       price: course.price || '৳৯৫০',
       enrolled_count: Number(course.enrolled_count) || 0,
       total_classes: Number(course.total_classes) || 0,
+      classes_count: Number(course.total_classes) || 0,
       total_sheets: Number(course.total_sheets) || 0,
+      sheets_count: Number(course.total_sheets) || 0,
       total_exams: Number(course.total_exams) || 0,
+      exams_count: Number(course.total_exams) || 0,
       theme_color: course.theme_color || 'emerald',
       features: Array.isArray(course.features) ? course.features : [],
       status: course.status || 'published',
-      description: course.description || '',
-      about_text: course.about_text || '',
-      routine_text: course.routine_text || '',
+      description: descText,
+      about_text: descText,
+      about: descText,
+      details: descText,
+      routine_text: routText,
+      routine: routText,
+      routine_description: routText,
       routine_pdf_url: course.routine_pdf_url || '',
+      routine_pdf: course.routine_pdf_url || '',
       routine_pdf_name: course.routine_pdf_name || '',
-      syllabus_text: course.syllabus_text || '',
+      syllabus_text: syllText,
+      syllabus: syllText,
+      syllabus_description: syllText,
       syllabus_pdf_url: course.syllabus_pdf_url || '',
+      syllabus_pdf: course.syllabus_pdf_url || '',
       syllabus_pdf_name: course.syllabus_pdf_name || '',
       leaderboard_enabled: course.leaderboard_enabled !== undefined ? Boolean(course.leaderboard_enabled) : true,
       leaderboard_info: course.leaderboard_info || '',
       helpline_contact: course.helpline_contact || '',
       details_button_text: course.details_button_text || 'বিস্তারিত',
+      details_text: course.details_button_text || 'বিস্তারিত',
       details_button_link: course.details_button_link || '#',
+      details_link: course.details_button_link || '#',
       enroll_button_text: course.enroll_button_text || 'এখনই ভর্তি হন',
+      enroll_text: course.enroll_button_text || 'এখনই ভর্তি হন',
       enroll_button_link: course.enroll_button_link || '#',
+      enroll_link: course.enroll_button_link || '#',
       enter_button_text: course.enter_button_text || 'প্রবেশ করুন',
+      enter_text: course.enter_button_text || 'প্রবেশ করুন',
       sheet_button_text: course.sheet_button_text || 'শিট ডাউনলোড',
+      sheet_text: course.sheet_button_text || 'শিট ডাউনলোড',
       updated_at: new Date().toISOString(),
     };
 
@@ -1628,13 +1729,16 @@ export const syncSingleCourseToSupabase = async (
 
       if (!stripped) {
         const optionalKeys = [
-          'routine_pdf_url', 'routine_pdf_name', 'routine_text',
-          'syllabus_pdf_url', 'syllabus_pdf_name', 'syllabus_text',
+          'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
+          'syllabus_pdf_url', 'syllabus_pdf', 'syllabus_pdf_name', 'syllabus_text', 'syllabus', 'syllabus_description',
           'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
-          'details_button_text', 'details_button_link', 'enroll_button_text', 'enroll_button_link',
-          'enter_button_text', 'sheet_button_text', 'badge_subtitle', 'about_text',
-          'description', 'features', 'theme_color', 'total_exams', 'total_sheets',
-          'total_classes', 'enrolled_count', 'instructor_name', 'badge', 'price', 'status', 'category'
+          'details_button_text', 'details_text', 'details_button_link', 'details_link',
+          'enroll_button_text', 'enroll_text', 'enroll_button_link', 'enroll_link',
+          'enter_button_text', 'enter_text', 'sheet_button_text', 'sheet_text',
+          'badge_subtitle', 'badge_title', 'about_text', 'about', 'details',
+          'description', 'features', 'theme_color', 'total_exams', 'exams_count',
+          'total_sheets', 'sheets_count', 'total_classes', 'classes_count',
+          'enrolled_count', 'instructor_name', 'instructor', 'badge', 'price', 'status', 'category'
         ];
         for (const key of optionalKeys) {
           if (key in payload) {
@@ -1658,6 +1762,135 @@ export const syncSingleCourseToSupabase = async (
       c.id === course.id ? { ...c, is_synced_to_supabase: true } : c
     );
     setLocalCoursesCache(updated);
+
+    // 2. Also Sync Related course_exams to Supabase
+    try {
+      const allExamsMap = getLocalCourseExamsCache();
+      const courseExamsList = allExamsMap[course.id] || [];
+      for (const exam of courseExamsList) {
+        const examPayload: any = {
+          id: exam.id,
+          course_id: course.id,
+          title: exam.title,
+          subject: exam.subject || 'আরবি',
+          topic: exam.topic || '',
+          question_count: Number(exam.question_count) || 20,
+          total_questions: Number(exam.question_count) || 20,
+          time_minutes: Number(exam.time_minutes) || 15,
+          duration_minutes: Number(exam.time_minutes) || 15,
+          duration: Number(exam.time_minutes) || 15,
+          total_marks: Number(exam.total_marks) || 20,
+          full_marks: Number(exam.total_marks) || 20,
+          pass_marks: Number(exam.pass_marks) || 10,
+          pass_mark: Number(exam.pass_marks) || 10,
+          negative_marks: Number(exam.negative_marks) || 0.25,
+          negative_mark: Number(exam.negative_marks) || 0.25,
+          is_locked: Boolean(exam.is_locked),
+          locked: Boolean(exam.is_locked),
+          position: Number(exam.position) || 1,
+          order: Number(exam.position) || 1,
+          serial: Number(exam.position) || 1,
+          instructions: exam.instructions || '',
+          questions: Array.isArray(exam.questions) ? exam.questions : [],
+          status: 'published',
+          is_published: true,
+          ...(exam.exam_id ? { exam_id: exam.exam_id } : {}),
+        };
+
+        for (let att = 0; att < 12; att++) {
+          const { error: exErr } = await client
+            .from('course_exams')
+            .upsert([examPayload], { onConflict: 'id' });
+          if (!exErr) break;
+          const exErrMsg = (exErr.message || '').toLowerCase();
+          let exStripped = false;
+          for (const k of Object.keys(examPayload)) {
+            if (exErrMsg.includes(k.toLowerCase()) && k !== 'title' && k !== 'course_id' && k !== 'id') {
+              delete examPayload[k];
+              exStripped = true;
+            }
+          }
+          if (exErrMsg.includes('questions') && Array.isArray(examPayload.questions)) {
+            examPayload.questions = JSON.stringify(examPayload.questions);
+            exStripped = true;
+          }
+          if (!exStripped) {
+            const optExKeys = [
+              'is_published', 'status', 'serial', 'order', 'locked', 'negative_mark',
+              'pass_mark', 'full_marks', 'duration', 'duration_minutes', 'total_questions',
+              'questions', 'instructions', 'pass_marks', 'topic', 'negative_marks',
+              'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'
+            ];
+            for (const k of optExKeys) {
+              if (k in examPayload) {
+                delete examPayload[k];
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Sync course exams warning:', e);
+    }
+
+    // 3. Also Sync Related course_sheets to Supabase
+    try {
+      const allSheetsMap = getLocalCourseSheetsCache();
+      const courseSheetsList = allSheetsMap[course.id] || [];
+      for (const sheet of courseSheetsList) {
+        const sheetPayload: any = {
+          id: sheet.id,
+          course_id: course.id,
+          title: sheet.title,
+          subject: sheet.subject || 'আরবি',
+          topic: sheet.topic || '',
+          pdf_url: sheet.pdf_url,
+          file_url: sheet.pdf_url,
+          pdf_link: sheet.pdf_url,
+          pdf_name: sheet.pdf_name || '',
+          file_size: sheet.file_size || '১.৫ মেগাবাইট',
+          page_count: sheet.page_count || '১০ পেজ',
+          total_pages: sheet.page_count || '১০ পেজ',
+          badge_text: sheet.badge_text || 'লেকচার নোট',
+          badge: sheet.badge_text || 'লেকচার নোট',
+          is_locked: Boolean(sheet.is_locked),
+          locked: Boolean(sheet.is_locked),
+          position: Number(sheet.position) || 1,
+          order: Number(sheet.position) || 1,
+          serial: Number(sheet.position) || 1,
+        };
+
+        for (let att = 0; att < 10; att++) {
+          const { error: shErr } = await client
+            .from('course_sheets')
+            .upsert([sheetPayload], { onConflict: 'id' });
+          if (!shErr) break;
+          const shErrMsg = (shErr.message || '').toLowerCase();
+          let shStripped = false;
+          for (const k of Object.keys(sheetPayload)) {
+            if (shErrMsg.includes(k.toLowerCase()) && k !== 'title' && k !== 'course_id' && k !== 'id') {
+              delete sheetPayload[k];
+              shStripped = true;
+            }
+          }
+          if (!shStripped) {
+            const optShKeys = [
+              'serial', 'order', 'locked', 'badge', 'total_pages', 'pdf_link', 'file_url',
+              'pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'
+            ];
+            for (const k of optShKeys) {
+              if (k in sheetPayload) {
+                delete sheetPayload[k];
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Sync course sheets warning:', e);
+    }
 
     return {
       success: true,
@@ -1882,7 +2115,7 @@ export const insertCourseExam = async (
   newExam: Omit<CourseExam, 'id' | 'created_at'>
 ): Promise<{ success: boolean; data?: CourseExam; error: string | null }> => {
   const client = getSupabaseClient();
-  const id = `ce-${Date.now()}`;
+  const id = generateStandardUUID();
   const examObj: CourseExam = {
     ...newExam,
     id,
@@ -1900,26 +2133,38 @@ export const insertCourseExam = async (
 
   try {
     const payload: any = {
+      id,
       course_id: newExam.course_id,
       title: newExam.title,
-      subject: newExam.subject,
+      subject: newExam.subject || 'আরবি',
       topic: newExam.topic || '',
-      question_count: newExam.question_count,
-      time_minutes: newExam.time_minutes,
-      total_marks: newExam.total_marks,
-      pass_marks: newExam.pass_marks || 10,
-      negative_marks: newExam.negative_marks,
-      is_locked: newExam.is_locked,
-      position: newExam.position || existing.length + 1,
+      question_count: Number(newExam.question_count) || 20,
+      total_questions: Number(newExam.question_count) || 20,
+      time_minutes: Number(newExam.time_minutes) || 15,
+      duration_minutes: Number(newExam.time_minutes) || 15,
+      duration: Number(newExam.time_minutes) || 15,
+      total_marks: Number(newExam.total_marks) || 20,
+      full_marks: Number(newExam.total_marks) || 20,
+      pass_marks: Number(newExam.pass_marks) || 10,
+      pass_mark: Number(newExam.pass_marks) || 10,
+      negative_marks: Number(newExam.negative_marks) || 0.25,
+      negative_mark: Number(newExam.negative_marks) || 0.25,
+      is_locked: Boolean(newExam.is_locked),
+      locked: Boolean(newExam.is_locked),
+      position: Number(newExam.position) || existing.length + 1,
+      order: Number(newExam.position) || existing.length + 1,
+      serial: Number(newExam.position) || existing.length + 1,
       instructions: newExam.instructions || '',
-      questions: newExam.questions || [],
+      questions: Array.isArray(newExam.questions) ? newExam.questions : [],
+      status: 'published',
+      is_published: true,
       ...(newExam.exam_id ? { exam_id: newExam.exam_id } : {}),
     };
 
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 15; attempt++) {
       const { data, error } = await client
         .from('course_exams')
         .insert([payload])
@@ -1939,7 +2184,7 @@ export const insertCourseExam = async (
 
       // 1. Check if any payload key is explicitly named in error message
       for (const key of Object.keys(payload)) {
-        if (errMsg.includes(key.toLowerCase()) && key !== 'title' && key !== 'course_id') {
+        if (errMsg.includes(key.toLowerCase()) && key !== 'title' && key !== 'course_id' && key !== 'id') {
           delete payload[key];
           stripped = true;
         }
@@ -1956,7 +2201,7 @@ export const insertCourseExam = async (
         const match = error.message.match(pattern);
         if (match && match[1]) {
           const colName = match[1];
-          if (colName in payload && colName !== 'title' && colName !== 'course_id') {
+          if (colName in payload && colName !== 'title' && colName !== 'course_id' && colName !== 'id') {
             delete payload[colName];
             stripped = true;
             break;
@@ -1964,8 +2209,18 @@ export const insertCourseExam = async (
         }
       }
 
+      if (errMsg.includes('questions') && Array.isArray(payload.questions)) {
+        payload.questions = JSON.stringify(payload.questions);
+        stripped = true;
+      }
+
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
-        const optKeys = ['questions', 'instructions', 'pass_marks', 'topic', 'negative_marks', 'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'];
+        const optKeys = [
+          'is_published', 'status', 'serial', 'order', 'locked', 'negative_mark',
+          'pass_mark', 'full_marks', 'duration', 'duration_minutes', 'total_questions',
+          'questions', 'instructions', 'pass_marks', 'topic', 'negative_marks',
+          'is_locked', 'position', 'exam_id', 'subject', 'time_minutes', 'total_marks', 'question_count'
+        ];
         for (const k of optKeys) {
           if (k in payload) {
             delete payload[k];
@@ -2013,7 +2268,33 @@ export const updateCourseExam = async (
   if (!client) return { success: true, error: null };
 
   try {
-    const payload: any = { ...updatedFields };
+    const payload: any = {
+      ...updatedFields,
+      ...(updatedFields.question_count !== undefined
+        ? { question_count: Number(updatedFields.question_count), total_questions: Number(updatedFields.question_count) }
+        : {}),
+      ...(updatedFields.time_minutes !== undefined
+        ? { time_minutes: Number(updatedFields.time_minutes), duration_minutes: Number(updatedFields.time_minutes), duration: Number(updatedFields.time_minutes) }
+        : {}),
+      ...(updatedFields.total_marks !== undefined
+        ? { total_marks: Number(updatedFields.total_marks), full_marks: Number(updatedFields.total_marks) }
+        : {}),
+      ...(updatedFields.pass_marks !== undefined
+        ? { pass_marks: Number(updatedFields.pass_marks), pass_mark: Number(updatedFields.pass_marks) }
+        : {}),
+      ...(updatedFields.negative_marks !== undefined
+        ? { negative_marks: Number(updatedFields.negative_marks), negative_mark: Number(updatedFields.negative_marks) }
+        : {}),
+      ...(updatedFields.is_locked !== undefined
+        ? { is_locked: Boolean(updatedFields.is_locked), locked: Boolean(updatedFields.is_locked) }
+        : {}),
+      ...(updatedFields.position !== undefined
+        ? { position: Number(updatedFields.position), order: Number(updatedFields.position), serial: Number(updatedFields.position) }
+        : {}),
+    };
+    delete payload.id;
+    delete payload.created_at;
+
     const { error } = await client
       .from('course_exams')
       .update(payload)
@@ -2078,13 +2359,13 @@ export const fetchCourseSheets = async (courseId: string): Promise<{ sheets: Cou
         title: row.title || '',
         subject: row.subject || localSheet?.subject || 'আরবি',
         topic: row.topic || localSheet?.topic || '',
-        pdf_url: row.pdf_url || '#',
+        pdf_url: row.pdf_url || row.file_url || row.pdf_link || '#',
         pdf_name: row.pdf_name || localSheet?.pdf_name || '',
         file_size: row.file_size || '১.৫ মেগাবাইট',
-        page_count: row.page_count || '১০ পেজ',
-        badge_text: row.badge_text || 'লেকচার নোট',
-        is_locked: Boolean(row.is_locked),
-        position: Number(row.position || 1),
+        page_count: row.page_count || row.total_pages || '১০ পেজ',
+        badge_text: row.badge_text || row.badge || 'লেকচার নোট',
+        is_locked: Boolean(row.is_locked || row.locked),
+        position: Number(row.position || row.order || 1),
         created_at: row.created_at || new Date().toISOString(),
       };
     });
@@ -2107,7 +2388,7 @@ export const insertCourseSheet = async (
   newSheet: Omit<CourseSheet, 'id' | 'created_at'>
 ): Promise<{ success: boolean; data?: CourseSheet; error: string | null }> => {
   const client = getSupabaseClient();
-  const id = `cs-${Date.now()}`;
+  const id = generateStandardUUID();
   const sheetObj: CourseSheet = {
     ...newSheet,
     id,
@@ -2125,23 +2406,31 @@ export const insertCourseSheet = async (
 
   try {
     const payload: any = {
+      id,
       course_id: newSheet.course_id,
       title: newSheet.title,
       subject: newSheet.subject || 'আরবি',
       topic: newSheet.topic || '',
       pdf_url: newSheet.pdf_url,
+      file_url: newSheet.pdf_url,
+      pdf_link: newSheet.pdf_url,
       pdf_name: newSheet.pdf_name || '',
-      file_size: newSheet.file_size,
-      page_count: newSheet.page_count,
+      file_size: newSheet.file_size || '১.৫ মেগাবাইট',
+      page_count: newSheet.page_count || '১০ পেজ',
+      total_pages: newSheet.page_count || '১০ পেজ',
       badge_text: newSheet.badge_text || 'লেকচার নোট',
-      is_locked: newSheet.is_locked,
-      position: newSheet.position || existing.length + 1,
+      badge: newSheet.badge_text || 'লেকচার নোট',
+      is_locked: Boolean(newSheet.is_locked),
+      locked: Boolean(newSheet.is_locked),
+      position: Number(newSheet.position) || existing.length + 1,
+      order: Number(newSheet.position) || existing.length + 1,
+      serial: Number(newSheet.position) || existing.length + 1,
     };
 
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 12; attempt++) {
       const { data, error } = await client
         .from('course_sheets')
         .insert([payload])
@@ -2161,14 +2450,17 @@ export const insertCourseSheet = async (
       const matches = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']?|find the ["']?([a-zA-Z0-9_]+)["']? column/i);
       if (matches) {
         const colName = matches[1] || matches[2];
-        if (colName && colName in payload) {
+        if (colName && colName in payload && colName !== 'title' && colName !== 'course_id' && colName !== 'id') {
           delete payload[colName];
           stripped = true;
         }
       }
 
       if (!stripped && (errMsg.includes('column') || errMsg.includes('does not exist'))) {
-        const optKeys = ['pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'];
+        const optKeys = [
+          'serial', 'order', 'locked', 'badge', 'total_pages', 'pdf_link', 'file_url',
+          'pdf_name', 'topic', 'subject', 'badge_text', 'page_count', 'file_size', 'is_locked', 'position'
+        ];
         for (const k of optKeys) {
           if (k in payload) {
             delete payload[k];

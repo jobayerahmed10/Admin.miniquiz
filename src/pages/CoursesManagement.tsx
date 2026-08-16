@@ -376,33 +376,52 @@ CREATE TABLE IF NOT EXISTS public.courses (
 -- ADD ALL MISSING COLUMNS IF 'courses' TABLE ALREADY EXISTS
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'আরবি প্রভাষক';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'রেকর্ড ব্যাচ';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge_title TEXT DEFAULT 'রেকর্ড ব্যাচ';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS badge_subtitle TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS instructor_name TEXT DEFAULT 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS instructor TEXT DEFAULT 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS price TEXT DEFAULT '৳৯৫০';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enrolled_count INTEGER DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_classes INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS classes_count INTEGER DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_sheets INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS sheets_count INTEGER DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS total_exams INTEGER DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS exams_count INTEGER DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'emerald';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS about_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS about TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_description TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_pdf_url TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_pdf TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS routine_pdf_name TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_description TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_pdf_url TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_pdf TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS syllabus_pdf_name TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS leaderboard_enabled BOOLEAN DEFAULT true;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS leaderboard_info TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS helpline_contact TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_text TEXT DEFAULT 'বিস্তারিত';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_text TEXT DEFAULT 'বিস্তারিত';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS details_link TEXT DEFAULT '#';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_text TEXT DEFAULT 'এখনই ভর্তি হন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_text TEXT DEFAULT 'এখনই ভর্তি হন';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_button_link TEXT DEFAULT '#';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enroll_link TEXT DEFAULT '#';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enter_button_text TEXT DEFAULT 'প্রবেশ করুন';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS enter_text TEXT DEFAULT 'প্রবেশ করুন';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS sheet_button_text TEXT DEFAULT 'শিট ডাউনলোড';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS sheet_text TEXT DEFAULT 'শিট ডাউনলোড';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 -- 2. COURSE EXAMS TABLE (With Question Builder)
@@ -429,15 +448,26 @@ CREATE TABLE IF NOT EXISTS public.course_exams (
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT 'আরবি';
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS topic TEXT;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 20;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS total_questions INTEGER DEFAULT 20;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS time_minutes INTEGER DEFAULT 15;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 15;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 15;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS total_marks INTEGER DEFAULT 20;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS full_marks INTEGER DEFAULT 20;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS pass_marks INTEGER DEFAULT 10;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS pass_mark INTEGER DEFAULT 10;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS negative_marks NUMERIC DEFAULT 0.25;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS negative_mark NUMERIC DEFAULT 0.25;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 1;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 1;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS serial INTEGER DEFAULT 1;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS instructions TEXT;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS questions JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS exam_id TEXT;
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
+ALTER TABLE public.course_exams ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT true;
 
 -- 3. COURSE SHEETS TABLE (PDF Handnotes & Lectures)
 CREATE TABLE IF NOT EXISTS public.course_sheets (
@@ -456,14 +486,24 @@ CREATE TABLE IF NOT EXISTS public.course_sheets (
 );
 
 -- ADD ALL MISSING COLUMNS IF 'course_sheets' TABLE ALREADY EXISTS
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT 'আরবি';
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS topic TEXT;
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'আরবি প্রভাষক';
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'লেকচার শিট';
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS badge_text TEXT DEFAULT 'লেকচার শিট';
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS pdf_link TEXT;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS file_url TEXT;
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS pdf_name TEXT;
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS file_size TEXT DEFAULT '১.২ মেগাবাইট';
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS total_pages INTEGER DEFAULT 12;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS page_count TEXT DEFAULT '১২ পেজ';
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false;
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS position INTEGER DEFAULT 1;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 1;
+ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS serial INTEGER DEFAULT 1;
 
 -- 4. COURSE APPLICATIONS TABLE (Enrollment & Payments)
 CREATE TABLE IF NOT EXISTS public.course_applications (
