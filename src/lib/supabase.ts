@@ -971,38 +971,82 @@ function normalizeCourseRow(row: any, fallbackLocalCourse?: Course): Course {
     parsedFeatures = fallbackLocalCourse.features;
   }
 
+  // Parse counts with all possible column variations from Supabase schema
+  const totalClasses = Number(
+    row.total_classes !== undefined && row.total_classes !== null ? row.total_classes :
+    row.classes_count !== undefined && row.classes_count !== null ? row.classes_count :
+    fallbackLocalCourse?.total_classes ?? 0
+  );
+
+  const totalSheets = Number(
+    row.total_sheets !== undefined && row.total_sheets !== null ? row.total_sheets :
+    row.sheets_count !== undefined && row.sheets_count !== null ? row.sheets_count :
+    fallbackLocalCourse?.total_sheets ?? 0
+  );
+
+  const totalExams = Number(
+    row.total_exams !== undefined && row.total_exams !== null ? row.total_exams :
+    row.exams_count !== undefined && row.exams_count !== null ? row.exams_count :
+    fallbackLocalCourse?.total_exams ?? 0
+  );
+
+  const enrolledCount = Number(
+    row.enrolled_count !== undefined && row.enrolled_count !== null ? row.enrolled_count :
+    fallbackLocalCourse?.enrolled_count ?? 0
+  );
+
+  // Description / About text parsing
+  const rawAbout = row.about_text || row.description || row.about || row.details;
+  const finalAbout = (rawAbout && rawAbout.trim() !== '') ? rawAbout : (fallbackLocalCourse?.about_text || fallbackLocalCourse?.description || '');
+
+  // Routine text parsing
+  const rawRoutine = row.routine_text || row.routine || row.routine_description;
+  const finalRoutine = (rawRoutine && rawRoutine.trim() !== '') ? rawRoutine : (fallbackLocalCourse?.routine_text || '');
+
+  // Routine PDF URL parsing
+  const rawRoutinePdf = row.routine_pdf_url || row.routine_pdf || row.pdf_url || row.file_url;
+  const finalRoutinePdf = rawRoutinePdf || fallbackLocalCourse?.routine_pdf_url || '';
+
+  // Syllabus text parsing
+  const rawSyllabus = row.syllabus_text || row.syllabus || row.syllabus_description;
+  const finalSyllabus = (rawSyllabus && rawSyllabus.trim() !== '') ? rawSyllabus : (fallbackLocalCourse?.syllabus_text || '');
+
+  // Syllabus PDF URL parsing
+  const rawSyllabusPdf = row.syllabus_pdf_url || row.syllabus_pdf || row.pdf_url || row.file_url;
+  const finalSyllabusPdf = rawSyllabusPdf || fallbackLocalCourse?.syllabus_pdf_url || '';
+
   return {
     id: String(row.id),
     title: row.title || fallbackLocalCourse?.title || 'শিরোনাম ছাড়া কোর্স',
     category: row.category || fallbackLocalCourse?.category || 'আরবি প্রভাষক',
-    badge: row.badge || fallbackLocalCourse?.badge || 'বিশেষ ব্যাচ',
+    badge: row.badge || row.badge_title || fallbackLocalCourse?.badge || 'বিশেষ ব্যাচ',
     badge_subtitle: row.badge_subtitle || fallbackLocalCourse?.badge_subtitle || '',
-    instructor_name: row.instructor_name || fallbackLocalCourse?.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+    instructor_name: row.instructor_name || row.instructor || row.teacher || fallbackLocalCourse?.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
     price: row.price || fallbackLocalCourse?.price || '৳০',
-    enrolled_count: Number(row.enrolled_count ?? fallbackLocalCourse?.enrolled_count ?? 0),
-    total_classes: Number(row.total_classes ?? fallbackLocalCourse?.total_classes ?? 0),
-    total_sheets: Number(row.total_sheets ?? fallbackLocalCourse?.total_sheets ?? 0),
-    total_exams: Number(row.total_exams ?? fallbackLocalCourse?.total_exams ?? 0),
+    enrolled_count: enrolledCount,
+    total_classes: totalClasses,
+    total_sheets: totalSheets,
+    total_exams: totalExams,
     theme_color: row.theme_color || fallbackLocalCourse?.theme_color || 'emerald',
     features: parsedFeatures.length > 0 ? parsedFeatures : (fallbackLocalCourse?.features || []),
     status: row.status || fallbackLocalCourse?.status || 'published',
-    description: row.description || row.about_text || fallbackLocalCourse?.description || fallbackLocalCourse?.about_text || '',
-    about_text: row.about_text || row.description || fallbackLocalCourse?.about_text || fallbackLocalCourse?.description || '',
-    routine_text: row.routine_text || fallbackLocalCourse?.routine_text || '',
-    routine_pdf_url: row.routine_pdf_url || fallbackLocalCourse?.routine_pdf_url || '',
-    routine_pdf_name: row.routine_pdf_name || fallbackLocalCourse?.routine_pdf_name || '',
-    syllabus_text: row.syllabus_text || fallbackLocalCourse?.syllabus_text || '',
-    syllabus_pdf_url: row.syllabus_pdf_url || fallbackLocalCourse?.syllabus_pdf_url || '',
-    syllabus_pdf_name: row.syllabus_pdf_name || fallbackLocalCourse?.syllabus_pdf_name || '',
+    description: finalAbout,
+    about_text: finalAbout,
+    routine_text: finalRoutine,
+    routine_pdf_url: finalRoutinePdf,
+    routine_pdf_name: row.routine_pdf_name || row.file_name || fallbackLocalCourse?.routine_pdf_name || '',
+    syllabus_text: finalSyllabus,
+    syllabus_pdf_url: finalSyllabusPdf,
+    syllabus_pdf_name: row.syllabus_pdf_name || row.file_name || fallbackLocalCourse?.syllabus_pdf_name || '',
     leaderboard_enabled: row.leaderboard_enabled !== undefined ? Boolean(row.leaderboard_enabled) : (fallbackLocalCourse?.leaderboard_enabled ?? true),
     leaderboard_info: row.leaderboard_info || fallbackLocalCourse?.leaderboard_info || '',
     helpline_contact: row.helpline_contact || fallbackLocalCourse?.helpline_contact || '',
-    details_button_text: row.details_button_text || fallbackLocalCourse?.details_button_text || 'বিস্তারিত',
-    details_button_link: row.details_button_link || fallbackLocalCourse?.details_button_link || '#',
-    enroll_button_text: row.enroll_button_text || fallbackLocalCourse?.enroll_button_text || 'এখনই ভর্তি হন',
-    enroll_button_link: row.enroll_button_link || fallbackLocalCourse?.enroll_button_link || '#',
-    enter_button_text: row.enter_button_text || fallbackLocalCourse?.enter_button_text || 'প্রবেশ করুন',
-    sheet_button_text: row.sheet_button_text || fallbackLocalCourse?.sheet_button_text || 'শিট ডাউনলোড',
+    details_button_text: row.details_button_text || row.details_text || fallbackLocalCourse?.details_button_text || 'বিস্তারিত',
+    details_button_link: row.details_button_link || row.details_link || fallbackLocalCourse?.details_button_link || '#',
+    enroll_button_text: row.enroll_button_text || row.enroll_text || fallbackLocalCourse?.enroll_button_text || 'এখনই ভর্তি হন',
+    enroll_button_link: row.enroll_button_link || row.enroll_link || fallbackLocalCourse?.enroll_button_link || '#',
+    enter_button_text: row.enter_button_text || row.enter_text || fallbackLocalCourse?.enter_button_text || 'প্রবেশ করুন',
+    sheet_button_text: row.sheet_button_text || row.sheet_text || fallbackLocalCourse?.sheet_button_text || 'শিট ডাউনলোড',
     created_at: row.created_at || fallbackLocalCourse?.created_at || new Date().toISOString(),
     updated_at: row.updated_at || fallbackLocalCourse?.updated_at,
   };
@@ -1205,7 +1249,7 @@ export const fetchAllCourses = async (): Promise<{
   }
 };
 
-// Helper to sync course sub-tables (course_details, course_routines, course_syllabus)
+// Helper to sync course sub-tables (course_details, course_routines, Coure_routine, course_syllabus)
 export const syncCourseSubTables = async (course: Partial<Course> & { id: string }) => {
   const client = getSupabaseClient();
   if (!client || !course.id) return;
@@ -1234,30 +1278,38 @@ export const syncCourseSubTables = async (course: Partial<Course> & { id: string
     };
     await client.from('course_details').upsert([detailsPayload], { onConflict: 'id' });
   } catch (e) {
-    // Graceful silent fallback if table not created
-  }
-
-  // 2. Sync to course_routines if table exists
-  try {
-    const routinePayload: any = {
-      id: course.id,
-      course_id: course.id,
-      title: course.title ? `${course.title} - রুটিন` : 'রুটিন',
-      routine_text: rout,
-      routine_description: rout,
-      routine: rout,
-      routine_pdf_url: routPdf,
-      pdf_url: routPdf,
-      pdf_link: routPdf,
-      file_url: routPdf,
-      routine_pdf_name: course.routine_pdf_name || '',
-      file_name: course.routine_pdf_name || '',
-      updated_at: new Date().toISOString(),
-    };
-    await client.from('course_routines').upsert([routinePayload], { onConflict: 'id' });
-  } catch (e) {
     // Graceful silent fallback
   }
+
+  // 2. Sync to course_routines
+  const routinePayload: any = {
+    id: course.id,
+    course_id: course.id,
+    title: course.title ? `${course.title} - রুটিন` : 'রুটিন',
+    routine_text: rout,
+    routine_description: rout,
+    routine: rout,
+    routine_pdf_url: routPdf,
+    pdf_url: routPdf,
+    pdf_link: routPdf,
+    file_url: routPdf,
+    routine_pdf_name: course.routine_pdf_name || '',
+    file_name: course.routine_pdf_name || '',
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    await client.from('course_routines').upsert([routinePayload], { onConflict: 'id' });
+  } catch (e) {}
+
+  // Also support Coure_routine (as created in some Supabase projects)
+  try {
+    await client.from('Coure_routine').upsert([routinePayload], { onConflict: 'id' });
+  } catch (e) {}
+
+  try {
+    await client.from('course_routine').upsert([routinePayload], { onConflict: 'id' });
+  } catch (e) {}
 
   // 3. Sync to course_syllabus if table exists
   try {

@@ -336,45 +336,64 @@ export const CoursesManagement: React.FC = () => {
 
   const sqlCode = `-- ==========================================
 -- TAMREEN ACADEMY - SUPABASE COURSES SQL SCHEMA
--- (Creates new tables AND automatically adds any missing columns)
+-- (Creates all tables AND automatically adds any missing columns)
 -- ==========================================
 
 -- 0. Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 1. COURSES TABLE
+-- 1. COURSES TABLE (Main Course Entity)
 CREATE TABLE IF NOT EXISTS public.courses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   category TEXT DEFAULT 'আরবি প্রভাষক',
   badge TEXT DEFAULT 'রেকর্ড ব্যাচ',
+  badge_title TEXT DEFAULT 'রেকর্ড ব্যাচ',
   badge_subtitle TEXT,
   instructor_name TEXT DEFAULT 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
+  instructor TEXT DEFAULT 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
   price TEXT DEFAULT '৳৯৫০',
   enrolled_count INTEGER DEFAULT 0,
   total_classes INTEGER DEFAULT 0,
+  classes_count INTEGER DEFAULT 0,
   total_sheets INTEGER DEFAULT 0,
+  sheets_count INTEGER DEFAULT 0,
   total_exams INTEGER DEFAULT 0,
+  exams_count INTEGER DEFAULT 0,
   theme_color TEXT DEFAULT 'emerald',
   features JSONB DEFAULT '[]'::jsonb,
   status TEXT DEFAULT 'published',
   description TEXT,
   about_text TEXT,
+  about TEXT,
+  details TEXT,
   routine_text TEXT,
+  routine TEXT,
+  routine_description TEXT,
   routine_pdf_url TEXT,
+  routine_pdf TEXT,
   routine_pdf_name TEXT,
   syllabus_text TEXT,
+  syllabus TEXT,
+  syllabus_description TEXT,
   syllabus_pdf_url TEXT,
+  syllabus_pdf TEXT,
   syllabus_pdf_name TEXT,
   leaderboard_enabled BOOLEAN DEFAULT true,
   leaderboard_info TEXT,
   helpline_contact TEXT,
   details_button_text TEXT DEFAULT 'বিস্তারিত',
+  details_text TEXT DEFAULT 'বিস্তারিত',
   details_button_link TEXT DEFAULT '#',
+  details_link TEXT DEFAULT '#',
   enroll_button_text TEXT DEFAULT 'এখনই ভর্তি হন',
+  enroll_text TEXT DEFAULT 'এখনই ভর্তি হন',
   enroll_button_link TEXT DEFAULT '#',
+  enroll_link TEXT DEFAULT '#',
   enter_button_text TEXT DEFAULT 'প্রবেশ করুন',
+  enter_text TEXT DEFAULT 'প্রবেশ করুন',
   sheet_button_text TEXT DEFAULT 'শিট ডাউনলোড',
+  sheet_text TEXT DEFAULT 'শিট ডাউনলোড',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -447,6 +466,8 @@ CREATE TABLE IF NOT EXISTS public.course_exams (
   instructions TEXT,
   questions JSONB DEFAULT '[]'::jsonb,
   exam_id TEXT,
+  status TEXT DEFAULT 'published',
+  is_published BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -482,6 +503,7 @@ CREATE TABLE IF NOT EXISTS public.course_sheets (
   title TEXT NOT NULL,
   category TEXT DEFAULT 'আরবি প্রভাষক',
   badge TEXT DEFAULT 'লেকচার শিট',
+  badge_text TEXT DEFAULT 'লেকচার শিট',
   pdf_url TEXT,
   file_name TEXT,
   file_size TEXT DEFAULT '১.২ মেগাবাইট',
@@ -511,7 +533,104 @@ ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS position INTEGER DEFAU
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 1;
 ALTER TABLE public.course_sheets ADD COLUMN IF NOT EXISTS serial INTEGER DEFAULT 1;
 
--- 4. COURSE APPLICATIONS TABLE (Enrollment & Payments)
+-- 4. COURSE DETAILS SUB-TABLE (Explicit About & Features storage)
+CREATE TABLE IF NOT EXISTS public.course_details (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  title TEXT,
+  about_text TEXT,
+  description TEXT,
+  about TEXT,
+  details TEXT,
+  features JSONB DEFAULT '[]'::jsonb,
+  helpline_contact TEXT,
+  details_button_link TEXT,
+  enroll_button_link TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS about_text TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS about TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS details TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS helpline_contact TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS details_button_link TEXT;
+ALTER TABLE public.course_details ADD COLUMN IF NOT EXISTS enroll_button_link TEXT;
+
+-- 5. COURSE ROUTINES SUB-TABLES (Handles standard and custom table names)
+CREATE TABLE IF NOT EXISTS public.course_routines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  title TEXT,
+  routine_text TEXT,
+  routine_description TEXT,
+  routine TEXT,
+  routine_pdf_url TEXT,
+  pdf_url TEXT,
+  pdf_link TEXT,
+  file_url TEXT,
+  routine_pdf_name TEXT,
+  file_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS routine_text TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS routine_description TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS routine TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS routine_pdf_url TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS routine_pdf_name TEXT;
+ALTER TABLE public.course_routines ADD COLUMN IF NOT EXISTS file_name TEXT;
+
+CREATE TABLE IF NOT EXISTS public."Coure_routine" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  title TEXT,
+  routine_text TEXT,
+  routine_description TEXT,
+  routine TEXT,
+  routine_pdf_url TEXT,
+  pdf_url TEXT,
+  pdf_link TEXT,
+  file_url TEXT,
+  routine_pdf_name TEXT,
+  file_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public."Coure_routine" ADD COLUMN IF NOT EXISTS routine_text TEXT;
+ALTER TABLE public."Coure_routine" ADD COLUMN IF NOT EXISTS routine_description TEXT;
+ALTER TABLE public."Coure_routine" ADD COLUMN IF NOT EXISTS routine TEXT;
+ALTER TABLE public."Coure_routine" ADD COLUMN IF NOT EXISTS routine_pdf_url TEXT;
+ALTER TABLE public."Coure_routine" ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+
+-- 6. COURSE SYLLABUS SUB-TABLE
+CREATE TABLE IF NOT EXISTS public.course_syllabus (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  title TEXT,
+  syllabus_text TEXT,
+  syllabus_description TEXT,
+  syllabus TEXT,
+  syllabus_pdf_url TEXT,
+  pdf_url TEXT,
+  pdf_link TEXT,
+  file_url TEXT,
+  syllabus_pdf_name TEXT,
+  file_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS syllabus_text TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS syllabus_description TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS syllabus TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS syllabus_pdf_url TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS syllabus_pdf_name TEXT;
+ALTER TABLE public.course_syllabus ADD COLUMN IF NOT EXISTS file_name TEXT;
+
+-- 7. COURSE APPLICATIONS TABLE (Enrollment & Payments)
 CREATE TABLE IF NOT EXISTS public.course_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_name TEXT NOT NULL,
@@ -527,10 +646,14 @@ CREATE TABLE IF NOT EXISTS public.course_applications (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. RLS POLICIES (Full Access)
+-- 8. RLS POLICIES (Full Access)
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_sheets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_routines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."Coure_routine" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_syllabus ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_applications ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow public all access on courses" ON public.courses;
@@ -542,10 +665,22 @@ CREATE POLICY "Allow public all access on course_exams" ON public.course_exams F
 DROP POLICY IF EXISTS "Allow public all access on course_sheets" ON public.course_sheets;
 CREATE POLICY "Allow public all access on course_sheets" ON public.course_sheets FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public all access on course_details" ON public.course_details;
+CREATE POLICY "Allow public all access on course_details" ON public.course_details FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on course_routines" ON public.course_routines;
+CREATE POLICY "Allow public all access on course_routines" ON public.course_routines FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on Coure_routine" ON public."Coure_routine";
+CREATE POLICY "Allow public all access on Coure_routine" ON public."Coure_routine" FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all access on course_syllabus" ON public.course_syllabus;
+CREATE POLICY "Allow public all access on course_syllabus" ON public.course_syllabus FOR ALL USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Allow public all access on course_applications" ON public.course_applications;
 CREATE POLICY "Allow public all access on course_applications" ON public.course_applications FOR ALL USING (true) WITH CHECK (true);
 
--- 6. RELOAD POSTGREST SCHEMA CACHE
+-- 9. RELOAD POSTGREST SCHEMA CACHE
 NOTIFY pgrst, 'reload schema';
 `;
 

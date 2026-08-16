@@ -87,6 +87,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
 
   useEffect(() => {
     if (editingCourse) {
+      const desc = editingCourse.about_text || editingCourse.description || '';
       setFormData({
         title: editingCourse.title || '',
         category: editingCourse.category || 'আরবি প্রভাষক',
@@ -94,16 +95,16 @@ export const CourseModal: React.FC<CourseModalProps> = ({
         badge_subtitle: editingCourse.badge_subtitle || '',
         instructor_name: editingCourse.instructor_name || 'মুফতি শফিক উল্লাহ ও তামরীন প্যানেল',
         price: editingCourse.price || '৳৯৫০',
-        enrolled_count: editingCourse.enrolled_count || 0,
-        total_classes: editingCourse.total_classes || 0,
-        total_sheets: editingCourse.total_sheets || 0,
-        total_exams: editingCourse.total_exams || 0,
+        enrolled_count: Number(editingCourse.enrolled_count) || 0,
+        total_classes: Number(editingCourse.total_classes ?? (editingCourse as any).classes_count ?? 0),
+        total_sheets: Number(editingCourse.total_sheets ?? (editingCourse as any).sheets_count ?? 0),
+        total_exams: Number(editingCourse.total_exams ?? (editingCourse as any).exams_count ?? 0),
         theme_color: editingCourse.theme_color || 'emerald',
-        features: editingCourse.features || [],
+        features: Array.isArray(editingCourse.features) ? editingCourse.features : [],
         newFeatureText: '',
         status: editingCourse.status || 'published',
-        description: editingCourse.description || '',
-        about_text: editingCourse.about_text || '',
+        description: desc,
+        about_text: desc,
         routine_text: editingCourse.routine_text || '',
         routine_pdf_url: editingCourse.routine_pdf_url || '',
         routine_pdf_name: editingCourse.routine_pdf_name || '',
