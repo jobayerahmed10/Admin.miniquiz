@@ -827,6 +827,7 @@ export const INITIAL_COURSES: Course[] = [
     enter_button_text: 'প্রবেশ করুন',
     sheet_button_text: 'শিট ডাউনলোড',
     helpline_contact: '018XXXXXXXX',
+    is_upcoming: false,
     created_at: new Date().toISOString(),
   },
   {
@@ -849,6 +850,10 @@ export const INITIAL_COURSES: Course[] = [
       'স্পেশাল লাইভ সলভ ক্লাস',
     ],
     status: 'published',
+    is_upcoming: true,
+    upcoming_date: '2026-09-15T20:00',
+    upcoming_badge_text: 'আপকামিং স্পেশাল ব্যাচ',
+    upcoming_note: '১৫ সেপ্টেম্বর থেকে লাইভ ওরিয়েন্টেশন ক্লাস শুরু হতে যাচ্ছে।',
     description: `সহকারী মৌলভী পদের জন্য এনটিআরসিএ ও মাদ্রাসা শিক্ষক নিয়োগ পরীক্ষার পূর্ণাঙ্গ প্রস্তুতি কোর্স।`,
     routine_text: `রবি, মঙ্গল, বৃহস্পতি রাত ৯:০০ টায় ক্লাস ও পরীক্ষা।`,
     syllabus_text: `কুরআন মাজিদ, হাদিস শরিফ, ফিকহুল ইসলাম ও আরবি ব্যাকরণ।`,
@@ -1031,6 +1036,10 @@ function normalizeCourseRow(row: any, fallbackLocalCourse?: Course): Course {
     theme_color: row.theme_color || fallbackLocalCourse?.theme_color || 'emerald',
     features: parsedFeatures.length > 0 ? parsedFeatures : (fallbackLocalCourse?.features || []),
     status: row.status || fallbackLocalCourse?.status || 'published',
+    is_upcoming: row.is_upcoming !== undefined ? Boolean(row.is_upcoming) : (fallbackLocalCourse?.is_upcoming ?? false),
+    upcoming_date: row.upcoming_date || row.upcoming_time || row.start_date || fallbackLocalCourse?.upcoming_date || '',
+    upcoming_badge_text: row.upcoming_badge_text || fallbackLocalCourse?.upcoming_badge_text || '',
+    upcoming_note: row.upcoming_note || row.upcoming_description || fallbackLocalCourse?.upcoming_note || '',
     description: finalAbout,
     about_text: finalAbout,
     routine_text: finalRoutine,
@@ -1383,6 +1392,10 @@ export const insertCourse = async (
       theme_color: newCourse.theme_color || 'emerald',
       features: Array.isArray(newCourse.features) ? newCourse.features : [],
       status: newCourse.status || 'published',
+      is_upcoming: newCourse.is_upcoming !== undefined ? Boolean(newCourse.is_upcoming) : false,
+      upcoming_date: newCourse.upcoming_date || '',
+      upcoming_badge_text: newCourse.upcoming_badge_text || '',
+      upcoming_note: newCourse.upcoming_note || '',
       description: descText,
       about_text: descText,
       about: descText,
@@ -1585,6 +1598,10 @@ export const updateCourse = async (
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.is_upcoming !== undefined) payload.is_upcoming = Boolean(updatedFields.is_upcoming);
+    if (updatedFields.upcoming_date !== undefined) payload.upcoming_date = updatedFields.upcoming_date;
+    if (updatedFields.upcoming_badge_text !== undefined) payload.upcoming_badge_text = updatedFields.upcoming_badge_text;
+    if (updatedFields.upcoming_note !== undefined) payload.upcoming_note = updatedFields.upcoming_note;
     if (descText !== undefined) {
       payload.description = descText;
       payload.about_text = descText;
@@ -1794,6 +1811,10 @@ export const syncSingleCourseToSupabase = async (
       theme_color: course.theme_color || 'emerald',
       features: Array.isArray(course.features) ? course.features : [],
       status: course.status || 'published',
+      is_upcoming: course.is_upcoming !== undefined ? Boolean(course.is_upcoming) : false,
+      upcoming_date: course.upcoming_date || '',
+      upcoming_badge_text: course.upcoming_badge_text || '',
+      upcoming_note: course.upcoming_note || '',
       description: descText,
       about_text: descText,
       about: descText,

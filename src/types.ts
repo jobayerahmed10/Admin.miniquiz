@@ -125,6 +125,12 @@ export interface Course {
   features: string[]; // List of key features/highlights
   status: 'published' | 'draft' | 'archived';
 
+  // আপকামিং ও সময় সেটিংস (Upcoming Course Settings)
+  is_upcoming?: boolean;
+  upcoming_date?: string; // Launch or class start date-time (ISO format, e.g. '2026-09-01T20:00')
+  upcoming_badge_text?: string; // Custom badge e.g. 'আপকামিং ব্যাচ' | 'শীঘ্রই আসছে'
+  upcoming_note?: string; // e.g. '১ সেপ্টেম্বর থেকে লাইভ ক্লাস শুরু'
+
   // 1. কোর্স সম্পর্কে বিস্তারিত (Course Details & Description)
   description?: string;
   about_text?: string;
