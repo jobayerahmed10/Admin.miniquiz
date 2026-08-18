@@ -14,6 +14,8 @@ import {
   Award,
   BookOpen,
   AlertCircle,
+  Rocket,
+  Clock,
 } from 'lucide-react';
 import {
   Course,
@@ -329,10 +331,22 @@ export const CoursesManagement: React.FC = () => {
     const matchesSearch =
       c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.instructor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.badge.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat = selectedCategory === 'সকল' || c.category === selectedCategory;
+      c.badge.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.upcoming_badge_text && c.upcoming_badge_text.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    let matchesCat = true;
+    if (selectedCategory === 'সকল') {
+      matchesCat = true;
+    } else if (selectedCategory === 'আপকামিং') {
+      matchesCat = !!c.is_upcoming;
+    } else {
+      matchesCat = c.category === selectedCategory;
+    }
+
     return matchesSearch && matchesCat;
   });
+
+  const upcomingCoursesCount = courses.filter((c) => c.is_upcoming).length;
 
   const sqlCode = `-- ==========================================
 -- TAMREEN ACADEMY - SUPABASE COURSES SQL SCHEMA
@@ -363,6 +377,10 @@ CREATE TABLE IF NOT EXISTS public.courses (
   theme_color TEXT DEFAULT 'emerald',
   features JSONB DEFAULT '[]'::jsonb,
   status TEXT DEFAULT 'published',
+  is_upcoming BOOLEAN DEFAULT false,
+  upcoming_date TIMESTAMPTZ,
+  upcoming_badge_text TEXT DEFAULT 'আপকামিং ব্যাচ',
+  upcoming_note TEXT,
   description TEXT,
   about_text TEXT,
   about TEXT,
@@ -416,6 +434,10 @@ ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS exams_count INTEGER DEFAULT 
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'emerald';
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS is_upcoming BOOLEAN DEFAULT false;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS upcoming_date TIMESTAMPTZ;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS upcoming_badge_text TEXT;
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS upcoming_note TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS about_text TEXT;
 ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS about TEXT;
@@ -854,6 +876,30 @@ NOTIFY pgrst, 'reload schema';
               {cat}
             </button>
           ))}
+
+          {/* Upcoming Filter Tab */}
+          <button
+            onClick={() => setSelectedCategory('আপকামিং')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              selectedCategory === 'আপকামিং'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                : 'bg-amber-500/10 text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 border border-amber-500/30'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            <span>আপকামিং কোর্স</span>
+            {upcomingCoursesCount > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  selectedCategory === 'আপকামিং'
+                    ? 'bg-slate-950 text-amber-300'
+                    : 'bg-amber-500/30 text-amber-200'
+                }`}
+              >
+                {upcomingCoursesCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 

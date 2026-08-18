@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Course, CourseExam, CourseSheet, CourseExamQuestion, COURSE_THEMES } from '../../types';
 import { fetchCourseExams, fetchCourseSheets, updateCourse, fetchQuestionsForCourseExam } from '../../lib/supabase';
+import { CourseCountdownBanner } from './CourseCountdownBanner';
 
 interface CourseDetailsModalProps {
   isOpen: boolean;
@@ -334,6 +335,12 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                 <span className="text-slate-600">&bull;</span>
                 <span className="text-emerald-400 font-bold">{course.enrolled_count} জন শিক্ষার্থী যুক্ত</span>
               </p>
+
+              {course.is_upcoming && (
+                <div className="pt-2">
+                  <CourseCountdownBanner course={course} />
+                </div>
+              )}
             </div>
 
             <button

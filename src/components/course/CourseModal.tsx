@@ -17,8 +17,11 @@ import {
   Trash2,
   Plus,
   Info,
+  Rocket,
+  Clock,
 } from 'lucide-react';
 import { Course, COURSE_CATEGORIES, COURSE_THEMES } from '../../types';
+import { formatBengaliDateTime } from '../../lib/countdown';
 
 interface CourseModalProps {
   isOpen: boolean;
@@ -64,6 +67,11 @@ export const CourseModal: React.FC<CourseModalProps> = ({
     features: ['লাইভ ও রেকর্ড ক্লাসের অ্যাক্সেস', 'অধ্যায়ভিত্তিক ৩০টি স্পেশাল মডেল টেস্ট', 'সকল পিডিএফ লেকচার শিট'],
     newFeatureText: '',
     status: 'published' as 'published' | 'draft' | 'archived',
+    // Upcoming settings
+    is_upcoming: false,
+    upcoming_date: '',
+    upcoming_badge_text: 'আপকামিং ব্যাচ',
+    upcoming_note: '',
     // Rich content fields
     description: '',
     about_text: '',
@@ -103,6 +111,10 @@ export const CourseModal: React.FC<CourseModalProps> = ({
         features: Array.isArray(editingCourse.features) ? editingCourse.features : [],
         newFeatureText: '',
         status: editingCourse.status || 'published',
+        is_upcoming: editingCourse.is_upcoming !== undefined ? Boolean(editingCourse.is_upcoming) : false,
+        upcoming_date: editingCourse.upcoming_date || '',
+        upcoming_badge_text: editingCourse.upcoming_badge_text || 'আপকামিং ব্যাচ',
+        upcoming_note: editingCourse.upcoming_note || '',
         description: desc,
         about_text: desc,
         routine_text: editingCourse.routine_text || '',
@@ -137,6 +149,10 @@ export const CourseModal: React.FC<CourseModalProps> = ({
         features: ['লাইভ ও রেকর্ড ক্লাসের অ্যাক্সেস', 'অধ্যায়ভিত্তিক ৩০টি স্পেশাল মডেল টেস্ট', 'সকল পিডিএফ লেকচার শিট'],
         newFeatureText: '',
         status: 'published',
+        is_upcoming: false,
+        upcoming_date: '',
+        upcoming_badge_text: 'আপকামিং ব্যাচ',
+        upcoming_note: '',
         description: '',
         about_text: `বিসমিল্লাহির রাহমানির রাহিম।
 এই কোর্সে শিক্ষক নিবন্ধন (NTRCA) ও মাদ্রাসা প্রভাষক পদের জন্য আরবি ও ইসলামিক স্টাডিজ বিষয়ের পূর্ণাঙ্গ প্রস্তুতি প্রদান করা হবে।
@@ -483,6 +499,146 @@ export const CourseModal: React.FC<CourseModalProps> = ({
                     </select>
                   </div>
                 </div>
+              </div>
+
+              {/* আপকামিং কোর্স ও সময় সেটিংস (Upcoming Course & Schedule Options) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-950/20 via-slate-950/70 to-orange-950/20 border border-amber-500/30 space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                      <Rocket className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-300">
+                        আপকামিং কোর্স সেটিংস (Upcoming Option)
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        কোর্স কার্ডে 'আপকামিং' ট্যাগ ও ঐচ্ছিক সময়/কাউন্টডাউন প্রদর্শন করুন
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_upcoming}
+                      onChange={(e) =>
+                        setFormData({ ...formData, is_upcoming: e.target.checked })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-200">
+                      {formData.is_upcoming ? 'আপকামিং সক্রিয়' : 'সাধারণ কোর্স'}
+                    </span>
+                  </label>
+                </div>
+
+                {formData.is_upcoming && (
+                  <div className="pt-2 border-t border-amber-500/20 space-y-3.5 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-amber-200/90 mb-1">
+                          আপকামিং ব্যাজ লেখা (Upcoming Badge Text)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="যেমন: আপকামিং স্পেশাল ব্যাচ / শীঘ্রই আসছে"
+                          value={formData.upcoming_badge_text}
+                          onChange={(e) =>
+                            setFormData({ ...formData, upcoming_badge_text: e.target.value })
+                          }
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-amber-200/90 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            <span>ক্লাস/কোর্স শুরুর সময় (অপশনাল)</span>
+                          </label>
+                          {formData.upcoming_date && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, upcoming_date: '' })}
+                              className="text-[10px] text-rose-400 hover:underline"
+                            >
+                              রিসেট
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="datetime-local"
+                          value={formData.upcoming_date ? formData.upcoming_date.slice(0, 16) : ''}
+                          onChange={(e) =>
+                            setFormData({ ...formData, upcoming_date: e.target.value })
+                          }
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Date Presets */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400 font-bold">কুইক টাইম সেট:</span>
+                      {[
+                        { label: 'আগামীকাল রাত ৮টা', days: 1, hour: 20 },
+                        { label: '৩ দিন পর', days: 3, hour: 20 },
+                        { label: '৭ দিন পর', days: 7, hour: 21 },
+                        { label: '১৫ দিন পর', days: 15, hour: 20 },
+                        { label: '১ মাস পর', days: 30, hour: 20 },
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + preset.days);
+                            d.setHours(preset.hour, 0, 0, 0);
+                            // format as YYYY-MM-DDTHH:mm
+                            const pad = (n: number) => String(n).padStart(2, '0');
+                            const isoLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+                              d.getDate()
+                            )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                            setFormData({ ...formData, upcoming_date: isoLocal });
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 text-[10px] font-bold text-slate-300 transition-colors"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Announcement / Note */}
+                    <div>
+                      <label className="block text-xs font-bold text-amber-200/90 mb-1">
+                        আপকামিং ঘোষণা বা শর্ট নোট (ঐচ্ছিক)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="যেমন: ১৫ সেপ্টেম্বর থেকে সরাসরি লাইভ ওরিয়েন্টেশন ক্লাস শুরু হতে যাচ্ছে।"
+                        value={formData.upcoming_note}
+                        onChange={(e) =>
+                          setFormData({ ...formData, upcoming_note: e.target.value })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    {/* Bangla formatted date display */}
+                    {formData.upcoming_date && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>
+                          <strong>নির্ধারিত সময়:</strong>{' '}
+                          {formatBengaliDateTime(formData.upcoming_date).fullStr ||
+                            formData.upcoming_date}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Highlights tags */}

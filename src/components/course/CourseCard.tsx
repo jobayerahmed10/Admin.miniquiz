@@ -13,9 +13,12 @@ import {
   ExternalLink,
   Info,
   Eye,
+  Rocket,
+  Clock,
 } from 'lucide-react';
 import { Course, COURSE_THEMES } from '../../types';
 import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { CourseCountdownBanner } from './CourseCountdownBanner';
 
 interface CourseCardProps {
   course: Course;
@@ -71,6 +74,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               <Tag className="w-3 h-3 text-slate-400" />
               {course.category}
             </span>
+
+            {/* Upcoming Course Tag */}
+            {course.is_upcoming && (
+              <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black flex items-center gap-1 shadow-sm">
+                <Rocket className="w-3 h-3 text-amber-400 animate-bounce" />
+                <span>{course.upcoming_badge_text || 'আপকামিং'}</span>
+              </span>
+            )}
 
             {/* Supabase Live Sync Indicator */}
             {course.is_synced_to_supabase !== false ? (
@@ -143,6 +154,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             ইন্সট্রাক্টর: <span className="text-slate-200">{course.instructor_name}</span>
           </p>
         </div>
+
+        {/* Upcoming Status & Live Countdown (if enabled) */}
+        {course.is_upcoming && (
+          <CourseCountdownBanner course={course} className="mb-4" />
+        )}
 
         {/* Price & Enrolled count pill */}
         <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 mb-4 flex items-center justify-between">
