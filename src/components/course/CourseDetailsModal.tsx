@@ -28,7 +28,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Course, CourseExam, CourseSheet, CourseExamQuestion, COURSE_THEMES } from '../../types';
-import { fetchCourseExams, fetchCourseSheets, updateCourse, fetchQuestionsForCourseExam } from '../../lib/supabase';
+import { fetchCourseExams, fetchCourseSheets, updateCourse, updateCourseExam, updateQuestion, fetchQuestionsForCourseExam } from '../../lib/supabase';
 import { CourseCountdownBanner } from './CourseCountdownBanner';
 
 interface CourseDetailsModalProps {
@@ -88,6 +88,85 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [examTimeLeft, setExamTimeLeft] = useState<number>(0);
   const [loadingExamId, setLoadingExamId] = useState<string | null>(null);
+
+  // Exam Question In-place Correction State
+  const [editingExamQuestionItem, setEditingExamQuestionItem] = useState<{
+    index: number;
+    question: CourseExamQuestion;
+  } | null>(null);
+  const [savingQuestionCorrection, setSavingQuestionCorrection] = useState(false);
+  const [questionCorrectionSuccess, setQuestionCorrectionSuccess] = useState<string | null>(null);
+
+  const handleStartEditExamQuestion = (idx: number, q: CourseExamQuestion) => {
+    setEditingExamQuestionItem({
+      index: idx,
+      question: {
+        id: q.id || `q-course-${Date.now()}-${idx}`,
+        question: q.question || '',
+        option_a: q.option_a || '',
+        option_b: q.option_b || '',
+        option_c: q.option_c || '',
+        option_d: q.option_d || '',
+        correct_answer: q.correct_answer || 'option_a',
+        explanation: q.explanation || '',
+        subject: q.subject || takingExam?.subject || course.category || 'আরবি',
+        topic: q.topic || takingExam?.topic || '',
+      },
+    });
+  };
+
+  const handleSaveQuestionCorrection = async () => {
+    if (!editingExamQuestionItem || !takingExam) return;
+    const { index, question } = editingExamQuestionItem;
+
+    if (!question.question.trim()) {
+      alert('অনুগ্রহ করে প্রশ্ন লিখুন।');
+      return;
+    }
+    if (!question.option_a.trim() || !question.option_b.trim() || !question.option_c.trim() || !question.option_d.trim()) {
+      alert('চারটি অপশন (ক, খ, গ, ঘ) সঠিকভাবে পূরণ করুন।');
+      return;
+    }
+
+    setSavingQuestionCorrection(true);
+    try {
+      const currentQuestions = takingExam.questions || [];
+      const updatedQuestions = currentQuestions.map((q, i) => (i === index ? question : q));
+
+      const updatedExam = { ...takingExam, questions: updatedQuestions };
+      setTakingExam(updatedExam);
+      setExams((prev) => prev.map((e) => (e.id === takingExam.id ? updatedExam : e)));
+
+      await updateCourseExam(takingExam.id, course.id, {
+        questions: updatedQuestions,
+      });
+
+      // Also update in public.questions if question has an ID
+      if (question.id && !question.id.startsWith('q-') && !question.id.startsWith('temp-')) {
+        try {
+          await updateQuestion(question.id, {
+            question: question.question,
+            option_a: question.option_a,
+            option_b: question.option_b,
+            option_c: question.option_c,
+            option_d: question.option_d,
+            correct_answer: question.correct_answer,
+            explanation: question.explanation,
+          });
+        } catch (qErr) {
+          console.warn('Could not update in public.questions:', qErr);
+        }
+      }
+
+      setEditingExamQuestionItem(null);
+      setQuestionCorrectionSuccess('প্রশ্নের অপশন ও সঠিক উত্তর সফলভাবে সংশোধন ও সেভ করা হয়েছে!');
+      setTimeout(() => setQuestionCorrectionSuccess(null), 3500);
+    } catch (err: any) {
+      alert('প্রশ্ন সংশোধন করতে সমস্যা হয়েছে: ' + (err?.message || 'অজানা ত্রুটি'));
+    } finally {
+      setSavingQuestionCorrection(false);
+    }
+  };
 
   useEffect(() => {
     setCourse(initialCourseData);
@@ -550,6 +629,13 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
               )}
 
               {/* QUESTIONS LIST */}
+              {questionCorrectionSuccess && (
+                <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{questionCorrectionSuccess}</span>
+                </div>
+              )}
+
               {(!takingExam.questions || takingExam.questions.length === 0) ? (
                 <div className="p-10 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
                   <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
@@ -561,8 +647,202 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
               ) : (
                 <div className="space-y-4">
                   {takingExam.questions.map((q, idx) => {
+                    const isEditingThis = editingExamQuestionItem?.index === idx;
+                    const editObj = isEditingThis ? editingExamQuestionItem.question : q;
                     const selected = selectedAnswers[q.id];
                     const isAnswered = Boolean(selected);
+
+                    if (isEditingThis) {
+                      return (
+                        <div
+                          key={q.id || idx}
+                          className="bg-slate-900 border-2 border-amber-500/80 rounded-2xl p-5 space-y-4 shadow-2xl animate-in fade-in duration-150"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-7 h-7 rounded-xl bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <h4 className="text-sm font-black text-amber-400">
+                                  অপশন ও সঠিক উত্তর সংশোধন
+                                </h4>
+                                <p className="text-[11px] text-slate-400">
+                                  ভুল অপশন বা সঠিক উত্তর ঠিক করে সেভ করুন
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setEditingExamQuestionItem(null)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                            >
+                              বাতিল
+                            </button>
+                          </div>
+
+                          {/* Question text */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-amber-300 mb-1">
+                              প্রশ্নের বিবরণ
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={editObj.question}
+                              onChange={(e) =>
+                                setEditingExamQuestionItem({
+                                  ...editingExamQuestionItem,
+                                  question: { ...editObj, question: e.target.value },
+                                })
+                              }
+                              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Correct Answer Quick Selector */}
+                          <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
+                            <label className="block text-[11px] font-extrabold text-slate-300">
+                              সঠিক উত্তর নির্বাচন করুন: <span className="text-emerald-400 font-bold">
+                                {editObj.correct_answer === 'option_a' ? 'ক (Option A)' :
+                                 editObj.correct_answer === 'option_b' ? 'খ (Option B)' :
+                                 editObj.correct_answer === 'option_c' ? 'গ (Option C)' : 'ঘ (Option D)'}
+                              </span>
+                            </label>
+                            <div className="grid grid-cols-4 gap-2">
+                              {[
+                                { key: 'option_a', label: 'ক (A)' },
+                                { key: 'option_b', label: 'খ (B)' },
+                                { key: 'option_c', label: 'গ (C)' },
+                                { key: 'option_d', label: 'ঘ (D)' },
+                              ].map((ans) => (
+                                <button
+                                  key={ans.key}
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingExamQuestionItem({
+                                      ...editingExamQuestionItem,
+                                      question: { ...editObj, correct_answer: ans.key as any },
+                                    })
+                                  }
+                                  className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1 border ${
+                                    editObj.correct_answer === ans.key
+                                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20'
+                                      : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600'
+                                  }`}
+                                >
+                                  {editObj.correct_answer === ans.key && <Check className="w-3.5 h-3.5" />}
+                                  {ans.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Options 4 inputs */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                              { key: 'option_a', label: 'ক. অপশন A', prop: 'option_a' },
+                              { key: 'option_b', label: 'খ. অপশন B', prop: 'option_b' },
+                              { key: 'option_c', label: 'গ. অপশন C', prop: 'option_c' },
+                              { key: 'option_d', label: 'ঘ. অপশন D', prop: 'option_d' },
+                            ].map((opt) => {
+                              const isCorrect = editObj.correct_answer === opt.key;
+                              return (
+                                <div
+                                  key={opt.key}
+                                  className={`p-3 rounded-xl border transition-all space-y-1.5 ${
+                                    isCorrect
+                                      ? 'bg-emerald-950/30 border-emerald-500/80 ring-1 ring-emerald-500/40'
+                                      : 'bg-slate-950/60 border-slate-800'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                                      <span>{opt.label}</span>
+                                      {isCorrect && (
+                                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-black">
+                                          ✓ সঠিক উত্তর
+                                        </span>
+                                      )}
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setEditingExamQuestionItem({
+                                          ...editingExamQuestionItem,
+                                          question: { ...editObj, correct_answer: opt.key as any },
+                                        })
+                                      }
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-all ${
+                                        isCorrect
+                                          ? 'bg-emerald-500 text-slate-950'
+                                          : 'bg-slate-800 text-slate-400 hover:text-emerald-400'
+                                      }`}
+                                    >
+                                      {isCorrect ? 'সঠিক নির্বাচিত' : 'সঠিক বানান'}
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={(editObj as any)[opt.prop] || ''}
+                                    onChange={(e) =>
+                                      setEditingExamQuestionItem({
+                                        ...editingExamQuestionItem,
+                                        question: { ...editObj, [opt.prop]: e.target.value },
+                                      })
+                                    }
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Explanation */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                              ব্যাখ্যা / নোট (ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="text"
+                              value={editObj.explanation || ''}
+                              onChange={(e) =>
+                                setEditingExamQuestionItem({
+                                  ...editingExamQuestionItem,
+                                  question: { ...editObj, explanation: e.target.value },
+                                })
+                              }
+                              placeholder="সঠিক উত্তরের তথ্যসূত্র বা ব্যাখ্যা..."
+                              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setEditingExamQuestionItem(null)}
+                              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                            >
+                              বাতিল
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveQuestionCorrection}
+                              disabled={savingQuestionCorrection}
+                              className="px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                            >
+                              {savingQuestionCorrection ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              <span>সংশোধন সংরক্ষণ করুন</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div
@@ -576,11 +856,22 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                           <h4 className="flex-1 text-sm font-bold text-white leading-relaxed">
                             {q.question}
                           </h4>
-                          {q.subject && (
-                            <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] shrink-0 font-medium">
-                              {q.subject}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {q.subject && (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] shrink-0 font-medium">
+                                {q.subject}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditExamQuestion(idx, q)}
+                              className="px-2.5 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1 transition-all"
+                              title="এই প্রশ্নের অপশন বা উত্তর সংশোধন করুন"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>সংশোধন</span>
+                            </button>
+                          </div>
                         </div>
 
                         {/* Options Grid */}

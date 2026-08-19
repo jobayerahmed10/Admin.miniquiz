@@ -396,7 +396,9 @@ export const fetchQuestionsByExamId = async (
 ): Promise<{ questions: Question[]; error: string | null }> => {
   const client = getSupabaseClient();
   if (!client) {
-    return { questions: [], error: 'সুপাবেস কনফিগার করা নেই।' };
+    const local = await fetchAllQuestions();
+    const matched = local.questions.filter((q) => String(q.exam_id) === String(examId));
+    return { questions: matched, error: null };
   }
 
   try {
@@ -406,13 +408,18 @@ export const fetchQuestionsByExamId = async (
       .eq('exam_id', examId)
       .order('created_at', { ascending: true });
 
-    if (error) {
-      return { questions: [], error: error.message };
+    if (!error && data && data.length > 0) {
+      return { questions: data.map(normalizeQuestionRow), error: null };
     }
 
-    return { questions: (data || []).map(normalizeQuestionRow), error: null };
+    // Fallback: check all questions in case exam_id is stored slightly differently or numeric
+    const all = await fetchAllQuestions();
+    const matched = all.questions.filter((q) => String(q.exam_id) === String(examId));
+    return { questions: matched, error: null };
   } catch (err: any) {
-    return { questions: [], error: err?.message || 'পরীক্ষার প্রশ্ন দেখতে ব্যর্থ।' };
+    const all = await fetchAllQuestions();
+    const matched = all.questions.filter((q) => String(q.exam_id) === String(examId));
+    return { questions: matched, error: null };
   }
 };
 
