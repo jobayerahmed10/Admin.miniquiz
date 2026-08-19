@@ -40,10 +40,10 @@ import {
   ExamBadgeType,
   ExamStatus,
   EXAM_BADGE_OPTIONS,
-  DEFAULT_SUBJECTS,
 } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AddQuestionsToExamModal } from '../components/AddQuestionsToExamModal';
+import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
 export const ExamsManagement: React.FC = () => {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -69,7 +69,8 @@ export const ExamsManagement: React.FC = () => {
   const [title, setTitle] = useState('');
   const [badgeType, setBadgeType] = useState<ExamBadgeType>('daily');
   const [badge, setBadge] = useState('দৈনিক মডেল টেস্ট');
-  const [subject, setSubject] = useState('সকল বিষয়');
+  const [availableSubjectsList, setAvailableSubjectsList] = useState<string[]>(() => getAllSubjects());
+  const [subject, setSubject] = useState('বাংলা');
   const [customSubject, setCustomSubject] = useState('');
   const [questionCount, setQuestionCount] = useState<number>(25);
   const [timeMinutes, setTimeMinutes] = useState<number>(20);
@@ -128,7 +129,9 @@ export const ExamsManagement: React.FC = () => {
     setTitle('');
     setBadgeType('daily');
     setBadge('দৈনিক মডেল টেস্ট');
-    setSubject('সকল বিষয়');
+    const subs = getAllSubjects();
+    setAvailableSubjectsList(subs);
+    setSubject(subs[0] || 'বাংলা');
     setCustomSubject('');
     setQuestionCount(25);
     setTimeMinutes(20);
@@ -147,7 +150,9 @@ export const ExamsManagement: React.FC = () => {
     setTitle(exam.title);
     setBadgeType(exam.badge_type);
     setBadge(exam.badge);
-    if (DEFAULT_SUBJECTS.includes(exam.subject)) {
+    const subs = getAllSubjects(exam.subject ? [exam.subject] : []);
+    setAvailableSubjectsList(subs);
+    if (subs.includes(exam.subject)) {
       setSubject(exam.subject);
       setCustomSubject('');
     } else {
@@ -176,7 +181,16 @@ export const ExamsManagement: React.FC = () => {
       return;
     }
 
-    const finalSubject = subject === 'অন্যান্য' ? customSubject.trim() || 'অন্যান্য' : subject;
+    let finalSubject = subject;
+    if (subject === 'অন্যান্য') {
+      const trimmed = customSubject.trim();
+      if (trimmed) {
+        addCustomSubject(trimmed);
+        finalSubject = trimmed;
+      } else {
+        finalSubject = 'বাংলা';
+      }
+    }
 
     setFormSubmitting(true);
 
@@ -877,11 +891,12 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
                     onChange={(e) => setSubject(e.target.value)}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
                   >
-                    {DEFAULT_SUBJECTS.map((sub) => (
+                    {availableSubjectsList.map((sub) => (
                       <option key={sub} value={sub}>
                         {sub}
                       </option>
                     ))}
+                    <option value="অন্যান্য">+ নতুন বিষয় লিখুন...</option>
                   </select>
 
                   {subject === 'অন্যান্য' && (

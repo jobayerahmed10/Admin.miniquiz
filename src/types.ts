@@ -47,7 +47,6 @@ export const EXAM_BADGE_OPTIONS: { type: ExamBadgeType; label: string; defaultBa
 ];
 
 export const DEFAULT_SUBJECTS = [
-  'সকল বিষয়',
   'বাংলা',
   'বাংলা ভাষা ও সাহিত্য',
   'ইংরেজি',
@@ -59,7 +58,12 @@ export const DEFAULT_SUBJECTS = [
   'কম্পিউটার ও তথ্যপ্রযুক্তি',
   'ভূগোল ও পরিবেশ',
   'নৈতিকতা ও সুশাসন',
+  'আল কুরআন ও হাদিস',
   'আল কুরআন ও তাফসির',
+  'ইসলাম শিক্ষা',
+  'আরবি',
+  'সহকারী মৌলভী',
+  'ইবতেদায়ী মৌলবি',
   'অন্যান্য',
 ];
 

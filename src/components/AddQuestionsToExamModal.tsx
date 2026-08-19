@@ -22,6 +22,7 @@ import {
 import { Question, Exam, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
 import { fetchAllQuestions, insertQuestion, insertBatchQuestions } from '../lib/supabase';
 import { isArabicText } from './AddAiQuestionsModal';
+import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
 interface AddQuestionsToExamModalProps {
   isOpen: boolean;
@@ -53,7 +54,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [manualOptionD, setManualOptionD] = useState('');
   const [manualCorrect, setManualCorrect] = useState<'option_a' | 'option_b' | 'option_c' | 'option_d'>('option_a');
   const [manualExplanation, setManualExplanation] = useState('');
-  const [manualSubject, setManualSubject] = useState(exam.subject || 'সাধারণ');
+  const [manualSubject, setManualSubject] = useState(exam.subject && exam.subject !== 'সাধারণ' ? exam.subject : 'বাংলা');
   const [manualCustomSubject, setManualCustomSubject] = useState('');
   const [manualTopic, setManualTopic] = useState('');
   const [manualCustomTopic, setManualCustomTopic] = useState('');
@@ -75,7 +76,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   // 3. AI Topic Generator State
   const [topic, setTopic] = useState('');
   const [topicCount, setTopicCount] = useState<number>(5);
-  const [topicSubject, setTopicSubject] = useState(exam.subject || 'সাধারণ জ্ঞান');
+  const [topicSubject, setTopicSubject] = useState(exam.subject && exam.subject !== 'সাধারণ' ? exam.subject : 'বাংলা');
   const [generatingTopic, setGeneratingTopic] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
@@ -88,18 +89,9 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   // Custom Subject input
   const [customSubInput, setCustomSubInput] = useState('');
   const [showCustomSubInput, setShowCustomSubInput] = useState(false);
-  const [subjectsList, setSubjectsList] = useState<string[]>([
-    exam.subject || 'সাধারণ',
-    'বাংলা ভাষা ও সাহিত্য',
-    'ইংরেজি',
-    'গণিত',
-    'সাধারণ জ্ঞান',
-    'বাংলাদেশ বিষয়াবলী',
-    'আন্তর্জাতিক বিষয়াবলী',
-    'বিজ্ঞান',
-    'কম্পিউটার ও তথ্যপ্রযুক্তি',
-    'আল কুরআন ও হাদিস',
-  ]);
+  const [subjectsList, setSubjectsList] = useState<string[]>(() =>
+    getAllSubjects(exam.subject ? [exam.subject] : [])
+  );
 
   // Toast / General message
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
@@ -107,6 +99,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   useEffect(() => {
     if (isOpen) {
       loadQuestionBank();
+      setSubjectsList(getAllSubjects(exam.subject ? [exam.subject] : []));
       if (exam && exam.question_count) {
         setTopicCount(exam.question_count);
       }
@@ -139,7 +132,16 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
 
     setManualSubmitting(true);
 
-    const finalSubject = manualSubject === 'অন্যান্য' ? (manualCustomSubject.trim() || 'অন্যান্য') : (manualSubject || exam.subject || 'সাধারণ');
+    let finalSubject = manualSubject;
+    if (manualSubject === 'অন্যান্য') {
+      const trimmed = manualCustomSubject.trim();
+      if (trimmed) {
+        addCustomSubject(trimmed);
+        finalSubject = trimmed;
+      } else {
+        finalSubject = exam.subject && exam.subject !== 'সাধারণ' ? exam.subject : 'বাংলা';
+      }
+    }
     const finalTopic = showManualCustomTopic ? manualCustomTopic.trim() : (manualTopic === 'অন্যান্য' ? manualCustomTopic.trim() : manualTopic.trim());
     const finalPost = showManualCustomPost ? manualCustomPost.trim() : (manualPost === 'অন্যান্য' ? manualCustomPost.trim() : manualPost.trim());
 
@@ -486,11 +488,11 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       q.question.toLowerCase().includes(bankSearch.toLowerCase()) ||
       q.option_a.toLowerCase().includes(bankSearch.toLowerCase()) ||
       (q.subject && q.subject.toLowerCase().includes(bankSearch.toLowerCase()));
-    const matchesSub = bankSubjectFilter === 'all' ? true : (q.subject || 'সাধারণ') === bankSubjectFilter;
+    const matchesSub = bankSubjectFilter === 'all' ? true : (q.subject || 'বাংলা') === bankSubjectFilter;
     return matchesSearch && matchesSub;
   });
 
-  const availableSubjects = Array.from(new Set(bankQuestions.map((q) => q.subject || 'সাধারণ')));
+  const availableSubjects = getAllSubjects(bankQuestions.map((q) => q.subject || ''));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-fadeIn">

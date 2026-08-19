@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Sparkles,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { insertBatchQuestions } from '../lib/supabase';
 import { Question } from '../types';
+import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
 // Helper to detect Arabic characters for RTL alignment.
 // If text contains Bengali or English characters (mixed text), force LTR (return false)
@@ -45,25 +46,26 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'copyPaste' | 'topicGen'>('copyPaste');
 
-  // Common State
-  const [subject, setSubject] = useState('ইংরেজি');
+  // Unified dynamic subject list
+  const [subjectList, setSubjectList] = useState<string[]>(() =>
+    getAllSubjects(availableSubjects)
+  );
+
+  // Common State - default to first available subject (e.g. 'বাংলা')
+  const [subject, setSubject] = useState<string>(() => {
+    const list = getAllSubjects(availableSubjects);
+    return list[0] || 'বাংলা';
+  });
   const [customSubjectInput, setCustomSubjectInput] = useState('');
   const [showAddSubjectInput, setShowAddSubjectInput] = useState(false);
-  const [subjectList, setSubjectList] = useState<string[]>(() => {
-    const defaultList = [
-      'ইংরেজি',
-      'বাংলা ভাষা ও সাহিত্য',
-      'সাধারণ জ্ঞান',
-      'গণিত',
-      'বাংলাদেশ বিষয়াবলী',
-      'আন্তর্জাতিক বিষয়াবলী',
-      'বিজ্ঞান',
-      'কম্পিউটার ও তথ্যপ্রযুক্তি',
-      'আল কুরআন ও হাদিস',
-      'ইসলাম শিক্ষা',
-    ];
-    return Array.from(new Set([...defaultList, ...availableSubjects]));
-  });
+
+  useEffect(() => {
+    const currentSubjects = getAllSubjects(availableSubjects);
+    setSubjectList(currentSubjects);
+    if (!currentSubjects.includes(subject)) {
+      setSubject(currentSubjects[0] || 'বাংলা');
+    }
+  }, [availableSubjects, isOpen]);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -95,12 +97,16 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   };
 
   const handleAddCustomSubject = () => {
-    if (customSubjectInput.trim()) {
-      const newSub = customSubjectInput.trim();
-      if (!subjectList.includes(newSub)) {
-        setSubjectList((prev) => [...prev, newSub]);
+    const trimmed = customSubjectInput.trim();
+    if (trimmed) {
+      if (trimmed === 'সাধারণ' || trimmed === 'সকল বিষয়') {
+        alert('এই নামটি বিষয় হিসেবে ব্যবহার করা যাবে না।');
+        return;
       }
-      handleSubjectChange(newSub);
+      addCustomSubject(trimmed);
+      const updatedList = getAllSubjects([trimmed, ...subjectList]);
+      setSubjectList(updatedList);
+      handleSubjectChange(trimmed);
       setCustomSubjectInput('');
       setShowAddSubjectInput(false);
     }

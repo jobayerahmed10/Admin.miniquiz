@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw } from 'lucide-react';
 import { fetchQuestionById, updateQuestion } from '../lib/supabase';
-import { QuestionStatus, DEFAULT_SUBJECTS, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
+import { QuestionStatus, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
+import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
 export const EditQuestion: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const [availableSubjectsList, setAvailableSubjectsList] = useState<string[]>(() => getAllSubjects());
   const [subject, setSubject] = useState<string>('বাংলা');
   const [customSubject, setCustomSubject] = useState<string>('');
   
@@ -73,7 +75,9 @@ export const EditQuestion: React.FC = () => {
           }
         }
         if (question.subject) {
-          if (DEFAULT_SUBJECTS.includes(question.subject)) {
+          const allSubs = getAllSubjects([question.subject]);
+          setAvailableSubjectsList(allSubs);
+          if (allSubs.includes(question.subject)) {
             setSubject(question.subject);
           } else {
             setSubject('অন্যান্য');
@@ -104,7 +108,16 @@ export const EditQuestion: React.FC = () => {
 
     setSaving(true);
 
-    const finalSubject = subject === 'অন্যান্য' ? customSubject.trim() || 'অন্যান্য' : subject;
+    let finalSubject = subject;
+    if (subject === 'অন্যান্য' || subject === '__NEW_SUBJECT__') {
+      const cleanCustom = customSubject.trim();
+      if (cleanCustom) {
+        addCustomSubject(cleanCustom);
+        finalSubject = cleanCustom;
+      } else {
+        finalSubject = 'বাংলা';
+      }
+    }
     const finalTopic = showCustomTopic ? customTopic.trim() : (topic === 'অন্যান্য' ? customTopic.trim() : topic.trim());
     const finalPost = showCustomPost ? customPost.trim() : (post === 'অন্যান্য' ? customPost.trim() : post.trim());
 
@@ -217,11 +230,12 @@ export const EditQuestion: React.FC = () => {
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >
-                {DEFAULT_SUBJECTS.map((sub) => (
+                {availableSubjectsList.map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
                   </option>
                 ))}
+                <option value="অন্যান্য">+ নতুন বিষয় ম্যানুয়ালি লিখুন...</option>
               </select>
 
               {subject === 'অন্যান্য' && (
