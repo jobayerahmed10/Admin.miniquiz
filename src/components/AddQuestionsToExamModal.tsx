@@ -18,9 +18,27 @@ import {
   Edit,
   Globe,
   PlusCircle,
+  Layers,
+  Save,
+  CheckSquare,
+  ArrowRight,
+  Filter,
+  Eye,
+  Rocket,
+  ToggleLeft,
+  ToggleRight,
+  Award,
 } from 'lucide-react';
-import { Question, Exam, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
-import { fetchAllQuestions, insertQuestion, insertBatchQuestions } from '../lib/supabase';
+import { Question, Exam, ExamStatus, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
+import {
+  fetchAllQuestions,
+  fetchQuestionsByExamId,
+  insertQuestion,
+  insertBatchQuestions,
+  updateQuestion,
+  deleteQuestion,
+  updateExam,
+} from '../lib/supabase';
 import { isArabicText } from './AddAiQuestionsModal';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
@@ -37,14 +55,44 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   exam,
   onQuestionsUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<'manual' | 'copypaste' | 'aitopic' | 'bank'>('manual');
+  // Tab State: 'current' (view & edit attached questions), 'manual', 'copypaste', 'aitopic', 'bank'
+  const [activeTab, setActiveTab] = useState<'current' | 'manual' | 'copypaste' | 'aitopic' | 'bank'>('current');
 
-  // Question Bank List for Tab 4
+  // Exam Publish / Status State
+  const [currentExamStatus, setCurrentExamStatus] = useState<ExamStatus>(exam.status || 'active');
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  // Attached Questions State (Questions already in this exam)
+  const [attachedQuestions, setAttachedQuestions] = useState<Question[]>([]);
+  const [loadingAttached, setLoadingAttached] = useState(false);
+  const [attachedSearch, setAttachedSearch] = useState('');
+  const [attachedSubjectFilter, setAttachedSubjectFilter] = useState('all');
+  const [settingCorrectAnswerId, setSettingCorrectAnswerId] = useState<string | number | null>(null);
+
+  // Inline Question Editing State
+  const [editingQuestionId, setEditingQuestionId] = useState<string | number | null>(null);
+  const [editingQuestionState, setEditingQuestionState] = useState<{
+    question: string;
+    option_a: string;
+    option_b: string;
+    option_c: string;
+    option_d: string;
+    correct_answer: 'option_a' | 'option_b' | 'option_c' | 'option_d';
+    explanation: string;
+    subject: string;
+    topic: string;
+  } | null>(null);
+  const [savingQuestionEdit, setSavingQuestionEdit] = useState(false);
+  const [editQuestionError, setEditQuestionError] = useState<string | null>(null);
+  const [deletingQuestionId, setDeletingQuestionId] = useState<string | number | null>(null);
+
+  // Question Bank List for Tab 5
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [loadingBank, setLoadingBank] = useState(false);
   const [bankSearch, setBankSearch] = useState('');
   const [bankSubjectFilter, setBankSubjectFilter] = useState('all');
   const [selectedBankIds, setSelectedBankIds] = useState<Set<string | number>>(new Set());
+  const [attachingFromBank, setAttachingFromBank] = useState(false);
 
   // 1. Manual Form State
   const [manualQuestion, setManualQuestion] = useState('');
@@ -96,15 +144,14 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   // Toast / General message
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadQuestionBank();
-      setSubjectsList(getAllSubjects(exam.subject ? [exam.subject] : []));
-      if (exam && exam.question_count) {
-        setTopicCount(exam.question_count);
-      }
+  const loadAttachedQuestions = async () => {
+    setLoadingAttached(true);
+    const res = await fetchQuestionsByExamId(exam.id);
+    if (!res.error) {
+      setAttachedQuestions(res.questions);
     }
-  }, [isOpen, exam]);
+    setLoadingAttached(false);
+  };
 
   const loadQuestionBank = async () => {
     setLoadingBank(true);
@@ -115,7 +162,186 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
     setLoadingBank(false);
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentExamStatus(exam.status || 'active');
+      loadAttachedQuestions();
+      loadQuestionBank();
+      setSubjectsList(getAllSubjects(exam.subject ? [exam.subject] : []));
+      if (exam && exam.question_count) {
+        setTopicCount(exam.question_count);
+      }
+    }
+  }, [isOpen, exam]);
+
   if (!isOpen) return null;
+
+  // Toggle Exam Publish / Status
+  const handleToggleExamPublish = async () => {
+    setTogglingStatus(true);
+    const nextStatus: ExamStatus = currentExamStatus === 'active' ? 'draft' : 'active';
+    const res = await updateExam(exam.id, { status: nextStatus });
+    setTogglingStatus(false);
+
+    if (res.success) {
+      setCurrentExamStatus(nextStatus);
+      setActionSuccessMsg(
+        nextStatus === 'active'
+          ? '🎉 মডেল টেস্টটি সফলভাবে লাইভ পাবলিশ করা হয়েছে!'
+          : 'মডেল টেস্টটি ড্রাফট (Draft) মোডে রাখা হয়েছে।'
+      );
+      setTimeout(() => setActionSuccessMsg(null), 3500);
+      onQuestionsUpdated(0);
+    } else {
+      alert(res.error || 'স্ট্যাটাস আপডেট করা সম্ভব হয়নি।');
+    }
+  };
+
+  // Instant 1-Click Set Correct Answer
+  const handleQuickSetCorrectAnswer = async (
+    questionId: string | number,
+    correctOption: 'option_a' | 'option_b' | 'option_c' | 'option_d'
+  ) => {
+    const current = attachedQuestions.find((q) => q.id === questionId);
+    if (!current || current.correct_answer === correctOption) return;
+
+    setSettingCorrectAnswerId(questionId);
+    // Optimistic UI update
+    setAttachedQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, correct_answer: correctOption } : q))
+    );
+
+    const res = await updateQuestion(questionId, {
+      correct_answer: correctOption,
+    });
+    setSettingCorrectAnswerId(null);
+
+    if (res.success) {
+      const optLabel =
+        correctOption === 'option_a'
+          ? 'ক'
+          : correctOption === 'option_b'
+          ? 'খ'
+          : correctOption === 'option_c'
+          ? 'গ'
+          : 'ঘ';
+      setActionSuccessMsg(`✓ অপশন (${optLabel}) সঠিক উত্তর হিসেবে সেট ও সেভ করা হয়েছে!`);
+      setTimeout(() => setActionSuccessMsg(null), 2500);
+      onQuestionsUpdated(0);
+    } else {
+      // Revert if error
+      setAttachedQuestions((prev) =>
+        prev.map((q) => (q.id === questionId ? { ...q, correct_answer: current.correct_answer } : q))
+      );
+      alert(res.error || 'সঠিক উত্তর পরিবর্তন করা যায়নি।');
+    }
+  };
+
+  // ----------------------------------------------------
+  // ATTACHED QUESTIONS EDIT & DELETE HANDLERS
+  // ----------------------------------------------------
+  const handleStartEditQuestion = (q: Question) => {
+    setEditingQuestionId(q.id);
+    setEditingQuestionState({
+      question: q.question,
+      option_a: q.option_a,
+      option_b: q.option_b,
+      option_c: q.option_c,
+      option_d: q.option_d,
+      correct_answer: (q.correct_answer as any) || 'option_a',
+      explanation: q.explanation || '',
+      subject: q.subject || exam.subject || 'বাংলা',
+      topic: q.topic || '',
+    });
+    setEditQuestionError(null);
+  };
+
+  const handleCancelEditQuestion = () => {
+    setEditingQuestionId(null);
+    setEditingQuestionState(null);
+    setEditQuestionError(null);
+  };
+
+  const handleSaveQuestionEdit = async (questionId: string | number) => {
+    if (!editingQuestionState) return;
+
+    if (
+      !editingQuestionState.question.trim() ||
+      !editingQuestionState.option_a.trim() ||
+      !editingQuestionState.option_b.trim() ||
+      !editingQuestionState.option_c.trim() ||
+      !editingQuestionState.option_d.trim()
+    ) {
+      setEditQuestionError('প্রশ্নের শিরোনাম এবং চারটি অপশনই পূরণ করা আবশ্যক।');
+      return;
+    }
+
+    setSavingQuestionEdit(true);
+    setEditQuestionError(null);
+
+    const res = await updateQuestion(questionId, {
+      question: editingQuestionState.question.trim(),
+      option_a: editingQuestionState.option_a.trim(),
+      option_b: editingQuestionState.option_b.trim(),
+      option_c: editingQuestionState.option_c.trim(),
+      option_d: editingQuestionState.option_d.trim(),
+      correct_answer: editingQuestionState.correct_answer,
+      explanation: editingQuestionState.explanation.trim() || null,
+      subject: editingQuestionState.subject.trim(),
+      topic: editingQuestionState.topic.trim() || undefined,
+    });
+
+    setSavingQuestionEdit(false);
+
+    if (res.success && res.data) {
+      const updatedItem = res.data;
+      setAttachedQuestions((prev) =>
+        prev.map((item) => (item.id === questionId ? { ...item, ...updatedItem } : item))
+      );
+      setEditingQuestionId(null);
+      setEditingQuestionState(null);
+      setActionSuccessMsg('প্রশ্ন ও অপশনসমূহ সফলভাবে সংশোধন ও সেভ করা হয়েছে!');
+      setTimeout(() => setActionSuccessMsg(null), 3500);
+      onQuestionsUpdated(0);
+    } else {
+      setEditQuestionError(res.error || 'প্রশ্ন সংরক্ষণ করা সম্ভব হয়নি।');
+    }
+  };
+
+  const handleDeleteAttachedQuestion = async (questionId: string | number) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই প্রশ্নটি পরীক্ষা থেকে বাদ বা মুছে ফেলতে চান?')) {
+      return;
+    }
+
+    setDeletingQuestionId(questionId);
+    const res = await deleteQuestion(questionId);
+    setDeletingQuestionId(null);
+
+    if (res.success) {
+      setAttachedQuestions((prev) => prev.filter((q) => q.id !== questionId));
+      setActionSuccessMsg('প্রশ্নটি পরীক্ষা থেকে সফলভাবে মুছে ফেলা হয়েছে!');
+      setTimeout(() => setActionSuccessMsg(null), 3000);
+      onQuestionsUpdated(-1);
+    } else {
+      alert(res.error || 'প্রশ্ন মুছে ফেলা সম্ভব হয়নি।');
+    }
+  };
+
+  // Filtered Attached Questions
+  const filteredAttachedQuestions = attachedQuestions.filter((q) => {
+    const matchesSearch =
+      q.question.toLowerCase().includes(attachedSearch.toLowerCase()) ||
+      q.option_a.toLowerCase().includes(attachedSearch.toLowerCase()) ||
+      q.option_b.toLowerCase().includes(attachedSearch.toLowerCase()) ||
+      q.option_c.toLowerCase().includes(attachedSearch.toLowerCase()) ||
+      q.option_d.toLowerCase().includes(attachedSearch.toLowerCase()) ||
+      (q.subject && q.subject.toLowerCase().includes(attachedSearch.toLowerCase()));
+    const matchesSub =
+      attachedSubjectFilter === 'all' ? true : (q.subject || 'সাধারণ') === attachedSubjectFilter;
+    return matchesSearch && matchesSub;
+  });
+
+  const attachedAvailableSubjects = getAllSubjects(attachedQuestions.map((q) => q.subject || ''));
 
   // ----------------------------------------------------
   // 1. MANUAL SAVE HANDLER
@@ -172,6 +398,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setManualOptionD('');
       setManualExplanation('');
       onQuestionsUpdated(1);
+      loadAttachedQuestions();
       loadQuestionBank();
       setTimeout(() => setManualSuccess(null), 3000);
     } else {
@@ -372,6 +599,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setExtractedQuestions([]);
       setRawText('');
       onQuestionsUpdated(extractedQuestions.length);
+      loadAttachedQuestions();
       loadQuestionBank();
       setTimeout(() => setActionSuccessMsg(null), 3000);
     } else {
@@ -452,6 +680,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setGeneratedQuestions([]);
       setTopic('');
       onQuestionsUpdated(generatedQuestions.length);
+      loadAttachedQuestions();
       loadQuestionBank();
       setTimeout(() => setActionSuccessMsg(null), 3000);
     } else {
@@ -475,12 +704,28 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const handleAttachFromBank = async () => {
     if (selectedBankIds.size === 0) return;
 
-    // Attach selected question IDs to current exam
-    const count = selectedBankIds.size;
-    setActionSuccessMsg(`${count} টি সিলেক্ট করা প্রশ্ন এই মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
-    setSelectedBankIds(new Set());
-    onQuestionsUpdated(count);
-    setTimeout(() => setActionSuccessMsg(null), 3000);
+    setAttachingFromBank(true);
+    const ids: (string | number)[] = Array.from(selectedBankIds);
+    try {
+      await Promise.all(
+        ids.map((id: string | number) =>
+          updateQuestion(id, {
+            exam_id: exam.id,
+          })
+        )
+      );
+      const count = ids.length;
+      setActionSuccessMsg(`${count} টি প্রশ্ন এই মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
+      setSelectedBankIds(new Set());
+      onQuestionsUpdated(count);
+      loadAttachedQuestions();
+      loadQuestionBank();
+      setTimeout(() => setActionSuccessMsg(null), 3000);
+    } catch (err: any) {
+      alert('প্রশ্ন যুক্ত করতে সমস্যা হয়েছে: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setAttachingFromBank(false);
+    }
   };
 
   const filteredBank = bankQuestions.filter((q) => {
@@ -498,36 +743,76 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-fadeIn">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-4xl w-full p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[92vh] relative space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl">
-              <HelpCircle className="w-6 h-6" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl shrink-0 mt-0.5">
+              <Award className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[11px]">
                   {exam.badge || 'মডেল টেস্ট'}
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">
-                  বিষয়: {exam.subject}
+                  বিষয়: <strong className="text-slate-800 dark:text-slate-200">{exam.subject}</strong>
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
+                  মোট প্রশ্ন: <strong className="text-emerald-600 dark:text-emerald-400">{attachedQuestions.length}</strong> {exam.question_count ? `/ ${exam.question_count} টি` : 'টি'}
+                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold">
+                  সময়: {exam.time_minutes || 20} মিনিট
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-1">
-                "{exam.title}" - প্রশ্ন সংযোজন
+                "{exam.title}" - পূর্ণাঙ্গ মডেল টেস্ট প্রিভিউ ও এডিটর
               </h2>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-2xl bg-slate-100 dark:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            {/* Live Publish Status Button */}
+            <button
+              type="button"
+              disabled={togglingStatus}
+              onClick={handleToggleExamPublish}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md ${
+                currentExamStatus === 'active'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-500/30'
+                  : 'bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white animate-pulse'
+              }`}
+              title="মডেল টেস্টের লাইভ পাবলিশ স্ট্যাটাস পরিবর্তন করুন"
+            >
+              {togglingStatus ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>আপডেট হচ্ছে...</span>
+                </>
+              ) : currentExamStatus === 'active' ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>✓ পাবলিশড (অনলাইন)</span>
+                </>
+              ) : (
+                <>
+                  <Rocket className="w-4 h-4" />
+                  <span>🚀 এখনই পাবলিশ করুন</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-2xl bg-slate-100 dark:bg-slate-800 transition-colors"
+              title="বন্ধ করুন"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Global Toast */}
         {actionSuccessMsg && (
-          <div className="p-4 bg-emerald-500 text-white rounded-2xl text-xs font-extrabold flex items-center justify-between shadow-lg animate-bounce">
+          <div className="p-3.5 bg-emerald-500 text-white rounded-2xl text-xs font-extrabold flex items-center justify-between shadow-lg animate-bounce">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5" />
               <span>{actionSuccessMsg}</span>
@@ -536,55 +821,604 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
         )}
 
         {/* TABS HEADER */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl">
+          <button
+            onClick={() => setActiveTab('current')}
+            className={`py-2.5 px-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'current'
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span className="truncate">📋 টেস্ট প্রিভিউ ও এডিট ({attachedQuestions.length})</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('manual')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'manual'
                 ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>ম্যানুয়ালি একটি একটি</span>
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">➕ নতুন প্রশ্ন লিখুন</span>
           </button>
 
           <button
             onClick={() => setActiveTab('copypaste')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'copypaste'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-indigo-500" />
-            <span>কপি-পেস্ট (AI ডিটেক্ট)</span>
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <span className="truncate">📋 কপি-পেস্ট AI</span>
           </button>
 
           <button
             onClick={() => setActiveTab('aitopic')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'aitopic'
                 ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <Wand2 className="w-4 h-4 text-purple-500" />
-            <span>টপিক থেকে এআই জেনারেটর</span>
+            <Wand2 className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+            <span className="truncate">🤖 এআই জেনারেটর</span>
           </button>
 
           <button
             onClick={() => setActiveTab('bank')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+            className={`py-2.5 px-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'bank'
-                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md'
+                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <Database className="w-4 h-4 text-amber-500" />
-            <span>প্রশ্ন ব্যাংক থেকে পিক</span>
+            <Database className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="truncate">🏦 প্রশ্ন ব্যাংক ({bankQuestions.length})</span>
           </button>
         </div>
+
+        {/* ----------------------------------------------------
+            TAB 0: CURRENT ATTACHED QUESTIONS (VIEW & EDIT)
+        ---------------------------------------------------- */}
+        {activeTab === 'current' && (
+          <div className="space-y-4 pt-1">
+            {/* Top Bar: Search, Subject Filter & Refresh */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={attachedSearch}
+                  onChange={(e) => setAttachedSearch(e.target.value)}
+                  placeholder="সংযুক্ত প্রশ্ন বা অপশনে খুঁজুন..."
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={attachedSubjectFilter}
+                  onChange={(e) => setAttachedSubjectFilter(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
+                >
+                  <option value="all">সকল বিষয় ({attachedQuestions.length})</option>
+                  {attachedAvailableSubjects.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub} ({attachedQuestions.filter((q) => (q.subject || 'সাধারণ') === sub).length})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={loadAttachedQuestions}
+                  disabled={loadingAttached}
+                  className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 rounded-xl text-slate-600 dark:text-slate-300 transition-colors"
+                  title="রিফ্রেশ করুন"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingAttached ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Helper Banner */}
+            <div className="p-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900 dark:text-emerald-200 font-bold">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>
+                  <strong>সহজ প্রিভিউ ও এডিট:</strong> নিচের যেকোনো অপশনে (ক, খ, গ, ঘ) ক্লিক করে সরাসরি সঠিক উত্তর পরিবর্তন করতে পারেন। টেক্সট বদলাতে <strong>"সংশোধন"</strong> বাটনে ক্লিক করুন।
+                </span>
+              </div>
+              <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/80 px-2.5 py-1 rounded-lg shrink-0">
+                ⚡ ১-ক্লিক অপশন নির্বাচন
+              </span>
+            </div>
+
+            {/* Questions List */}
+            {loadingAttached ? (
+              <div className="py-12 text-center text-slate-500">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-emerald-500 mb-2" />
+                <p className="text-xs font-bold">পরীক্ষার সংযুক্ত প্রশ্নসমূহ লোড হচ্ছে...</p>
+              </div>
+            ) : filteredAttachedQuestions.length === 0 ? (
+              <div className="py-12 px-4 text-center bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                <HelpCircle className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                    {attachedQuestions.length === 0
+                      ? 'এই পরীক্ষায় এখনও কোনো প্রশ্ন যুক্ত করা হয়নি'
+                      : 'অনুসন্ধানের সাথে কোনো প্রশ্ন মেলেনি'}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+                    {attachedQuestions.length === 0
+                      ? 'উপরের ট্যাব থেকে নতুন প্রশ্ন লিখুন, টেক্সট কপি-পেস্ট করুন, এআই দিয়ে তৈরি করুন অথবা প্রশ্ন ব্যাংক থেকে সিলেক্ট করে যুক্ত করুন।'
+                      : 'অন্য কোনো কিওয়ার্ড বা বিষয় দিয়ে চেষ্টা করুন।'}
+                  </p>
+                </div>
+                {attachedQuestions.length === 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    <button
+                      onClick={() => setActiveTab('manual')}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      ম্যানুয়ালি যোগ করুন
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('bank')}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      প্রশ্ন ব্যাংক থেকে নির্বাচন করুন
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[58vh] overflow-y-auto pr-1">
+                {filteredAttachedQuestions.map((q, idx) => {
+                  const isEditingThis = editingQuestionId === q.id;
+
+                  if (isEditingThis && editingQuestionState) {
+                    return (
+                      <div
+                        key={q.id}
+                        className="bg-emerald-50/40 dark:bg-emerald-950/20 border-2 border-emerald-500/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-md animate-fadeIn"
+                      >
+                        <div className="flex items-center justify-between border-b border-emerald-200/60 dark:border-emerald-900/60 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-emerald-600 text-white font-black text-xs rounded-lg">
+                              প্রশ্ন #{idx + 1} সম্পাদনা
+                            </span>
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                              (যেকোনো প্রশ্ন ও বিকল্প অপশন সংশোধন করে সেভ করুন)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditQuestion}
+                            className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                          >
+                            বাতিল
+                          </button>
+                        </div>
+
+                        {editQuestionError && (
+                          <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                            <span>{editQuestionError}</span>
+                          </div>
+                        )}
+
+                        {/* Subject & Topic Inputs in Edit Mode */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                              বিষয়:
+                            </label>
+                            <select
+                              value={editingQuestionState.subject}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, subject: e.target.value } : null
+                                )
+                              }
+                              className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            >
+                              {subjectsList.map((sub) => (
+                                <option key={sub} value={sub}>
+                                  {sub}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                              টপিক (ঐচ্ছিক):
+                            </label>
+                            <input
+                              type="text"
+                              value={editingQuestionState.topic}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, topic: e.target.value } : null
+                                )
+                              }
+                              placeholder="টপিক..."
+                              className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Question Text */}
+                        <div>
+                          <label className="block text-[11px] font-black text-slate-800 dark:text-slate-200 mb-1">
+                            প্রশ্নের শিরোনাম:
+                          </label>
+                          <textarea
+                            value={editingQuestionState.question}
+                            onChange={(e) =>
+                              setEditingQuestionState((prev) =>
+                                prev ? { ...prev, question: e.target.value } : null
+                              )
+                            }
+                            rows={2}
+                            dir={isArabicText(editingQuestionState.question) ? 'rtl' : 'ltr'}
+                            className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            placeholder="সংশোধিত প্রশ্ন লিখুন..."
+                          />
+                        </div>
+
+                        {/* 4 Options Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Option A */}
+                          <div className={`p-2.5 rounded-xl border transition-all ${
+                            editingQuestionState.correct_answer === 'option_a'
+                              ? 'bg-emerald-100/60 dark:bg-emerald-950/60 border-emerald-500'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                                ক) অপশন A:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingQuestionState((prev) =>
+                                    prev ? { ...prev, correct_answer: 'option_a' } : null
+                                  )
+                                }
+                                className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 transition-all ${
+                                  editingQuestionState.correct_answer === 'option_a'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-200'
+                                }`}
+                              >
+                                {editingQuestionState.correct_answer === 'option_a' && <Check className="w-3 h-3" />}
+                                সঠিক উত্তর
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingQuestionState.option_a}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, option_a: e.target.value } : null
+                                )
+                              }
+                              dir={isArabicText(editingQuestionState.option_a) ? 'rtl' : 'ltr'}
+                              className="w-full p-2 bg-transparent border-0 border-b border-slate-300 dark:border-slate-600 text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          {/* Option B */}
+                          <div className={`p-2.5 rounded-xl border transition-all ${
+                            editingQuestionState.correct_answer === 'option_b'
+                              ? 'bg-emerald-100/60 dark:bg-emerald-950/60 border-emerald-500'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                                খ) অপশন B:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingQuestionState((prev) =>
+                                    prev ? { ...prev, correct_answer: 'option_b' } : null
+                                  )
+                                }
+                                className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 transition-all ${
+                                  editingQuestionState.correct_answer === 'option_b'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-200'
+                                }`}
+                              >
+                                {editingQuestionState.correct_answer === 'option_b' && <Check className="w-3 h-3" />}
+                                সঠিক উত্তর
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingQuestionState.option_b}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, option_b: e.target.value } : null
+                                )
+                              }
+                              dir={isArabicText(editingQuestionState.option_b) ? 'rtl' : 'ltr'}
+                              className="w-full p-2 bg-transparent border-0 border-b border-slate-300 dark:border-slate-600 text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          {/* Option C */}
+                          <div className={`p-2.5 rounded-xl border transition-all ${
+                            editingQuestionState.correct_answer === 'option_c'
+                              ? 'bg-emerald-100/60 dark:bg-emerald-950/60 border-emerald-500'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                                গ) অপশন C:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingQuestionState((prev) =>
+                                    prev ? { ...prev, correct_answer: 'option_c' } : null
+                                  )
+                                }
+                                className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 transition-all ${
+                                  editingQuestionState.correct_answer === 'option_c'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-200'
+                                }`}
+                              >
+                                {editingQuestionState.correct_answer === 'option_c' && <Check className="w-3 h-3" />}
+                                সঠিক উত্তর
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingQuestionState.option_c}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, option_c: e.target.value } : null
+                                )
+                              }
+                              dir={isArabicText(editingQuestionState.option_c) ? 'rtl' : 'ltr'}
+                              className="w-full p-2 bg-transparent border-0 border-b border-slate-300 dark:border-slate-600 text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          {/* Option D */}
+                          <div className={`p-2.5 rounded-xl border transition-all ${
+                            editingQuestionState.correct_answer === 'option_d'
+                              ? 'bg-emerald-100/60 dark:bg-emerald-950/60 border-emerald-500'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                                ঘ) অপশন D:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingQuestionState((prev) =>
+                                    prev ? { ...prev, correct_answer: 'option_d' } : null
+                                  )
+                                }
+                                className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 transition-all ${
+                                  editingQuestionState.correct_answer === 'option_d'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-200'
+                                }`}
+                              >
+                                {editingQuestionState.correct_answer === 'option_d' && <Check className="w-3 h-3" />}
+                                সঠিক উত্তর
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingQuestionState.option_d}
+                              onChange={(e) =>
+                                setEditingQuestionState((prev) =>
+                                  prev ? { ...prev, option_d: e.target.value } : null
+                                )
+                              }
+                              dir={isArabicText(editingQuestionState.option_d) ? 'rtl' : 'ltr'}
+                              className="w-full p-2 bg-transparent border-0 border-b border-slate-300 dark:border-slate-600 text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Explanation */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                            ব্যাখ্যা / নোট (ঐচ্ছিক):
+                          </label>
+                          <textarea
+                            value={editingQuestionState.explanation}
+                            onChange={(e) =>
+                              setEditingQuestionState((prev) =>
+                                prev ? { ...prev, explanation: e.target.value } : null
+                              )
+                            }
+                            rows={2}
+                            dir={isArabicText(editingQuestionState.explanation) ? 'rtl' : 'ltr'}
+                            placeholder="সঠিক উত্তরের ব্যাখ্যা লিখুন..."
+                            className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Save / Cancel Footer Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-900/60">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditQuestion}
+                            className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-extrabold hover:bg-slate-300 transition-colors"
+                          >
+                            বাতিল
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingQuestionEdit}
+                            onClick={() => handleSaveQuestionEdit(q.id)}
+                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all"
+                          >
+                            {savingQuestionEdit ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>সংরক্ষণ হচ্ছে...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-3.5 h-3.5" />
+                                <span>সংশোধন সেভ করুন</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={q.id}
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-emerald-300 dark:hover:border-emerald-800 transition-all space-y-3 relative group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-extrabold text-[11px]">
+                            প্রশ্ন #{idx + 1}
+                          </span>
+                          {q.subject && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[10px]">
+                              {q.subject}
+                            </span>
+                          )}
+                          {q.topic && (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[10px]">
+                              {q.topic}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Edit & Delete Action Buttons */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditQuestion(q)}
+                            className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-black flex items-center gap-1 transition-all shadow-sm"
+                            title="প্রশ্ন ও বিকল্প অপশন সংশোধন করুন"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>সংশোধন / অপশন ঠিক করুন</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={deletingQuestionId === q.id}
+                            onClick={() => handleDeleteAttachedQuestion(q.id)}
+                            className="p-1.5 bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 rounded-xl transition-all"
+                            title="এই পরীক্ষা থেকে প্রশ্নটি বাদ দিন"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Question Text */}
+                      <p
+                        className="text-sm font-black text-slate-900 dark:text-white leading-relaxed"
+                        dir={isArabicText(q.question) ? 'rtl' : 'ltr'}
+                      >
+                        {q.question}
+                      </p>
+
+                      {/* 4 Options Grid with Instant 1-Click Correct Answer Selection */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        {[
+                          { key: 'option_a' as const, label: 'ক', text: q.option_a },
+                          { key: 'option_b' as const, label: 'খ', text: q.option_b },
+                          { key: 'option_c' as const, label: 'গ', text: q.option_c },
+                          { key: 'option_d' as const, label: 'ঘ', text: q.option_d },
+                        ].map((opt) => {
+                          const isCorrect = q.correct_answer === opt.key;
+                          const isBeingSet = settingCorrectAnswerId === q.id;
+                          return (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              disabled={isBeingSet}
+                              onClick={() => handleQuickSetCorrectAnswer(q.id, opt.key)}
+                              title={
+                                isCorrect
+                                  ? 'এটি বর্তমান সঠিক উত্তর'
+                                  : 'ক্লিক করে এই অপশনটিকে সঠিক উত্তর বানান'
+                              }
+                              className={`group/opt px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-between text-left transition-all duration-150 cursor-pointer ${
+                                isCorrect
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-500 text-emerald-950 dark:text-emerald-200 ring-2 ring-emerald-500/40 shadow-sm'
+                                  : 'bg-slate-50 hover:bg-emerald-50/60 dark:bg-slate-800/50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 hover:border-emerald-400'
+                              }`}
+                            >
+                              <div
+                                className="flex items-center gap-2 pr-2"
+                                dir={isArabicText(opt.text) ? 'rtl' : 'ltr'}
+                              >
+                                <span
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
+                                    isCorrect
+                                      ? 'bg-emerald-600 text-white shadow'
+                                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 group-hover/opt:bg-emerald-100 dark:group-hover/opt:bg-emerald-950 group-hover/opt:text-emerald-700'
+                                  }`}
+                                >
+                                  {opt.label}
+                                </span>
+                                <span className="leading-snug">{opt.text}</span>
+                              </div>
+
+                              <div className="shrink-0">
+                                {isCorrect ? (
+                                  <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black flex items-center gap-1 shadow-sm">
+                                    <Check className="w-3.5 h-3.5" /> সঠিক উত্তর
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover/opt:text-emerald-600 opacity-60 sm:opacity-0 group-hover/opt:opacity-100 transition-opacity">
+                                    সঠিক করতে ক্লিক
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Explanation */}
+                      {q.explanation && (
+                        <div
+                          className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/40"
+                          dir={isArabicText(q.explanation) ? 'rtl' : 'ltr'}
+                        >
+                          <strong className="text-slate-700 dark:text-slate-300">ব্যাখ্যা: </strong>
+                          {q.explanation}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ----------------------------------------------------
             TAB 1: MANUAL QUESTION ENTRY
@@ -1591,6 +2425,58 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
             </div>
           </div>
         )}
+
+        {/* STICKY FOOTER WITH PUBLISH & QUICK STATUS BAR */}
+        <div className="sticky bottom-0 -mx-5 -mb-5 sm:-mx-7 sm:-mb-7 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 z-20 rounded-b-3xl">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+              মোট সংযুক্ত প্রশ্ন: <span className="text-emerald-600 dark:text-emerald-400 font-black">{attachedQuestions.length} টি</span>
+              {exam.question_count ? ` / ${exam.question_count} টি` : ''}
+            </span>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                currentExamStatus === 'active'
+                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+              }`}
+            >
+              {currentExamStatus === 'active' ? '● লাইভ পাবলিশড (Online)' : '○ ড্রাফট মোড (Draft)'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={togglingStatus}
+              onClick={handleToggleExamPublish}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all ${
+                currentExamStatus === 'active'
+                  ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
+            >
+              {currentExamStatus === 'active' ? (
+                <>
+                  <ToggleLeft className="w-4 h-4 text-slate-500" />
+                  <span>ড্রাফট মোডে রাখুন</span>
+                </>
+              ) : (
+                <>
+                  <Rocket className="w-4 h-4" />
+                  <span>🚀 মডেল টেস্ট পাবলিশ করুন</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-black rounded-xl transition-colors shadow"
+            >
+              সম্পন্ন / বন্ধ করুন
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

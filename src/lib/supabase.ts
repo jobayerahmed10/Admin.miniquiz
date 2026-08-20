@@ -285,6 +285,7 @@ export const insertQuestion = async (
       subject: newQuestion.subject || 'ইংরেজি',
       topic: newQuestion.topic || '',
       post: newQuestion.post || '',
+      ...(newQuestion.exam_id !== undefined ? { exam_id: newQuestion.exam_id } : {}),
     };
 
     let { data, error } = await client
@@ -446,6 +447,7 @@ export const updateQuestion = async (
     if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
     if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
     if (updatedFields.post !== undefined) payload.post = updatedFields.post;
+    if (updatedFields.exam_id !== undefined) payload.exam_id = updatedFields.exam_id;
 
     let { data, error } = await client
       .from('questions')
