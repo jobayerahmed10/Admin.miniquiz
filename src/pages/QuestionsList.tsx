@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   HelpCircle,
@@ -99,8 +99,11 @@ export const QuestionsList: React.FC = () => {
     };
   }, []);
 
-  // Compute all unified available subjects
-  const allAvailableSubjects = getAllSubjects(questions.map((q) => q.subject));
+  // Compute all unified available subjects (memoized to avoid rerender thrashing)
+  const allAvailableSubjects = useMemo(
+    () => getAllSubjects(questions.map((q) => q.subject)),
+    [questions, customSubjects]
+  );
 
   const handleSingleSubjectChange = async (questionId: string | number, newSubject: string) => {
     if (newSubject === '__NEW_SUBJECT__') {

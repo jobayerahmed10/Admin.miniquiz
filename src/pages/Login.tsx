@@ -35,10 +35,16 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     try {
-      const { data, error } = await client.auth.signInWithPassword({
+      // Add a 10s timeout wrapper for slow mobile networks
+      const loginPromise = client.auth.signInWithPassword({
         email: email.trim(),
         password: password,
       });
+      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+        setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), 10000)
+      );
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
 
       if (error) {
         // Bengali error formatting for common error codes
@@ -46,6 +52,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           setErrorMsg('ভুল ইমেইল অথবা পাসওয়ার্ড! আবার চেষ্টা করুন।');
         } else if (error.message.includes('Email not confirmed')) {
           setErrorMsg('আপনার ইমেইল ভেরিফাই করা হয়নি। অনুগ্রহ করে ইমেইল ইনবক্স চেক করুন।');
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          setErrorMsg('মোবাইল ডেটা বা ইন্টারনেট কানেকশনে সমস্যা হচ্ছে। অনুগ্রহ করে সংযোগ চেক করুন অথবা নিচে "ডেমো অ্যাডমিন মোড" ব্যবহার করুন।');
         } else {
           setErrorMsg(`লগইন ব্যর্থ হয়েছে: ${error.message}`);
         }
@@ -60,7 +68,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setErrorMsg('লগইন প্রক্রিয়ায় ত্রুটি ঘটেছে।');
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'লগইন করতে অজানাকোন সমস্যা হয়েছে।');
+      if (err?.message === 'NETWORK_TIMEOUT' || err?.message?.includes('Failed to fetch')) {
+        setErrorMsg('মোবাইল ডেটা ধীরগতির কারণে টাইমআউট হয়েছে। আবার চেষ্টা করুন অথবা নিচে "ডেমো অ্যাডমিন মোড" ব্যবহার করে সরাসরি পরিচালনা করুন।');
+      } else {
+        setErrorMsg(err?.message || 'লগইন করতে অজানা কোন সমস্যা হয়েছে।');
+      }
     } finally {
       setLoading(false);
     }

@@ -60,12 +60,12 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   const [showAddSubjectInput, setShowAddSubjectInput] = useState(false);
 
   useEffect(() => {
-    const currentSubjects = getAllSubjects(availableSubjects);
-    setSubjectList(currentSubjects);
-    if (!currentSubjects.includes(subject)) {
-      setSubject(currentSubjects[0] || 'বাংলা');
+    if (isOpen) {
+      const currentSubjects = getAllSubjects(availableSubjects);
+      setSubjectList(currentSubjects);
+      setSubject((prev) => (currentSubjects.includes(prev) ? prev : currentSubjects[0] || 'বাংলা'));
     }
-  }, [availableSubjects, isOpen]);
+  }, [isOpen]);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);

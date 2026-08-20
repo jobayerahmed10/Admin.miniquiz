@@ -136,35 +136,41 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
   useEffect(() => {
     if (activeExamForQuestions) {
       const refreshed = exams.find((e) => e.id === activeExamForQuestions.id);
-      if (refreshed) {
+      if (refreshed && (refreshed.title !== activeExamForQuestions.title || refreshed.questions?.length !== activeExamForQuestions.questions?.length)) {
         setActiveExamForQuestions(refreshed);
-      }
-      setTopicInput(activeExamForQuestions.topic || activeExamForQuestions.title || '');
-      setTopicSubject(activeExamForQuestions.subject || course.category || 'আরবি');
-      if (activeExamForQuestions.question_count) {
-        setTopicQuestionCount(activeExamForQuestions.question_count);
-      }
-
-      // If active exam has no questions loaded in state, dynamically fetch from Supabase
-      if (!activeExamForQuestions.questions || activeExamForQuestions.questions.length === 0) {
-        fetchQuestionsForCourseExam(
-          activeExamForQuestions.id,
-          course.id,
-          activeExamForQuestions.subject,
-          activeExamForQuestions.topic
-        ).then((res) => {
-          if (res.questions && res.questions.length > 0) {
-            onUpdateExam(activeExamForQuestions.id, {
-              questions: res.questions,
-              question_count: res.questions.length,
-              total_marks: res.questions.length,
-            });
-            setActiveExamForQuestions((prev) => (prev ? { ...prev, questions: res.questions, question_count: res.questions.length } : null));
-          }
-        });
       }
     }
   }, [exams]);
+
+  // Handle setting initial inputs when opening an exam for questions
+  const handleOpenQuestionsModal = (exam: CourseExam) => {
+    setActiveExamForQuestions(exam);
+    setTopicInput(exam.topic || exam.title || '');
+    setTopicSubject(exam.subject || course.category || 'বাংলা');
+    if (exam.question_count) {
+      setTopicQuestionCount(exam.question_count);
+    }
+    setQuestionTab('current');
+
+    // If active exam has no questions loaded in state, dynamically fetch from Supabase
+    if (!exam.questions || exam.questions.length === 0) {
+      fetchQuestionsForCourseExam(
+        exam.id,
+        course.id,
+        exam.subject,
+        exam.topic
+      ).then((res) => {
+        if (res.questions && res.questions.length > 0) {
+          onUpdateExam(exam.id, {
+            questions: res.questions,
+            question_count: res.questions.length,
+            total_marks: res.questions.length,
+          });
+          setActiveExamForQuestions((prev) => (prev && prev.id === exam.id ? { ...prev, questions: res.questions, question_count: res.questions.length } : prev));
+        }
+      });
+    }
+  };
 
   // Load question bank when opening bank tab
   useEffect(() => {
@@ -2260,7 +2266,7 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
 
                         <div className="flex items-center gap-2 shrink-0">
                           <button
-                            onClick={() => setActiveExamForQuestions(exam)}
+                            onClick={() => handleOpenQuestionsModal(exam)}
                             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs hover:from-amber-400 hover:to-amber-500 flex items-center gap-1.5 shadow-md shadow-amber-500/20"
                           >
                             <Sparkles className="w-3.5 h-3.5" />

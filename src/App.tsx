@@ -27,7 +27,7 @@ const AdminLayout: React.FC<{
   onLogout: () => void;
   userEmail?: string;
 }> = ({ isAuthenticated, onLogout, userEmail }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : true));
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [stats, setStats] = useState({ questionsCount: 30, examsCount: 2 });
 
@@ -112,34 +112,76 @@ export default function App() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Check Supabase Auth Session
+    let isMounted = true;
+
+    // Check Supabase Auth Session with timeout protection for mobile data
     const checkSession = async () => {
+      // Check cached session in localStorage first for instantaneous startup on mobile
+      const local = localStorage.getItem('miniquiz_admin_session');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (isMounted) setSession(parsed);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       const client = getSupabaseClient();
       if (client) {
         try {
-          const { data } = await client.auth.getSession();
-          if (data?.session) {
-            setSession(data.session);
-          } else {
-            // Check fallback session in localStorage if testing
-            const local = localStorage.getItem('miniquiz_admin_session');
-            if (local) {
-              setSession(JSON.parse(local));
-            }
+          // Race getSession with a 2.5s timeout so mobile networks don't hang indefinitely
+          const sessionPromise = client.auth.getSession();
+          const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null } }), 2500)
+          );
+
+          const result: any = await Promise.race([sessionPromise, timeoutPromise]);
+          if (result?.data?.session && isMounted) {
+            setSession(result.data.session);
+            localStorage.setItem('miniquiz_admin_session', JSON.stringify(result.data.session));
           }
         } catch (err) {
-          console.error(err);
+          console.error('Auth session error:', err);
         }
-      } else {
-        const local = localStorage.getItem('miniquiz_admin_session');
-        if (local) {
-          setSession(JSON.parse(local));
+
+        // Also setup onAuthStateChange listener
+        try {
+          const { data: authListener } = client.auth.onAuthStateChange((_event, newSession) => {
+            if (isMounted) {
+              if (newSession) {
+                setSession(newSession);
+                localStorage.setItem('miniquiz_admin_session', JSON.stringify(newSession));
+              } else if (!localStorage.getItem('miniquiz_admin_session')) {
+                setSession(null);
+              }
+            }
+          });
+
+          return () => {
+            authListener?.subscription?.unsubscribe();
+          };
+        } catch (e) {
+          console.error('Auth listener setup error:', e);
         }
       }
-      setCheckingAuth(false);
+
+      if (isMounted) {
+        setCheckingAuth(false);
+      }
     };
 
     checkSession();
+
+    // Fallback safety timer ensuring spinner never hangs longer than 3 seconds
+    const fallbackTimer = setTimeout(() => {
+      if (isMounted) setCheckingAuth(false);
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimer);
+    };
   }, []);
 
   const handleLoginSuccess = (userSession: any) => {
