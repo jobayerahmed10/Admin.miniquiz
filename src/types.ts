@@ -307,16 +307,19 @@ export interface SyllabusTopic {
 }
 
 export interface SubjectPost {
-  id: string;
-  name: string; // e.g. 'আরবি প্রভাষক' | 'সহকারী মৌলভী' | 'সহকারী মৌলভী (কারী)'
-  code: string; // e.g. 'ARB-LEC', 'ASST-MOU', 'ASST-QAR'
-  tagline?: string; // e.g. '১৮তম ও ১৯তম শিক্ষক নিবন্ধন বিশেষ'
-  description?: string;
-  theme_color?: string; // e.g. 'emerald', 'indigo', 'amber', 'rose', 'teal', 'purple'
+  id: string; // Unique identifier slug (e.g. 'arabic_lecturer', 'math_teacher' or UUID)
+  name: string; // Subject/Post title (e.g. "আরবি প্রভাষক প্রস্তুতি", "বাংলা প্রভাষক")
+  code: string; // Post/Subject Code (e.g. "৩০০", "৩১১", "আবশ্যিক")
+  tagline?: string; // Short badge/level label (e.g. "মাদ্রাসা ও কলেজ পর্যায়")
+  badge?: string; // e.g. "প্রভাষক আরবি • কোড: ৩০০"
+  subtitle?: string; // Summary of topics or subject coverage
+  description?: string; // Detailed post description
+  theme_color?: string; // e.g. '#6366F1' or theme identifier
   gradient?: string; // e.g. 'from-emerald-600 to-teal-500'
-  icon_name?: string; // e.g. 'BookOpen', 'Award', 'GraduationCap', 'Languages', 'Sparkles'
+  gradient_class?: string; // Tailwind class e.g. 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 shadow-indigo-500/25'
+  icon_name?: string; // Lucide icon name (e.g. 'BookOpenCheck', 'GraduationCap', 'BookMarked', 'ScrollText', 'Library')
   status: 'active' | 'draft';
-  order_index: number;
+  order_index?: number;
   topics: SyllabusTopic[];
   created_at?: string;
   updated_at?: string;

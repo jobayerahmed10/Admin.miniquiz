@@ -1,22 +1,63 @@
 // Central Subject Post & Syllabus Topic Manager for Tamreen Academy
-// Manages Posts (যেমন: আরবি প্রভাষক, সহকারী মৌলভী, সহকারী মৌলভী কারী, ইবতেদায়ী মৌলভী, ইবতেদায়ী কারী, জেনারেল ইত্যাদি)
-// and their Syllabus Topics. Supports Supabase persistence with instant LocalStorage sync.
+// Fully integrated with Supabase table: `subject_posts`
+// Handles CRUD: Create, Read, Update, Delete with realtime sync and resilient fallback.
 
 import { SubjectPost, SyllabusTopic } from '../types';
 import { getSupabaseClient } from './supabase';
 
 const STORAGE_KEY = 'tamreen_subject_posts_v1';
 
+export const THEME_COLOR_MAP: Record<string, { hex: string; gradient_class: string; label: string }> = {
+  '#10B981': {
+    hex: '#10B981',
+    gradient_class: 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-emerald-500/25',
+    label: 'পান্না সবুজ (Emerald)',
+  },
+  '#6366F1': {
+    hex: '#6366F1',
+    gradient_class: 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 shadow-indigo-500/25',
+    label: 'ইন্ডিগো পার্পল (Indigo)',
+  },
+  '#0D9488': {
+    hex: '#0D9488',
+    gradient_class: 'bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-700 shadow-teal-500/25',
+    label: 'টিয়াল সায়ান (Teal)',
+  },
+  '#8B5CF6': {
+    hex: '#8B5CF6',
+    gradient_class: 'bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 shadow-purple-500/25',
+    label: 'রয়েল পার্পল (Purple)',
+  },
+  '#F59E0B': {
+    hex: '#F59E0B',
+    gradient_class: 'bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-700 shadow-amber-500/25',
+    label: 'অ্যাম্বার গোল্ড (Amber)',
+  },
+  '#F43F5E': {
+    hex: '#F43F5E',
+    gradient_class: 'bg-gradient-to-br from-rose-500 via-rose-600 to-pink-700 shadow-rose-500/25',
+    label: 'গোলাপী লাল (Rose)',
+  },
+  '#0284C7': {
+    hex: '#0284C7',
+    gradient_class: 'bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 shadow-blue-500/25',
+    label: 'স্কাই ব্লু (Sky Blue)',
+  },
+};
+
 export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
   {
-    id: 'post-arb-lec',
-    name: 'আরবি প্রভাষক',
-    code: 'ARB-LEC',
-    tagline: '১৮তম ও ১৯তম শিক্ষক নিবন্ধন ও মাদ্রাসা প্রভাষক প্রস্তুতি',
+    id: 'arabic_lecturer',
+    name: 'আরবি প্রভাষক প্রস্তুতি',
+    code: '৩০০',
+    tagline: 'মাদ্রাসা ও কলেজ পর্যায়',
+    badge: 'প্রভাষক আরবি • কোড: ৩০০',
+    subtitle: 'আরবি সাহিত্য, বালাগাত, নাহু ও উলুমুল কুরআন প্রস্তুতি',
     description: 'মাদ্রাসা আলিয়া ও ফাজিল-কামিল পর্যায়ের আরবি প্রভাষক পদের পূর্ণাঙ্গ বিষয়ভিত্তিক প্রস্তুতি ও সিলেবাস।',
-    theme_color: 'emerald',
+    theme_color: '#10B981',
+    gradient_class: 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-emerald-500/25',
     gradient: 'from-emerald-600 to-teal-500',
-    icon_name: 'Languages',
+    icon_name: 'BookOpenCheck',
     status: 'active',
     order_index: 1,
     created_at: new Date().toISOString(),
@@ -30,14 +71,17 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     ],
   },
   {
-    id: 'post-asst-moulvi',
+    id: 'asst_moulvi',
     name: 'সহকারী মৌলভী',
-    code: 'ASST-MOU',
-    tagline: 'দাখিল ও আলিম স্তরের সহকারী মৌলভী নিয়োগ প্রস্তুতি',
+    code: '৩১১',
+    tagline: 'দাখিল ও আলিম পর্যায়',
+    badge: 'সহকারী মৌলভী • কোড: ৩১১',
+    subtitle: 'কুরআন, হাদিস, ফিকহ ও আকাইদ',
     description: 'দাখিল ও আলিম মাদ্রাসার শিক্ষক নিয়োগে সহকারী মৌলভী পদের স্পেশাল সিলেবাস ও মডেল টেস্ট।',
-    theme_color: 'teal',
+    theme_color: '#0D9488',
+    gradient_class: 'bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-700 shadow-teal-500/25',
     gradient: 'from-teal-600 to-cyan-500',
-    icon_name: 'BookOpen',
+    icon_name: 'ScrollText',
     status: 'active',
     order_index: 2,
     created_at: new Date().toISOString(),
@@ -51,14 +95,17 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     ],
   },
   {
-    id: 'post-asst-qari',
+    id: 'asst_qari',
     name: 'সহকারী মৌলভী (কারী)',
-    code: 'ASST-QAR',
-    tagline: 'মাদ্রাসার সহকারী মৌলভী ও কারী শিক্ষক নিয়োগ স্পেশাল',
+    code: '৩১২',
+    tagline: 'মাদ্রাসা কেরাত ও তাজবিদ স্পেশাল',
+    badge: 'সহকারী কারী • কোড: ৩১২',
+    subtitle: 'ইলমুত তাজবিদ, কেরাত ও হাদিস',
     description: 'কেরাত ও তাজবিদ স্পেশাল সহকারী মৌলভী কারী পদের সম্পূর্ণ সিলেবাস ও প্রশ্নব্যাংক।',
-    theme_color: 'amber',
+    theme_color: '#F59E0B',
+    gradient_class: 'bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-700 shadow-amber-500/25',
     gradient: 'from-amber-600 to-yellow-500',
-    icon_name: 'Award',
+    icon_name: 'BookMarked',
     status: 'active',
     order_index: 3,
     created_at: new Date().toISOString(),
@@ -71,12 +118,15 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     ],
   },
   {
-    id: 'post-ebt-moulvi',
+    id: 'ebt_moulvi',
     name: 'ইবতেদায়ী মৌলভী',
-    code: 'EBT-MOU',
-    tagline: 'প্রাথমিক ও ইবতেদায়ী মাদ্রাসা মৌলভী প্রস্তুতি',
+    code: '৩১৩',
+    tagline: 'ইবতেদায়ী মাদ্রাসা পর্যায়',
+    badge: 'ইবতেদায়ী মৌলভী • কোড: ৩১৩',
+    subtitle: 'প্রাথমিক দ্বীনিয়াহ ও আরবি ব্যাকরণ',
     description: 'ইবতেদায়ী মাদ্রাসার শিক্ষার্থীদের পাঠদানের জন্য প্রয়োজনীয় মৌলভী শিক্ষক নিয়োগের সিলেবাস।',
-    theme_color: 'indigo',
+    theme_color: '#6366F1',
+    gradient_class: 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 shadow-indigo-500/25',
     gradient: 'from-indigo-600 to-purple-500',
     icon_name: 'GraduationCap',
     status: 'active',
@@ -91,14 +141,17 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     ],
   },
   {
-    id: 'post-ebt-qari',
+    id: 'ebt_qari',
     name: 'ইবতেদায়ী কারী',
-    code: 'EBT-QAR',
-    tagline: 'ইবতেদায়ী কারী ও কুরআন শিক্ষক নিয়োগ প্রস্তুতি',
+    code: '৩১৪',
+    tagline: 'ইবতেদায়ী কুরআন ও তাজবিদ শিক্ষক',
+    badge: 'ইবতেদায়ী কারী • কোড: ৩১৪',
+    subtitle: 'তাজবিদ ও বিশুদ্ধ কুরআন পাঠ',
     description: 'ছোটদের বিশুদ্ধ কুরআন পাঠদান ও তিলাওয়াতের জন্য ইবতেদায়ী কারী পদের বিষয়ভিত্তিক প্রস্তুতি।',
-    theme_color: 'rose',
+    theme_color: '#F43F5E',
+    gradient_class: 'bg-gradient-to-br from-rose-500 via-rose-600 to-pink-700 shadow-rose-500/25',
     gradient: 'from-rose-600 to-pink-500',
-    icon_name: 'Sparkles',
+    icon_name: 'Library',
     status: 'active',
     order_index: 5,
     created_at: new Date().toISOString(),
@@ -110,47 +163,80 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     ],
   },
   {
-    id: 'post-asst-teacher',
-    name: 'সহকারী শিক্ষক (প্রাইমারি ও হাইস্কুল)',
-    code: 'ASST-TEA',
-    tagline: 'প্রাইমারি সহকারী শিক্ষক ও এনটিআরসিএ হাইস্কুল লেভেল',
-    description: 'প্রাইমারি শিক্ষক নিয়োগ ও ১৮তম-১৯তম শিক্ষক নিবন্ধনে সহকারী শিক্ষক পদের পূর্ণাঙ্গ বিষয়ভিত্তিক প্রস্তুতি।',
-    theme_color: 'purple',
+    id: 'bangla_lecturer',
+    name: 'বাংলা প্রভাষক',
+    code: '৩০১',
+    tagline: 'কলেজ ও মাদ্রাসা পর্যায়',
+    badge: 'বাংলা প্রভাষক • কোড: ৩০১',
+    subtitle: 'বাংলা ভাষা ও সাহিত্যের পূর্ণাঙ্গ প্রস্তুতি',
+    description: 'বাংলা প্রভাষক শিক্ষক নিবন্ধন ও কলেজ লেভেলের জন্য বিশেষ সিলেবাস।',
+    theme_color: '#8B5CF6',
+    gradient_class: 'bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 shadow-purple-500/25',
     gradient: 'from-purple-600 to-indigo-500',
-    icon_name: 'Briefcase',
+    icon_name: 'BookOpen',
     status: 'active',
     order_index: 6,
     created_at: new Date().toISOString(),
     topics: [
-      { id: 'top-tea-1', name: 'বাংলা সাহিত্য ও ব্যাকরণ', description: 'ধ্বনি, বর্ণ, সমাস, কারক, বাক্য ও বাংলা সাহিত্যের গুরুত্বপূর্ণ কবি-সাহিত্যিক', order_index: 1 },
-      { id: 'top-tea-2', name: 'English Grammar & Vocabulary', description: 'Tense, Parts of Speech, Prepositions, Voice, Synonyms & Antonyms', order_index: 2 },
-      { id: 'top-tea-3', name: 'গণিত ও মানসিক দক্ষতা', description: 'পাটিগণিত (লাভ-ক্ষতি, শতকরা, সুদকষা), বীজগণিত ও জ্যামিতি', order_index: 3 },
-      { id: 'top-tea-4', name: 'বাংলাদেশ ও আন্তর্জাতিক বিষয়াবলী', description: 'মুক্তিযুদ্ধ, সংবিধান, ইতিহাস, ভৌগোলিক সীমানা ও সাম্প্রতিক বিশ্ব', order_index: 4 },
-      { id: 'top-tea-5', name: 'সাধারণ বিজ্ঞান ও তথ্যপ্রযুক্তি', description: 'দৈনন্দিন বিজ্ঞান, কম্পিউটার বেসিক ও মোবাইল প্রযুক্তি', order_index: 5 },
-    ],
-  },
-  {
-    id: 'post-bcs-general',
-    name: 'বিসিএস ও ১০ম-২০তম গ্রেড জেনারেল',
-    code: 'BCS-GEN',
-    tagline: 'বিসিএস প্রিলিমিনারি ও সকল গ্রেডের সাধারণ নিয়োগ প্রস্তুতি',
-    description: 'বিসিএস, পিএসসি নন-ক্যাডার, মন্ত্রণালয় ও অধিদপ্তর নিয়োগ পরীক্ষার পূর্ণাঙ্গ বিষয়ভিত্তিক প্রস্তুতি।',
-    theme_color: 'blue',
-    gradient: 'from-blue-600 to-indigo-500',
-    icon_name: 'Award',
-    status: 'active',
-    order_index: 7,
-    created_at: new Date().toISOString(),
-    topics: [
-      { id: 'top-gen-1', name: 'বাংলা ভাষা ও সাহিত্য (BCS)', description: 'চর্যাপদ থেকে আধুনিক যুগ, বানান শুদ্ধি, বাগধারা ও অনুবাদ', order_index: 1 },
-      { id: 'top-gen-2', name: 'English Language & Literature', description: 'Clauses, Idioms, Literary Works & Authors', order_index: 2 },
-      { id: 'top-gen-3', name: 'গাণিতিক যুক্তি ও মানসিক দক্ষতা', description: 'সংখ্যার ধারণা, সেট, লগারিদম, বিন্যাস-সমাবেশ ও লজিকাল রিজনিং', order_index: 3 },
-      { id: 'top-gen-4', name: 'বাংলাদেশ বিষয়াবলী (বিস্তারিত)', description: 'প্রাচীন কাল থেকে আধুনিক বাংলাদেশ, অর্থনীতি, শিল্প ও বাজেট', order_index: 4 },
-      { id: 'top-gen-5', name: 'আন্তর্জাতিক বিষয়াবলী ও ভূগোল', description: 'আন্তর্জাতিক নিরাপত্তা, সংস্থা, পরিবেশ পরিবর্তন ও দুর্যোগ ব্যবস্থাপনা', order_index: 5 },
-      { id: 'top-gen-6', name: 'বিজ্ঞান, কম্পিউটার ও সুশাসন', description: 'ভৌত বিজ্ঞান, তথ্যপ্রযুক্তি ও নৈতিকতা-মূল্যবোধ', order_index: 6 },
+      { id: 'top-bng-1', name: 'প্রাচীন ও মধ্যযুগীয় বাংলা সাহিত্য', description: 'চর্যাপদ, মঙ্গলকাব্য ও বৈষ্ণব পদাবলী', order_index: 1 },
+      { id: 'top-bng-2', name: 'আধুনিক বাংলা সাহিত্য ও রচয়িতাগণ', description: 'মাইকেল, বঙ্কিম, রবীন্দ্রনাথ, নজরুল ও জীবনানন্দ', order_index: 2 },
+      { id: 'top-bng-3', name: 'বাংলা ব্যাকরণ ও ধ্বনিতত্ত্ব', description: 'সন্ধি, সমাস, কারক, প্রত্যয় ও উপসর্গ', order_index: 3 },
+      { id: 'top-bng-4', name: 'ভাষা বিজ্ঞান ও উপভাষা', description: 'বাংলা ভাষার উৎপত্তি, ক্রমবিকাশ ও সাধু-চলিত রীতি', order_index: 4 },
     ],
   },
 ];
+
+/**
+ * Normalizes topics from various Supabase formats (JSON string, string[], or object[])
+ */
+export const normalizeTopicsFromDb = (rawTopics: any): SyllabusTopic[] => {
+  if (!rawTopics) return [];
+
+  let parsed = rawTopics;
+  if (typeof rawTopics === 'string') {
+    try {
+      parsed = JSON.parse(rawTopics);
+    } catch {
+      parsed = rawTopics.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.map((item: any, idx: number): SyllabusTopic => {
+    if (typeof item === 'string') {
+      return {
+        id: `top-${idx + 1}-${Date.now().toString(36)}`,
+        name: item.trim(),
+        order_index: idx + 1,
+      };
+    }
+    if (item && typeof item === 'object') {
+      return {
+        id: item.id || `top-${idx + 1}`,
+        name: item.name || item.title || `টপিক ${idx + 1}`,
+        description: item.description || '',
+        order_index: typeof item.order_index === 'number' ? item.order_index : idx + 1,
+        estimated_questions: item.estimated_questions || 0,
+      };
+    }
+    return {
+      id: `top-${idx + 1}`,
+      name: String(item),
+      order_index: idx + 1,
+    };
+  });
+};
+
+/**
+ * Formats topics array to JSON array of strings for Supabase `subject_posts.topics`
+ */
+export const formatTopicsForDb = (topics: SyllabusTopic[] | string[]): string[] => {
+  if (!Array.isArray(topics)) return [];
+  return topics
+    .map((t) => (typeof t === 'string' ? t.trim() : t.name?.trim()))
+    .filter((n): n is string => Boolean(n && n.length > 0));
+};
 
 /**
  * Get all subject posts from local storage (or fallback to initial)
@@ -187,9 +273,13 @@ export const saveLocalSubjectPosts = (posts: SubjectPost[]) => {
 };
 
 /**
- * Fetch all Subject Posts (attempts Supabase table, falls back gracefully)
+ * Fetch all Subject Posts from Supabase `subject_posts` table (with resilient local fallback)
  */
-export const fetchSubjectPosts = async (): Promise<{ posts: SubjectPost[]; source: 'supabase' | 'local' }> => {
+export const fetchSubjectPosts = async (): Promise<{
+  posts: SubjectPost[];
+  source: 'supabase' | 'local';
+  error?: string;
+}> => {
   const localPosts = getLocalSubjectPosts();
   const client = getSupabaseClient();
 
@@ -200,79 +290,125 @@ export const fetchSubjectPosts = async (): Promise<{ posts: SubjectPost[]; sourc
   try {
     const { data, error } = await client
       .from('subject_posts')
-      .select('*')
-      .order('order_index', { ascending: true });
+      .select('*');
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      const formatted: SubjectPost[] = data.map((row: any) => ({
-        id: String(row.id),
-        name: row.name || row.title || 'অনুরোধকৃত পদ',
-        code: row.code || 'CODE',
-        tagline: row.tagline || '',
-        description: row.description || '',
-        theme_color: row.theme_color || 'emerald',
-        gradient: row.gradient || 'from-emerald-600 to-teal-500',
-        icon_name: row.icon_name || 'BookOpen',
-        status: row.status === 'draft' ? 'draft' : 'active',
-        order_index: typeof row.order_index === 'number' ? row.order_index : 0,
-        topics: Array.isArray(row.topics)
-          ? row.topics
-          : typeof row.topics === 'string'
-          ? JSON.parse(row.topics || '[]')
-          : [],
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      }));
+      const formatted: SubjectPost[] = data.map((row: any, idx: number) => {
+        const themeConfig = THEME_COLOR_MAP[row.theme_color] || THEME_COLOR_MAP['#10B981'];
+        return {
+          id: String(row.id),
+          name: row.name || row.title || 'অনুরোধকৃত পদ',
+          code: row.code || '',
+          tagline: row.tagline || '',
+          badge: row.badge || (row.name ? `${row.name} • কোড: ${row.code || 'আবশ্যিক'}` : ''),
+          subtitle: row.subtitle || row.description || '',
+          description: row.description || '',
+          theme_color: row.theme_color || themeConfig.hex,
+          gradient_class: row.gradient_class || themeConfig.gradient_class,
+          gradient: row.gradient || 'from-emerald-600 to-teal-500',
+          icon_name: row.icon_name || 'BookOpenCheck',
+          status: row.status === 'draft' ? 'draft' : 'active',
+          order_index: typeof row.order_index === 'number' ? row.order_index : idx + 1,
+          topics: normalizeTopicsFromDb(row.topics),
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
+        };
+      });
+
+      // Sort by order_index ascending
+      formatted.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
       saveLocalSubjectPosts(formatted);
       return { posts: formatted, source: 'supabase' };
     }
-  } catch (err) {
-    console.info('Using local subject posts store:', err);
+
+    if (error) {
+      console.warn('Supabase fetch subject_posts warning (using local store):', error.message);
+    }
+  } catch (err: any) {
+    console.info('Using local subject posts store:', err?.message || err);
   }
 
   return { posts: localPosts, source: 'local' };
 };
 
 /**
- * Create a new Subject Post
+ * Generate clean slug ID from name or custom input
+ */
+export const generateSlugId = (name: string, customId?: string): string => {
+  if (customId && customId.trim()) {
+    return customId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  }
+  const clean = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '_');
+  return clean ? `${clean}_${Date.now().toString(36).slice(-4)}` : `post_${Date.now()}`;
+};
+
+/**
+ * Create a new Subject Post directly in Supabase `subject_posts`
  */
 export const createSubjectPost = async (
-  newPost: Omit<SubjectPost, 'id' | 'created_at' | 'updated_at'>
+  newPost: Omit<SubjectPost, 'created_at' | 'updated_at'> & { custom_slug?: string }
 ): Promise<{ success: boolean; post: SubjectPost; error?: string }> => {
   const currentPosts = getLocalSubjectPosts();
+  const themeConfig = THEME_COLOR_MAP[newPost.theme_color || '#10B981'] || THEME_COLOR_MAP['#10B981'];
+
+  const generatedId = newPost.id && newPost.id.trim()
+    ? newPost.id.trim()
+    : generateSlugId(newPost.name, newPost.custom_slug);
+
   const post: SubjectPost = {
     ...newPost,
-    id: `post-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    id: generatedId,
+    code: newPost.code || '',
+    tagline: newPost.tagline || '',
+    badge: newPost.badge || `${newPost.name} • কোড: ${newPost.code || 'আবশ্যিক'}`,
+    subtitle: newPost.subtitle || newPost.tagline || '',
+    description: newPost.description || '',
+    theme_color: newPost.theme_color || themeConfig.hex,
+    gradient_class: newPost.gradient_class || themeConfig.gradient_class,
+    icon_name: newPost.icon_name || 'BookOpenCheck',
+    status: newPost.status || 'active',
+    order_index: newPost.order_index || currentPosts.length + 1,
+    topics: newPost.topics || [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  const updatedPosts = [...currentPosts, post];
+  // 1. Update local cache immediately
+  const updatedPosts = [...currentPosts.filter((p) => p.id !== post.id), post];
   saveLocalSubjectPosts(updatedPosts);
 
-  // Sync to Supabase if table exists
+  // 2. Direct Supabase insert / upsert into `subject_posts`
   const client = getSupabaseClient();
   if (client) {
     try {
-      await client.from('subject_posts').insert([
-        {
-          id: post.id,
-          name: post.name,
-          code: post.code,
-          tagline: post.tagline,
-          description: post.description,
-          theme_color: post.theme_color,
-          gradient: post.gradient,
-          icon_name: post.icon_name,
-          status: post.status,
-          order_index: post.order_index,
-          topics: post.topics,
-          created_at: post.created_at,
-        },
-      ]);
-    } catch (e) {
-      console.warn('Could not sync created post to Supabase:', e);
+      const dbPayload = {
+        id: post.id,
+        name: post.name,
+        code: post.code,
+        tagline: post.tagline,
+        badge: post.badge,
+        subtitle: post.subtitle,
+        description: post.description,
+        topics: formatTopicsForDb(post.topics),
+        icon_name: post.icon_name,
+        theme_color: post.theme_color,
+        gradient_class: post.gradient_class,
+      };
+
+      const { error } = await client
+        .from('subject_posts')
+        .upsert([dbPayload], { onConflict: 'id' });
+
+      if (error) {
+        console.warn('Supabase subject_posts insert note:', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Could not sync created post to Supabase:', e?.message || e);
     }
   }
 
@@ -280,7 +416,7 @@ export const createSubjectPost = async (
 };
 
 /**
- * Update an existing Subject Post
+ * Update an existing Subject Post directly in Supabase `subject_posts` (eq('id', id))
  */
 export const updateSubjectPost = async (
   id: string,
@@ -289,42 +425,66 @@ export const updateSubjectPost = async (
   const currentPosts = getLocalSubjectPosts();
   const index = currentPosts.findIndex((p) => p.id === id);
 
-  if (index === -1) {
-    return { success: false, error: 'পদটি পাওয়া যায়নি।' };
-  }
+  const existingPost: SubjectPost = index !== -1
+    ? currentPosts[index]
+    : {
+        id,
+        name: updates.name || 'নতুন পদ',
+        code: updates.code || '',
+        status: 'active',
+        topics: [],
+      };
+
+  const themeConfig = updates.theme_color
+    ? (THEME_COLOR_MAP[updates.theme_color] || THEME_COLOR_MAP['#10B981'])
+    : (THEME_COLOR_MAP[existingPost.theme_color || '#10B981'] || THEME_COLOR_MAP['#10B981']);
 
   const updatedPost: SubjectPost = {
-    ...currentPosts[index],
+    ...existingPost,
     ...updates,
+    theme_color: updates.theme_color || existingPost.theme_color || themeConfig.hex,
+    gradient_class: updates.gradient_class || existingPost.gradient_class || themeConfig.gradient_class,
+    badge: updates.badge || existingPost.badge || `${updates.name || existingPost.name} • কোড: ${updates.code || existingPost.code || 'আবশ্যিক'}`,
+    subtitle: updates.subtitle || existingPost.subtitle || updates.tagline || existingPost.tagline || '',
     updated_at: new Date().toISOString(),
   };
 
+  // 1. Update local cache immediately
   const updatedList = [...currentPosts];
-  updatedList[index] = updatedPost;
+  if (index !== -1) {
+    updatedList[index] = updatedPost;
+  } else {
+    updatedList.push(updatedPost);
+  }
   saveLocalSubjectPosts(updatedList);
 
-  // Sync to Supabase
+  // 2. Direct Supabase update / upsert in `subject_posts` table
   const client = getSupabaseClient();
   if (client) {
     try {
-      await client
+      const dbPayload = {
+        id: updatedPost.id,
+        name: updatedPost.name,
+        code: updatedPost.code,
+        tagline: updatedPost.tagline || '',
+        badge: updatedPost.badge || '',
+        subtitle: updatedPost.subtitle || '',
+        description: updatedPost.description || '',
+        topics: formatTopicsForDb(updatedPost.topics),
+        icon_name: updatedPost.icon_name || 'BookOpenCheck',
+        theme_color: updatedPost.theme_color || '#10B981',
+        gradient_class: updatedPost.gradient_class || themeConfig.gradient_class,
+      };
+
+      const { error } = await client
         .from('subject_posts')
-        .update({
-          name: updatedPost.name,
-          code: updatedPost.code,
-          tagline: updatedPost.tagline,
-          description: updatedPost.description,
-          theme_color: updatedPost.theme_color,
-          gradient: updatedPost.gradient,
-          icon_name: updatedPost.icon_name,
-          status: updatedPost.status,
-          order_index: updatedPost.order_index,
-          topics: updatedPost.topics,
-          updated_at: updatedPost.updated_at,
-        })
-        .eq('id', id);
-    } catch (e) {
-      console.warn('Could not sync post update to Supabase:', e);
+        .upsert(dbPayload, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('Supabase subject_posts update note:', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Could not sync post update to Supabase:', e?.message || e);
     }
   }
 
@@ -332,19 +492,24 @@ export const updateSubjectPost = async (
 };
 
 /**
- * Delete a Subject Post
+ * Delete a Subject Post directly from Supabase `subject_posts`
  */
 export const deleteSubjectPost = async (id: string): Promise<{ success: boolean; error?: string }> => {
+  // 1. Remove from local cache
   const currentPosts = getLocalSubjectPosts();
   const updatedList = currentPosts.filter((p) => p.id !== id);
   saveLocalSubjectPosts(updatedList);
 
+  // 2. Delete row from Supabase
   const client = getSupabaseClient();
   if (client) {
     try {
-      await client.from('subject_posts').delete().eq('id', id);
-    } catch (e) {
-      console.warn('Could not delete post from Supabase:', e);
+      const { error } = await client.from('subject_posts').delete().eq('id', id);
+      if (error) {
+        console.warn('Supabase delete note:', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Could not delete post from Supabase:', e?.message || e);
     }
   }
 
@@ -352,7 +517,7 @@ export const deleteSubjectPost = async (id: string): Promise<{ success: boolean;
 };
 
 /**
- * Add a Syllabus Topic to a Post
+ * Add a Syllabus Topic to a Post and sync topics array to Supabase
  */
 export const addTopicToPost = async (
   postId: string,
@@ -383,7 +548,7 @@ export const addTopicToPost = async (
 };
 
 /**
- * Update a Topic inside a Post
+ * Update a Topic inside a Post and sync to Supabase
  */
 export const updateTopicInPost = async (
   postId: string,
@@ -408,7 +573,7 @@ export const updateTopicInPost = async (
 };
 
 /**
- * Delete a Topic from a Post
+ * Delete a Topic from a Post and sync to Supabase
  */
 export const deleteTopicFromPost = async (
   postId: string,
@@ -429,7 +594,7 @@ export const deleteTopicFromPost = async (
 };
 
 /**
- * Reorder Topics in a Post
+ * Reorder Topics in a Post and sync to Supabase
  */
 export const reorderTopicsInPost = async (
   postId: string,
@@ -454,11 +619,14 @@ export const getTopicsForPostName = (
   const target = postNameOrId.trim().toLowerCase();
 
   const found = posts.find(
-    (p) => p.name.toLowerCase() === target || p.id === postNameOrId || p.code.toLowerCase() === target
+    (p) =>
+      p.name.toLowerCase() === target ||
+      p.id.toLowerCase() === target ||
+      p.code.toLowerCase() === target
   );
 
   if (found && Array.isArray(found.topics)) {
-    return found.topics.map((t) => t.name);
+    return found.topics.map((t) => (typeof t === 'string' ? t : t.name));
   }
 
   return [];
