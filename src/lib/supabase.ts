@@ -1204,6 +1204,20 @@ export const generateStandardUUID = (): string => {
   });
 };
 
+// Helper: Format ISO timestamp or return null for PostgreSQL timestamp columns
+export const formatTimestampOrNull = (val?: string | null): string | null => {
+  if (!val || typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+  const parsed = Date.parse(trimmed);
+  if (isNaN(parsed)) return null;
+  try {
+    return new Date(parsed).toISOString();
+  } catch (e) {
+    return null;
+  }
+};
+
 // Fetch All Courses from public.courses with graceful local fallback
 export const fetchAllCourses = async (): Promise<{
   courses: Course[];
@@ -1402,7 +1416,7 @@ export const insertCourse = async (
       features: Array.isArray(newCourse.features) ? newCourse.features : [],
       status: newCourse.status || 'published',
       is_upcoming: newCourse.is_upcoming !== undefined ? Boolean(newCourse.is_upcoming) : false,
-      upcoming_date: newCourse.upcoming_date || '',
+      upcoming_date: formatTimestampOrNull(newCourse.upcoming_date),
       upcoming_badge_text: newCourse.upcoming_badge_text || '',
       upcoming_note: newCourse.upcoming_note || '',
       description: descText,
@@ -1496,7 +1510,15 @@ export const insertCourse = async (
         stripped = true;
       }
 
-      // 4. Fallback sequential strip if generic schema cache error
+      // 4. If timestamp or timezone syntax error
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+        if ('upcoming_date' in payload) {
+          delete payload.upcoming_date;
+          stripped = true;
+        }
+      }
+
+      // 5. Fallback sequential strip if generic schema cache error
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const optionalKeys = [
           'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
@@ -1608,7 +1630,7 @@ export const updateCourse = async (
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if (updatedFields.is_upcoming !== undefined) payload.is_upcoming = Boolean(updatedFields.is_upcoming);
-    if (updatedFields.upcoming_date !== undefined) payload.upcoming_date = updatedFields.upcoming_date;
+    if (updatedFields.upcoming_date !== undefined) payload.upcoming_date = formatTimestampOrNull(updatedFields.upcoming_date);
     if (updatedFields.upcoming_badge_text !== undefined) payload.upcoming_badge_text = updatedFields.upcoming_badge_text;
     if (updatedFields.upcoming_note !== undefined) payload.upcoming_note = updatedFields.upcoming_note;
     if (descText !== undefined) {
@@ -1730,7 +1752,15 @@ export const updateCourse = async (
         stripped = true;
       }
 
-      // 4. Fallback sequential strip
+      // 4. If timestamp or timezone syntax error
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+        if ('upcoming_date' in payload) {
+          delete payload.upcoming_date;
+          stripped = true;
+        }
+      }
+
+      // 5. Fallback sequential strip
       if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
         const keys = Object.keys(payload);
         if (keys.length > 0) {
@@ -1821,7 +1851,7 @@ export const syncSingleCourseToSupabase = async (
       features: Array.isArray(course.features) ? course.features : [],
       status: course.status || 'published',
       is_upcoming: course.is_upcoming !== undefined ? Boolean(course.is_upcoming) : false,
-      upcoming_date: course.upcoming_date || '',
+      upcoming_date: formatTimestampOrNull(course.upcoming_date),
       upcoming_badge_text: course.upcoming_badge_text || '',
       upcoming_note: course.upcoming_note || '',
       description: descText,
