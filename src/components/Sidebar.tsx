@@ -108,15 +108,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: '',
     },
     {
-      id: 'glossary',
-      path: '#',
-      title: 'শব্দকোষ ও রিসোর্স',
-      subTitle: 'GLOSSARY & PDF NOTES',
-      icon: BookOpen,
-      badge: null,
-      badgeColor: '',
-    },
-    {
       id: 'users',
       path: '/admin/students',
       title: 'নিবন্ধিত শিক্ষার্থী তালিকা',
