@@ -18,6 +18,8 @@ import {
 import { insertBatchQuestions } from '../lib/supabase';
 import { Question } from '../types';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
+import { MultiPostSelector } from './MultiPostSelector';
+import { formatPosts } from '../lib/postManager';
 
 // Helper to detect Arabic characters for RTL alignment.
 // If text contains Bengali or English characters (mixed text), force LTR (return false)
@@ -79,7 +81,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
 
   // Tab 2: Topic Gen State
   const [topic, setTopic] = useState('');
-  const [post, setPost] = useState('');
+  const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -377,7 +379,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       status: 'published',
       subject: subject || q.subject || 'ইংরেজি',
       topic: q.topic || topic || '',
-      post: q.post || post || '',
+      post: q.post || formatPosts(selectedPosts) || '',
     }));
 
     const { success, error } = await insertBatchQuestions(formattedForSave);
@@ -513,14 +515,11 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">পদ / Post (Designation):</label>
-                <input
-                  type="text"
-                  value={post}
-                  onChange={(e) => setPost(e.target.value)}
-                  placeholder="যেমন: সহকারী শিক্ষক"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+              <div className="md:col-span-3">
+                <MultiPostSelector
+                  selectedPosts={selectedPosts}
+                  onChange={setSelectedPosts}
+                  label="পদ / Post (Designation) - একাধিক পদ কমা দিয়ে বা সিলেক্ট করে যুক্ত করুন:"
                 />
               </div>
             </div>

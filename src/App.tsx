@@ -12,6 +12,7 @@ import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
 import { StudentsManagement } from './pages/StudentsManagement';
+import { SubjectPostsManagement } from './pages/SubjectPostsManagement';
 import { StudentApp } from './pages/StudentApp';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
@@ -252,6 +253,7 @@ export default function App() {
         >
           <Route path="/admin" element={<DashboardRoute />} />
           <Route path="/admin/exams" element={<ExamsManagement />} />
+          <Route path="/admin/subject-posts" element={<SubjectPostsManagement />} />
           <Route path="/admin/courses" element={<CoursesManagement />} />
           <Route path="/admin/enrollments" element={<EnrollmentsManagement />} />
           <Route path="/admin/students" element={<StudentsManagement />} />

@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw, BookOpen } from 'lucide-react';
 import { fetchQuestionById, updateQuestion } from '../lib/supabase';
-import { QuestionStatus, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
+import { QuestionStatus, DEFAULT_TOPICS, SubjectPost } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
+import { MultiPostSelector } from '../components/MultiPostSelector';
+import { parsePosts, formatPosts } from '../lib/postManager';
+import { fetchSubjectPosts, getTopicsForPostName } from '../lib/subjectPostManager';
 
 export const EditQuestion: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,9 +21,8 @@ export const EditQuestion: React.FC = () => {
   const [customTopic, setCustomTopic] = useState<string>('');
   const [showCustomTopic, setShowCustomTopic] = useState<boolean>(false);
 
-  const [post, setPost] = useState<string>('');
-  const [customPost, setCustomPost] = useState<string>('');
-  const [showCustomPost, setShowCustomPost] = useState<boolean>(false);
+  const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
+  const [subjectPostsList, setSubjectPostsList] = useState<SubjectPost[]>([]);
 
   const [questionText, setQuestionText] = useState('');
   const [optionA, setOptionA] = useState('');
@@ -35,6 +37,40 @@ export const EditQuestion: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchSubjectPosts().then((res) => {
+      setSubjectPostsList(res.posts);
+    });
+  }, []);
+
+  // Compute dynamic topics from selected posts
+  const postSpecificTopics = useMemo(() => {
+    const collected = new Set<string>();
+    selectedPosts.forEach((postName) => {
+      const tops = getTopicsForPostName(postName, subjectPostsList);
+      tops.forEach((t) => collected.add(t));
+    });
+    return Array.from(collected);
+  }, [selectedPosts, subjectPostsList]);
+
+  // Handle post change with auto subject alignment
+  const handlePostsChange = (newPosts: string[]) => {
+    setSelectedPosts(newPosts);
+    if (newPosts.length > 0) {
+      const firstPost = newPosts[0];
+      const match = subjectPostsList.find(
+        (p) => p.name.toLowerCase() === firstPost.toLowerCase()
+      );
+      if (match) {
+        if (match.name.includes('আরবি') && subject === 'বাংলা') {
+          setSubject('আরবি');
+        } else if (match.name.includes('মৌলভী') && subject === 'বাংলা') {
+          setSubject('সহকারী মৌলভী');
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -67,12 +103,7 @@ export const EditQuestion: React.FC = () => {
           }
         }
         if (question.post) {
-          if (DEFAULT_POSTS.includes(question.post)) {
-            setPost(question.post);
-          } else {
-            setShowCustomPost(true);
-            setCustomPost(question.post);
-          }
+          setSelectedPosts(parsePosts(question.post));
         }
         if (question.subject) {
           const allSubs = getAllSubjects([question.subject]);
@@ -119,7 +150,7 @@ export const EditQuestion: React.FC = () => {
       }
     }
     const finalTopic = showCustomTopic ? customTopic.trim() : (topic === 'অন্যান্য' ? customTopic.trim() : topic.trim());
-    const finalPost = showCustomPost ? customPost.trim() : (post === 'অন্যান্য' ? customPost.trim() : post.trim());
+    const finalPost = formatPosts(selectedPosts);
 
     const updatedData = {
       question: questionText.trim(),
@@ -253,8 +284,14 @@ export const EditQuestion: React.FC = () => {
             {/* Topic Field (টপিক) */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                  টপিক (Topic)
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                  <BookOpen className="w-3.5 h-3.5 text-teal-500" />
+                  <span>টপিক (Topic)</span>
+                  {postSpecificTopics.length > 0 && (
+                    <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold px-1.5 py-0.5 bg-teal-50 dark:bg-teal-950/60 rounded-md">
+                      {postSpecificTopics.length} টি সিলেবাস টপিক
+                    </span>
+                  )}
                 </label>
                 <button
                   type="button"
@@ -287,61 +324,41 @@ export const EditQuestion: React.FC = () => {
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                   >
                     <option value="">-- টপিক নির্বাচন করুন (ঐচ্ছিক) --</option>
-                    {DEFAULT_TOPICS.map((top) => (
-                      <option key={top} value={top}>
-                        {top}
-                      </option>
-                    ))}
+                    
+                    {/* Post specific topics group if post selected */}
+                    {postSpecificTopics.length > 0 && (
+                      <optgroup label="📌 নির্বাচিত পদের নির্ধারিত সিলেবাস টপিকসমূহ">
+                        {postSpecificTopics.map((top) => (
+                          <option key={top} value={top}>
+                            ★ {top}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {/* Default common topics */}
+                    <optgroup label="সাধারণ বিষয়ভিত্তিক টপিকসমূহ">
+                      {DEFAULT_TOPICS.filter((t) => !postSpecificTopics.includes(t)).map((top) => (
+                        <option key={top} value={top}>
+                          {top}
+                        </option>
+                      ))}
+                    </optgroup>
+                    
+                    <option value="অন্যান্য">+ নতুন টপিক ম্যানুয়ালি লিখুন...</option>
                   </select>
                 </div>
               )}
             </div>
 
-            {/* Post / Designation Field (পদ) */}
+            {/* Post / Designation Field (পদ) - Multi-select */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                  পদ (Post / Designation)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowCustomPost(!showCustomPost)}
-                  className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
-                >
-                  {showCustomPost ? 'লিস্ট থেকে বাছুন' : '+ নতুন ম্যানুয়াল'}
-                </button>
-              </div>
-
-              {showCustomPost ? (
-                <input
-                  type="text"
-                  value={customPost}
-                  onChange={(e) => setCustomPost(e.target.value)}
-                  placeholder="নতুন পদের নাম ম্যানুয়ালি লিখুন..."
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-emerald-500 rounded-2xl text-xs font-bold focus:outline-none text-slate-900 dark:text-slate-100 placeholder-slate-400"
-                />
-              ) : (
-                <div className="space-y-2">
-                  <select
-                    value={post}
-                    onChange={(e) => {
-                      if (e.target.value === 'অন্যান্য') {
-                        setShowCustomPost(true);
-                      } else {
-                        setPost(e.target.value);
-                      }
-                    }}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
-                  >
-                    <option value="">-- পদ নির্বাচন করুন (ঐচ্ছিক) --</option>
-                    {DEFAULT_POSTS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <MultiPostSelector
+                selectedPosts={selectedPosts}
+                onChange={handlePostsChange}
+                label="পদ / পদের নাম (Posts / Designations)"
+                placeholder="কমা (,) দিয়ে একাধিক পদ লিখুন..."
+              />
             </div>
           </div>
 

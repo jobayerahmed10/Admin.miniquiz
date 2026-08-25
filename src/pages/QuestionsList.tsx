@@ -34,6 +34,7 @@ import {
   deleteCustomSubject,
   BASE_SUBJECTS,
 } from '../lib/subjectManager';
+import { parsePosts, getAllPosts, isPostMatch } from '../lib/postManager';
 
 export const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -42,6 +43,7 @@ export const QuestionsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const [postFilter, setPostFilter] = useState<string>('all');
 
   // Custom Subject Management States
   const [customSubjects, setCustomSubjects] = useState<string[]>(getCustomSubjects());
@@ -103,6 +105,12 @@ export const QuestionsList: React.FC = () => {
   const allAvailableSubjects = useMemo(
     () => getAllSubjects(questions.map((q) => q.subject)),
     [questions, customSubjects]
+  );
+
+  // Compute all available posts
+  const allAvailablePosts = useMemo(
+    () => getAllPosts(questions.map((q) => q.post)),
+    [questions]
   );
 
   const handleSingleSubjectChange = async (questionId: string | number, newSubject: string) => {
@@ -229,7 +237,9 @@ export const QuestionsList: React.FC = () => {
     const matchesSubject =
       subjectFilter === 'all' ? true : qSub === subjectFilter;
 
-    return matchesSearch && matchesStatus && matchesSubject;
+    const matchesPost = isPostMatch(q.post, postFilter);
+
+    return matchesSearch && matchesStatus && matchesSubject && matchesPost;
   });
 
   // Count questions with unwanted 'সাধারণ' or empty subject
@@ -377,6 +387,26 @@ export const QuestionsList: React.FC = () => {
                 return (
                   <option key={sub} value={sub}>
                     {sub} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Post / Designation Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs">
+            <Tag className="w-3.5 h-3.5 text-amber-500" />
+            <select
+              value={postFilter}
+              onChange={(e) => setPostFilter(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="all">সকল পদ (All Posts)</option>
+              {allAvailablePosts.map((p) => {
+                const count = questions.filter((q) => isPostMatch(q.post, p)).length;
+                return (
+                  <option key={p} value={p}>
+                    {p} ({count})
                   </option>
                 );
               })}
@@ -634,9 +664,16 @@ export const QuestionsList: React.FC = () => {
                             </span>
                           )}
                           {q.post && (
-                            <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[10px] border border-amber-200/50 dark:border-amber-800/50">
-                              পদ: {q.post}
-                            </span>
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {parsePosts(q.post).map((p) => (
+                                <span
+                                  key={p}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-[10px] border border-amber-200/60 dark:border-amber-800/60"
+                                >
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -915,9 +952,16 @@ export const QuestionsList: React.FC = () => {
                   </span>
                 )}
                 {viewQuestion.post && (
-                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[10px]">
-                    পদ: {viewQuestion.post}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {parsePosts(viewQuestion.post).map((p) => (
+                      <span
+                        key={p}
+                        className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[10px]"
+                      >
+                        পদ: {p}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
               <p className="font-bold text-base text-slate-900 dark:text-slate-100">

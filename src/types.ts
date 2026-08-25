@@ -297,5 +297,31 @@ export interface StudentDashboardGrowthData {
   weaknesses: string[];
 }
 
+export interface SyllabusTopic {
+  id: string;
+  name: string;
+  description?: string;
+  order_index: number;
+  estimated_questions?: number;
+  subject_id?: string;
+}
+
+export interface SubjectPost {
+  id: string;
+  name: string; // e.g. 'আরবি প্রভাষক' | 'সহকারী মৌলভী' | 'সহকারী মৌলভী (কারী)'
+  code: string; // e.g. 'ARB-LEC', 'ASST-MOU', 'ASST-QAR'
+  tagline?: string; // e.g. '১৮তম ও ১৯তম শিক্ষক নিবন্ধন বিশেষ'
+  description?: string;
+  theme_color?: string; // e.g. 'emerald', 'indigo', 'amber', 'rose', 'teal', 'purple'
+  gradient?: string; // e.g. 'from-emerald-600 to-teal-500'
+  icon_name?: string; // e.g. 'BookOpen', 'Award', 'GraduationCap', 'Languages', 'Sparkles'
+  status: 'active' | 'draft';
+  order_index: number;
+  topics: SyllabusTopic[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+
 
 
