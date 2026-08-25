@@ -11,6 +11,8 @@ import { EnrollmentsManagement } from './pages/EnrollmentsManagement';
 import { QuestionsList } from './pages/QuestionsList';
 import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
+import { StudentsManagement } from './pages/StudentsManagement';
+import { StudentApp } from './pages/StudentApp';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
 interface AdminContextType {
@@ -234,6 +236,10 @@ export default function App() {
           }
         />
 
+        {/* Student App Portal (Mobile Friendly, No login screen bottom buttons, Study Growth Dashboard) */}
+        <Route path="/app" element={<StudentApp />} />
+        <Route path="/student" element={<StudentApp />} />
+
         {/* Protected Admin Routes */}
         <Route
           element={
@@ -248,6 +254,7 @@ export default function App() {
           <Route path="/admin/exams" element={<ExamsManagement />} />
           <Route path="/admin/courses" element={<CoursesManagement />} />
           <Route path="/admin/enrollments" element={<EnrollmentsManagement />} />
+          <Route path="/admin/students" element={<StudentsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
           <Route path="/admin/questions/create" element={<CreateQuestion />} />
           <Route path="/admin/questions/edit/:id" element={<EditQuestion />} />

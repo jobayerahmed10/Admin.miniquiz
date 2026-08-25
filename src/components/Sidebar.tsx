@@ -108,12 +108,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'users',
-      path: '#',
-      title: 'ব্যবহারকারী ও ভিআইপি এক্সেস',
-      subTitle: 'USERS & VIP ACCESS',
+      path: '/admin/students',
+      title: 'নিবন্ধিত শিক্ষার্থী তালিকা',
+      subTitle: 'STUDENTS & ID LIST',
       icon: Users,
-      badge: null,
-      badgeColor: '',
+      badge: 'নতুন',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     },
   ];
 
@@ -252,10 +252,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="p-3.5 border-t border-slate-800/80 bg-[#070c16] text-[10px] text-slate-500 flex items-center justify-between">
-          <span className="font-semibold">v2.5 Full-Stack</span>
-          <span className="text-emerald-400/80 font-mono font-medium">Gemini 3.6 API</span>
+        {/* Sidebar Footer & Student App Link */}
+        <div className="p-3.5 border-t border-slate-800/80 bg-[#070c16] space-y-2">
+          <Link
+            to="/app"
+            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600/20 to-teal-500/20 hover:from-emerald-600/30 hover:to-teal-500/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>শিক্ষার্থী অ্যাপে যান (Student App)</span>
+          </Link>
+          <div className="text-[10px] text-slate-500 flex items-center justify-between px-1">
+            <span className="font-semibold">v2.5 Full-Stack</span>
+            <span className="text-emerald-400/80 font-mono font-medium">Supabase Auth</span>
+          </div>
         </div>
       </aside>
     </>

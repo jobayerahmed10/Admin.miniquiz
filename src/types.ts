@@ -246,4 +246,56 @@ export interface DashboardStats {
   activeExams?: number;
 }
 
+export interface StudentUser {
+  id: string; // Unique student ID e.g. AT-2026-XXXX or UUID
+  student_id_code: string; // Formatted student ID (e.g. AT-2026-9814)
+  name: string;
+  phone: string;
+  email?: string;
+  avatar_url?: string;
+  created_at: string;
+  target_exam?: string; // e.g. 'NTRCA প্রভাষক (আরবি)' | 'সহকারী মৌলভী'
+  enrolled_courses?: string[];
+  total_exams_taken?: number;
+  avg_score?: number;
+  study_streak_days?: number;
+  total_study_minutes?: number;
+}
+
+export interface SubjectPerformance {
+  subject: string;
+  total_questions: number;
+  correct_count: number;
+  accuracy_pct: number;
+  mastery_level: 'weak' | 'moderate' | 'strong';
+}
+
+export interface ExamAttemptRecord {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  subject: string;
+  total_questions: number;
+  correct_answers: number;
+  wrong_answers: number;
+  score: number;
+  total_marks: number;
+  date: string;
+}
+
+export interface StudentDashboardGrowthData {
+  student: StudentUser;
+  totalExamsTaken: number;
+  totalQuestionsSolved: number;
+  overallAccuracyPct: number;
+  avgScore: number;
+  studyStreakDays: number;
+  totalStudyHours: number;
+  subjectPerformances: SubjectPerformance[];
+  recentAttempts: ExamAttemptRecord[];
+  strengths: string[];
+  weaknesses: string[];
+}
+
+
 
