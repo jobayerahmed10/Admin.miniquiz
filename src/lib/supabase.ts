@@ -1208,7 +1208,7 @@ export const generateStandardUUID = (): string => {
 export const formatTimestampOrNull = (val?: string | null): string | null => {
   if (!val || typeof val !== 'string') return null;
   const trimmed = val.trim();
-  if (!trimmed) return null;
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
   const parsed = Date.parse(trimmed);
   if (isNaN(parsed)) return null;
   try {
@@ -1416,7 +1416,7 @@ export const insertCourse = async (
       features: Array.isArray(newCourse.features) ? newCourse.features : [],
       status: newCourse.status || 'published',
       is_upcoming: newCourse.is_upcoming !== undefined ? Boolean(newCourse.is_upcoming) : false,
-      upcoming_date: formatTimestampOrNull(newCourse.upcoming_date),
+      ...(formatTimestampOrNull(newCourse.upcoming_date) ? { upcoming_date: formatTimestampOrNull(newCourse.upcoming_date) } : {}),
       upcoming_badge_text: newCourse.upcoming_badge_text || '',
       upcoming_note: newCourse.upcoming_note || '',
       description: descText,
@@ -1455,7 +1455,7 @@ export const insertCourse = async (
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 35; attempt++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
       const { data, error } = await client
         .from('courses')
         .insert([payload])
@@ -1511,16 +1511,31 @@ export const insertCourse = async (
       }
 
       // 4. If timestamp or timezone syntax error
-      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date') || errMsg.includes('invalid input syntax')) {
         if ('upcoming_date' in payload) {
           delete payload.upcoming_date;
           stripped = true;
         }
+        if ('updated_at' in payload) {
+          delete payload.updated_at;
+          stripped = true;
+        }
+        if ('created_at' in payload) {
+          delete payload.created_at;
+          stripped = true;
+        }
+        for (const k of Object.keys(payload)) {
+          if (payload[k] === '' && (k.includes('date') || k.includes('time') || k.includes('routine') || k.includes('syllabus'))) {
+            delete payload[k];
+            stripped = true;
+          }
+        }
       }
 
-      // 5. Fallback sequential strip if generic schema cache error
-      if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
+      // 5. Fallback sequential strip
+      if (!stripped) {
         const optionalKeys = [
+          'upcoming_date', 'upcoming_badge_text', 'upcoming_note', 'is_upcoming',
           'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
           'syllabus_pdf_url', 'syllabus_pdf', 'syllabus_pdf_name', 'syllabus_text', 'syllabus', 'syllabus_description',
           'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
@@ -1630,7 +1645,12 @@ export const updateCourse = async (
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if (updatedFields.is_upcoming !== undefined) payload.is_upcoming = Boolean(updatedFields.is_upcoming);
-    if (updatedFields.upcoming_date !== undefined) payload.upcoming_date = formatTimestampOrNull(updatedFields.upcoming_date);
+    if (updatedFields.upcoming_date !== undefined) {
+      const formattedDate = formatTimestampOrNull(updatedFields.upcoming_date);
+      if (formattedDate) {
+        payload.upcoming_date = formattedDate;
+      }
+    }
     if (updatedFields.upcoming_badge_text !== undefined) payload.upcoming_badge_text = updatedFields.upcoming_badge_text;
     if (updatedFields.upcoming_note !== undefined) payload.upcoming_note = updatedFields.upcoming_note;
     if (descText !== undefined) {
@@ -1692,7 +1712,7 @@ export const updateCourse = async (
     let lastError: any = null;
     let updatedRow: any = null;
 
-    for (let attempt = 0; attempt < 35; attempt++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
       if (Object.keys(payload).length === 0) {
         break;
       }
@@ -1753,15 +1773,25 @@ export const updateCourse = async (
       }
 
       // 4. If timestamp or timezone syntax error
-      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date') || errMsg.includes('invalid input syntax')) {
         if ('upcoming_date' in payload) {
           delete payload.upcoming_date;
           stripped = true;
         }
+        if ('updated_at' in payload) {
+          delete payload.updated_at;
+          stripped = true;
+        }
+        for (const k of Object.keys(payload)) {
+          if (payload[k] === '' && (k.includes('date') || k.includes('time') || k.includes('routine') || k.includes('syllabus'))) {
+            delete payload[k];
+            stripped = true;
+          }
+        }
       }
 
       // 5. Fallback sequential strip
-      if (!stripped && (errMsg.includes('column') || errMsg.includes('schema cache') || errMsg.includes('does not exist'))) {
+      if (!stripped) {
         const keys = Object.keys(payload);
         if (keys.length > 0) {
           const keyToDelete = keys.find((k) => k !== 'title') || keys[0];
@@ -1851,7 +1881,7 @@ export const syncSingleCourseToSupabase = async (
       features: Array.isArray(course.features) ? course.features : [],
       status: course.status || 'published',
       is_upcoming: course.is_upcoming !== undefined ? Boolean(course.is_upcoming) : false,
-      upcoming_date: formatTimestampOrNull(course.upcoming_date),
+      ...(formatTimestampOrNull(course.upcoming_date) ? { upcoming_date: formatTimestampOrNull(course.upcoming_date) } : {}),
       upcoming_badge_text: course.upcoming_badge_text || '',
       upcoming_note: course.upcoming_note || '',
       description: descText,
@@ -1885,13 +1915,12 @@ export const syncSingleCourseToSupabase = async (
       enter_text: course.enter_button_text || 'প্রবেশ করুন',
       sheet_button_text: course.sheet_button_text || 'শিট ডাউনলোড',
       sheet_text: course.sheet_button_text || 'শিট ডাউনলোড',
-      updated_at: new Date().toISOString(),
     };
 
     let lastError: any = null;
     let insertedRow: any = null;
 
-    for (let attempt = 0; attempt < 35; attempt++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
       const { data, error } = await client
         .from('courses')
         .upsert([payload], { onConflict: 'id' })
@@ -1920,21 +1949,56 @@ export const syncSingleCourseToSupabase = async (
         }
       }
 
+      // Regex column matching
+      const regexPatterns = [
+        /find the ['"]?([a-zA-Z0-9_]+)['"]? column/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i,
+        /column ['"]?([a-zA-Z0-9_]+)['"]?/i,
+      ];
+
+      for (const pattern of regexPatterns) {
+        const match = error.message.match(pattern);
+        if (match && match[1]) {
+          const colName = match[1];
+          if (colName in payload && colName !== 'title' && colName !== 'id') {
+            delete payload[colName];
+            stripped = true;
+            break;
+          }
+        }
+      }
+
       if (errMsg.includes('features') && Array.isArray(payload.features)) {
         payload.features = JSON.stringify(payload.features);
         stripped = true;
       }
 
       // If timestamp or timezone syntax error
-      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date') || errMsg.includes('invalid input syntax')) {
         if ('upcoming_date' in payload) {
           delete payload.upcoming_date;
           stripped = true;
+        }
+        if ('updated_at' in payload) {
+          delete payload.updated_at;
+          stripped = true;
+        }
+        if ('created_at' in payload) {
+          delete payload.created_at;
+          stripped = true;
+        }
+        for (const k of Object.keys(payload)) {
+          if (payload[k] === '' && (k.includes('date') || k.includes('time') || k.includes('routine') || k.includes('syllabus'))) {
+            delete payload[k];
+            stripped = true;
+          }
         }
       }
 
       if (!stripped) {
         const optionalKeys = [
+          'upcoming_date', 'upcoming_badge_text', 'upcoming_note', 'is_upcoming',
           'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
           'syllabus_pdf_url', 'syllabus_pdf', 'syllabus_pdf_name', 'syllabus_text', 'syllabus', 'syllabus_description',
           'leaderboard_info', 'leaderboard_enabled', 'helpline_contact',
