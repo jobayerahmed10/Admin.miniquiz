@@ -1925,6 +1925,14 @@ export const syncSingleCourseToSupabase = async (
         stripped = true;
       }
 
+      // If timestamp or timezone syntax error
+      if (errMsg.includes('timestamp') || errMsg.includes('time zone') || errMsg.includes('date')) {
+        if ('upcoming_date' in payload) {
+          delete payload.upcoming_date;
+          stripped = true;
+        }
+      }
+
       if (!stripped) {
         const optionalKeys = [
           'routine_pdf_url', 'routine_pdf', 'routine_pdf_name', 'routine_text', 'routine', 'routine_description',
