@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen,
   HelpCircle,
@@ -284,48 +285,60 @@ export const StudentApp: React.FC = () => {
                         <span>বিষয়: {examQuestions[currentQIndex]?.subject || activeTakingExam.subject}</span>
                       </div>
 
-                      {/* Question Text */}
-                      <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 text-sm sm:text-base font-bold text-slate-100 leading-relaxed">
-                        {examQuestions[currentQIndex]?.question}
-                      </div>
+                      {/* Animated Question Content */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={currentQIndex}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-4"
+                        >
+                          {/* Question Text */}
+                          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 text-sm sm:text-base font-bold text-slate-100 leading-relaxed">
+                            {examQuestions[currentQIndex]?.question}
+                          </div>
 
-                      {/* 4 Options Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                        {[
-                          { key: 'option_a', label: 'ক', text: examQuestions[currentQIndex]?.option_a },
-                          { key: 'option_b', label: 'খ', text: examQuestions[currentQIndex]?.option_b },
-                          { key: 'option_c', label: 'গ', text: examQuestions[currentQIndex]?.option_c },
-                          { key: 'option_d', label: 'ঘ', text: examQuestions[currentQIndex]?.option_d },
-                        ].map((opt) => {
-                          const isSelected = selectedAnswers[examQuestions[currentQIndex]?.id] === opt.key;
-                          return (
-                            <button
-                              key={opt.key}
-                              type="button"
-                              onClick={() => {
-                                setSelectedAnswers({
-                                  ...selectedAnswers,
-                                  [examQuestions[currentQIndex].id]: opt.key,
-                                });
-                              }}
-                              className={`p-3.5 rounded-xl text-xs font-bold border flex items-center gap-3 text-left transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg ring-2 ring-emerald-400/40'
-                                  : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700 text-slate-200 hover:border-slate-600'
-                              }`}
-                            >
-                              <span
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
-                                  isSelected ? 'bg-white text-emerald-700' : 'bg-slate-700 text-slate-300'
-                                }`}
-                              >
-                                {opt.label}
-                              </span>
-                              <span className="leading-snug">{opt.text}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                          {/* 4 Options Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                            {[
+                              { key: 'option_a', label: 'ক', text: examQuestions[currentQIndex]?.option_a },
+                              { key: 'option_b', label: 'খ', text: examQuestions[currentQIndex]?.option_b },
+                              { key: 'option_c', label: 'গ', text: examQuestions[currentQIndex]?.option_c },
+                              { key: 'option_d', label: 'ঘ', text: examQuestions[currentQIndex]?.option_d },
+                            ].map((opt) => {
+                              const isSelected = selectedAnswers[examQuestions[currentQIndex]?.id] === opt.key;
+                              return (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAnswers({
+                                      ...selectedAnswers,
+                                      [examQuestions[currentQIndex].id]: opt.key,
+                                    });
+                                  }}
+                                  className={`p-3.5 rounded-xl text-xs font-bold border flex items-center gap-3 text-left transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg ring-2 ring-emerald-400/40'
+                                      : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700 text-slate-200 hover:border-slate-600'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
+                                      isSelected ? 'bg-white text-emerald-700' : 'bg-slate-700 text-slate-300'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </span>
+                                  <span className="leading-snug">{opt.text}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      </AnimatePresence>
 
                       {/* Question Navigation */}
                       <div className="flex items-center justify-between pt-4 border-t border-slate-800">
@@ -518,13 +531,23 @@ export const StudentApp: React.FC = () => {
                               পূর্ণমান: {exam.total_marks || 20}
                             </span>
 
-                            <button
-                              onClick={() => handleStartExam(exam)}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
-                            >
-                              <Play className="w-3.5 h-3.5 fill-white" />
-                              <span>পরীক্ষা শুরু করুন</span>
-                            </button>
+                            {exam.status === 'upcoming' ? (
+                              <button
+                                disabled
+                                className="px-4 py-2 bg-slate-800 text-slate-400 font-black text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-not-allowed"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>আপকামিং</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleStartExam(exam)}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-white" />
+                                <span>পরীক্ষা শুরু করুন</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

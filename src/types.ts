@@ -19,7 +19,7 @@ export interface Question {
 }
 
 export type ExamBadgeType = 'free' | 'daily' | 'weekly' | 'live';
-export type ExamStatus = 'active' | 'draft';
+export type ExamStatus = 'active' | 'draft' | 'upcoming';
 
 export interface Exam {
   id: string;

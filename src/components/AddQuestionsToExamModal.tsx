@@ -228,17 +228,18 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   if (!isOpen) return null;
 
   // Toggle Exam Publish / Status
-  const handleToggleExamPublish = async () => {
+  const handleChangeExamStatus = async (status: ExamStatus) => {
     setTogglingStatus(true);
-    const nextStatus: ExamStatus = currentExamStatus === 'active' ? 'draft' : 'active';
-    const res = await updateExam(exam.id, { status: nextStatus });
+    const res = await updateExam(exam.id, { status: status });
     setTogglingStatus(false);
 
     if (res.success) {
-      setCurrentExamStatus(nextStatus);
+      setCurrentExamStatus(status);
       setActionSuccessMsg(
-        nextStatus === 'active'
+        status === 'active'
           ? '🎉 মডেল টেস্টটি সফলভাবে লাইভ পাবলিশ করা হয়েছে!'
+          : status === 'upcoming'
+          ? 'মডেল টেস্টটি আপকামিং (Upcoming) মোডে রাখা হয়েছে।'
           : 'মডেল টেস্টটি ড্রাফট (Draft) মোডে রাখা হয়েছে।'
       );
       setTimeout(() => setActionSuccessMsg(null), 3500);
@@ -762,7 +763,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
             attachedCount={attachedQuestions.length}
             targetCount={exam.question_count || 0}
             currentExamStatus={currentExamStatus}
-            onTogglePublish={handleToggleExamPublish}
+            onChangeStatus={handleChangeExamStatus}
             togglingStatus={togglingStatus}
           />
         </div>
@@ -894,7 +895,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
                   পাস মার্ক
@@ -916,6 +917,18 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                   min="1"
                   value={infoTimeMinutes}
                   onChange={(e) => setInfoTimeMinutes(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  মোট নম্বর
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={infoTotalMarks}
+                  onChange={(e) => setInfoTotalMarks(Number(e.target.value))}
                   className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
                 />
               </div>

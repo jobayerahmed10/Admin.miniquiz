@@ -12,6 +12,8 @@ import {
   HelpCircle,
   FileText,
   PlusCircle,
+  Calendar,
+  Save
 } from 'lucide-react';
 import { Exam, ExamStatus } from '../../types';
 
@@ -22,7 +24,7 @@ interface ExamStepWizardHeaderProps {
   attachedCount: number;
   targetCount: number;
   currentExamStatus: ExamStatus;
-  onTogglePublish: () => void;
+  onChangeStatus: (status: ExamStatus) => void;
   togglingStatus: boolean;
 }
 
@@ -33,14 +35,14 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
   attachedCount,
   targetCount,
   currentExamStatus,
-  onTogglePublish,
+  onChangeStatus,
   togglingStatus,
 }) => {
   const percentComplete = targetCount > 0 ? Math.min(Math.round((attachedCount / targetCount) * 100), 100) : 100;
 
   return (
     <div className="space-y-4">
-      {/* Top Banner with Exam Info & Publish Toggle */}
+      {/* Top Banner with Exam Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-md border border-slate-700/60">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -57,6 +59,9 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-200 font-bold border border-slate-700">
               নেগেটিভ মার্ক: {exam.negative_marks || 0.25}
             </span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-200 font-bold border border-slate-700">
+              মোট মার্ক: {exam.total_marks || 0}
+            </span>
           </div>
 
           <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
@@ -64,30 +69,17 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
           </h2>
         </div>
 
-        {/* Live Status Button */}
+        {/* Status indicator */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={togglingStatus}
-            onClick={onTogglePublish}
-            className={`px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all shadow-lg ${
-              currentExamStatus === 'active'
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400/30'
-                : 'bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white animate-pulse'
-            }`}
-          >
-            {currentExamStatus === 'active' ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                <span>✓ লাইভ পাবলিশড</span>
-              </>
-            ) : (
-              <>
-                <Rocket className="w-4 h-4 text-amber-200" />
-                <span>🚀 এখনই লাইভ পাবলিশ করুন</span>
-              </>
-            )}
-          </button>
+           <span className={`px-3 py-1.5 rounded-xl text-[11px] font-black border ${
+              currentExamStatus === 'active' 
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                : currentExamStatus === 'upcoming'
+                ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+           }`}>
+             {currentExamStatus === 'active' ? '✓ লাইভ পাবলিশড' : currentExamStatus === 'upcoming' ? '🗓 আপকামিং' : '📝 ড্রাফট'}
+           </span>
         </div>
       </div>
 
@@ -190,23 +182,56 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
           )}
 
           {currentStep === 3 && (
-            <div className="flex items-center gap-2 w-full md:w-auto justify-between">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
               <button
                 type="button"
                 onClick={() => onStepChange(2)}
-                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs rounded-xl flex items-center gap-1"
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs rounded-xl flex items-center gap-1 mr-auto md:mr-4"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>প্রশ্ন যোগ</span>
               </button>
+
               <button
                 type="button"
                 disabled={togglingStatus}
-                onClick={onTogglePublish}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1.5"
+                onClick={() => onChangeStatus('draft')}
+                className={`px-4 py-2 font-black text-xs rounded-xl shadow-sm flex items-center gap-1.5 border transition-colors ${
+                  currentExamStatus === 'draft'
+                    ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                <Save className="w-4 h-4" />
+                <span>ড্রাফট</span>
+              </button>
+              
+              <button
+                type="button"
+                disabled={togglingStatus}
+                onClick={() => onChangeStatus('upcoming')}
+                className={`px-4 py-2 font-black text-xs rounded-xl shadow-sm flex items-center gap-1.5 border transition-colors ${
+                  currentExamStatus === 'upcoming'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700/50 text-blue-700 dark:text-blue-300'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 hover:text-blue-600'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>আপকামিং</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={togglingStatus}
+                onClick={() => onChangeStatus('active')}
+                className={`px-4 py-2 font-black text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all ${
+                  currentExamStatus === 'active'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 hover:text-emerald-600'
+                }`}
               >
                 <Rocket className="w-4 h-4" />
-                <span>সেভ ও পাবলিশ</span>
+                <span>পাবলিশ</span>
               </button>
             </div>
           )}
