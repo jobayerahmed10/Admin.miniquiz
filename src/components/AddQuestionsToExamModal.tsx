@@ -18,6 +18,7 @@ import {
   UserCheck,
   Check,
   Edit,
+  FileText,
 } from 'lucide-react';
 import { Question, Exam, ExamStatus, DEFAULT_TOPICS, DEFAULT_POSTS } from '../types';
 import {
@@ -48,17 +49,34 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   exam,
   onQuestionsUpdated,
 }) => {
-  // Step State: 'add' (Step 1) | 'preview' (Step 2)
-  const [wizardStep, setWizardStep] = useState<'add' | 'preview'>('add');
+  // Step State: 1 (Info) | 2 (Add Questions) | 3 (Preview & Edit)
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
 
-  // Sub-tabs inside Step 1 ('add'): 'aitopic' | 'copypaste' | 'manual' | 'bank'
+  // Exam Info Form State (Step 1)
+  const [infoTitle, setInfoTitle] = useState(exam.title || '');
+  const [infoBadgeType, setInfoBadgeType] = useState(exam.badge_type || 'daily');
+  const [infoBadge, setInfoBadge] = useState(exam.badge || 'দৈনিক মডেল টেস্ট');
+  const [infoSubject, setInfoSubject] = useState(exam.subject || 'বাংলা');
+  const [infoTopic, setInfoTopic] = useState(exam.topic || '');
+  const [infoPost, setInfoPost] = useState(exam.post || '');
+  const [infoPassMark, setInfoPassMark] = useState(exam.pass_mark || 0);
+  const [infoExamType, setInfoExamType] = useState(exam.exam_type || 'free_exams');
+  const [infoCategory, setInfoCategory] = useState(exam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)');
+  const [infoQuestionCount, setInfoQuestionCount] = useState(exam.question_count || 25);
+  const [infoTimeMinutes, setInfoTimeMinutes] = useState(exam.time_minutes || 20);
+  const [infoNegativeMarks, setInfoNegativeMarks] = useState(exam.negative_marks || 0.25);
+  const [infoTotalMarks, setInfoTotalMarks] = useState(exam.total_marks || 25);
+  const [infoDescription, setInfoDescription] = useState(exam.description || '');
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  // Sub-tabs inside Step 2 ('add'): 'aitopic' | 'copypaste' | 'manual' | 'bank'
   const [addMethodTab, setAddMethodTab] = useState<'aitopic' | 'copypaste' | 'manual' | 'bank'>('aitopic');
 
-  // Student test simulation mode inside Step 2
+  // Student test simulation mode inside Step 3
   const [isStudentMode, setIsStudentMode] = useState(false);
   const [studentAnswers, setStudentAnswers] = useState<Record<string | number, string>>({});
 
-  // Inline Quick Add toggle inside Step 2
+  // Inline Quick Add toggle inside Step 3
   const [showInlineAdd, setShowInlineAdd] = useState(false);
 
   // Exam Publish / Status State
@@ -124,7 +142,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
 
   // Toast / General message & CTA
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
-  const [showNextPromptBanner, setShowNextPromptBanner] = useState(false);
 
   const loadAttachedQuestions = async () => {
     setLoadingAttached(true);
@@ -150,14 +167,63 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       loadAttachedQuestions();
       loadQuestionBank();
       setSubjectsList(getAllSubjects(exam.subject ? [exam.subject] : []));
+
+      setInfoTitle(exam.title || '');
+      setInfoBadgeType(exam.badge_type || 'daily');
+      setInfoBadge(exam.badge || 'দৈনিক মডেল টেস্ট');
+      setInfoSubject(exam.subject || 'বাংলা');
+      setInfoTopic(exam.topic || '');
+      setInfoPost(exam.post || '');
+      setInfoPassMark(exam.pass_mark || 0);
+      setInfoExamType(exam.exam_type || 'free_exams');
+      setInfoCategory(exam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)');
+      setInfoQuestionCount(exam.question_count || 25);
+      setInfoTimeMinutes(exam.time_minutes || 20);
+      setInfoNegativeMarks(exam.negative_marks || 0.25);
+      setInfoTotalMarks(exam.total_marks || 25);
+      setInfoDescription(exam.description || '');
+
       if (exam && exam.question_count) {
         setTopicCount(exam.question_count);
       }
-      // If exam already has questions, start on preview if desired, or default to add
-      setWizardStep(exam.question_count && exam.question_count > 0 ? 'preview' : 'add');
-      setShowNextPromptBanner(false);
+      setWizardStep(1);
     }
   }, [isOpen, exam]);
+
+  const handleSaveExamInfoAndNext = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!infoTitle.trim()) {
+      alert('পরীক্ষার শিরোনাম দেয়া আবশ্যক।');
+      return;
+    }
+    setSavingInfo(true);
+    const payload = {
+      title: infoTitle.trim(),
+      badge: infoBadge.trim() || 'মডেল টেস্ট',
+      badge_type: infoBadgeType,
+      subject: infoSubject,
+      topic: infoTopic.trim() || null,
+      post: infoPost.trim() || null,
+      pass_mark: Number(infoPassMark),
+      exam_type: infoExamType,
+      category: infoCategory,
+      question_count: Number(infoQuestionCount),
+      time_minutes: Number(infoTimeMinutes),
+      negative_marks: Number(infoNegativeMarks),
+      total_marks: Number(infoTotalMarks),
+      description: infoDescription.trim(),
+    };
+    const res = await updateExam(exam.id, payload);
+    setSavingInfo(false);
+    if (res.success) {
+      setActionSuccessMsg('✓ পরীক্ষার তথ্য সফলভাবে সংরক্ষিত হয়েছে! এখন প্রশ্ন যুক্ত করুন।');
+      setTimeout(() => setActionSuccessMsg(null), 2500);
+      setWizardStep(2);
+      onQuestionsUpdated(0);
+    } else {
+      alert(res.error || 'তথ্য সংরক্ষণ করতে সমস্যা হয়েছে।');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -329,7 +395,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setManualOptionC('');
       setManualOptionD('');
       setManualExplanation('');
-      setShowNextPromptBanner(true);
       onQuestionsUpdated(1);
       loadAttachedQuestions();
       loadQuestionBank();
@@ -527,7 +592,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setActionSuccessMsg(`🎉 ${extractedQuestions.length} টি প্রশ্ন মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
       setExtractedQuestions([]);
       setRawText('');
-      setShowNextPromptBanner(true);
       onQuestionsUpdated(extractedQuestions.length);
       await loadAttachedQuestions();
       loadQuestionBank();
@@ -603,7 +667,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setActionSuccessMsg(`🎉 ${generatedQuestions.length} টি জেনারেটকৃত প্রশ্ন মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
       setGeneratedQuestions([]);
       setTopic('');
-      setShowNextPromptBanner(true);
       onQuestionsUpdated(generatedQuestions.length);
       await loadAttachedQuestions();
       loadQuestionBank();
@@ -640,7 +703,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       const count = ids.length;
       setActionSuccessMsg(`🎉 ${count} টি প্রশ্ন এই মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
       setSelectedBankIds(new Set());
-      setShowNextPromptBanner(true);
       onQuestionsUpdated(count);
       await loadAttachedQuestions();
       loadQuestionBank();
@@ -715,38 +777,212 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
           </div>
         )}
 
-        {/* Prominent Next CTA Banner when questions are added in Step 1 */}
-        {showNextPromptBanner && wizardStep === 'add' && (
-          <div className="p-4 bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 text-white rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-xl shrink-0">
-                <Sparkles className="w-5 h-5 text-amber-200" />
+        {/* ========================================================================= */}
+        {/* STEP 1: EXAM INFO & SETTINGS                                              */}
+        {/* ========================================================================= */}
+        {wizardStep === 1 && (
+          <form onSubmit={handleSaveExamInfoAndNext} className="space-y-5 pt-1 animate-fadeIn">
+            <div className="bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 p-4 rounded-2xl text-xs text-emerald-900 dark:text-emerald-200 space-y-1">
+              <div className="flex items-center gap-2 font-extrabold text-emerald-700 dark:text-emerald-300">
+                <FileText className="w-4 h-4 text-emerald-600" />
+                <span>ধাপ ১: পরীক্ষার সাধারণ তথ্য ও সেটিংস</span>
               </div>
+              <p>
+                পরীক্ষার শিরোনাম, ক্যাটাগরি, বিষয়, সময় এবং নম্বর বণ্টন নির্ধারণ করুন। "সেভ করুন ও পরবর্তী ধাপ" বাটনে ক্লিক করে প্রশ্ন যুক্ত করার ধাপে যান।
+              </p>
+            </div>
+
+            {/* Exam Title */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                পরীক্ষার শিরোনাম (Title) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={infoTitle}
+                onChange={(e) => setInfoTitle(e.target.value)}
+                placeholder='যেমন: "১৯তম NTRCA সাধারণ জ্ঞান ও বাংলা বিশেষ মডেল টেস্ট"'
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            {/* Badge Type & Badge Custom Text */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <h4 className="text-xs sm:text-sm font-black">
-                  প্রশ্ন সফলভাবে যুক্ত হয়েছে! ({attachedQuestions.length} টি প্রশ্ন বর্তমান)
-                </h4>
-                <p className="text-[11px] text-emerald-100 font-medium">
-                  এখন "লাইভ প্রিভিউ ও সম্পাদনা" বাটনে ক্লিক করে প্রতিটি প্রশ্ন পরীক্ষা বা এডিট করুন।
-                </p>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  ব্যাজের ধরন (Badge Type) <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={infoBadgeType}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setInfoBadgeType(val);
+                    if (val === 'daily') setInfoBadge('দৈনিক মডেল টেস্ট');
+                    else if (val === 'weekly') setInfoBadge('সাপ্তাহিক মেগা টেস্ট');
+                    else if (val === 'special') setInfoBadge('বিশেষ সাজেশন');
+                    else if (val === 'job') setInfoBadge('চাকরি প্রস্তুতি');
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                >
+                  <option value="daily">দৈনিক মডেল টেস্ট (Daily)</option>
+                  <option value="weekly">সাপ্তাহিক মেগা টেস্ট (Weekly)</option>
+                  <option value="special">বিশেষ সাজেশন (Special)</option>
+                  <option value="job">চাকরি প্রস্তুতি (Job Prep)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  ব্যাজ লেবেল (Badge Label)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={infoBadge}
+                  onChange={(e) => setInfoBadge(e.target.value)}
+                  placeholder="যেমন: দৈনিক মডেল টেস্ট"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium text-slate-900 dark:text-slate-100"
+                />
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setWizardStep('preview')}
-              className="px-5 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition-all shrink-0 cursor-pointer"
-            >
-              <span>পরবর্তী: লাইভ প্রিভিউ ও এডিট করুন</span>
-              <ArrowRight className="w-4 h-4 text-emerald-600" />
-            </button>
-          </div>
+            {/* Subject Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                বিষয় (Subject) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={infoSubject}
+                onChange={(e) => setInfoSubject(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+              >
+                {subjectsList.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Topic, Post, Pass mark & Time */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  টপিক বা অধ্যায় (Topic)
+                </label>
+                <input
+                  type="text"
+                  value={infoTopic}
+                  onChange={(e) => setInfoTopic(e.target.value)}
+                  placeholder="যেমন: ধ্বনি ও বর্ণ, সমাস, আন্তর্জাতিক"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  পদ বা ডেজিগনেশন (Post / Designation)
+                </label>
+                <input
+                  type="text"
+                  value={infoPost}
+                  onChange={(e) => setInfoPost(e.target.value)}
+                  placeholder="যেমন: সহকারী শিক্ষক, বিসিএস"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  পাস মার্ক
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={infoPassMark}
+                  onChange={(e) => setInfoPassMark(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  সময় (মিনিট)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={infoTimeMinutes}
+                  onChange={(e) => setInfoTimeMinutes(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  নেগেটিভ মার্ক
+                </label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  value={infoNegativeMarks}
+                  onChange={(e) => setInfoNegativeMarks(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  মোট প্রশ্ন সংখ্যা
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={infoQuestionCount}
+                  onChange={(e) => setInfoQuestionCount(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-center text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                পরীক্ষার বিবরণ ও নির্দেশিকা (Description)
+              </label>
+              <textarea
+                rows={3}
+                value={infoDescription}
+                onChange={(e) => setInfoDescription(e.target.value)}
+                placeholder="পরীক্ষার নিয়মাবলী ও নির্দেশিকা লিখুন..."
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div className="pt-3 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setWizardStep(2)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs rounded-2xl flex items-center gap-1.5"
+              >
+                <span>স্কিপ করে প্রশ্ন যোগ করুন ➜</span>
+              </button>
+              <button
+                type="submit"
+                disabled={savingInfo}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer"
+              >
+                {savingInfo ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>সেভ করুন ও পরবর্তী ধাপ: প্রশ্ন সংযোজন ➜</span>
+              </button>
+            </div>
+          </form>
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 1: ADD QUESTIONS WORKSPACE                                           */}
+        {/* STEP 2: ADD QUESTIONS WORKSPACE                                           */}
         {/* ========================================================================= */}
-        {wizardStep === 'add' && (
+        {wizardStep === 2 && (
           <div className="space-y-4 pt-1">
             {/* Sub-Tabs for Add Methods */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl">
@@ -1347,9 +1583,9 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2: LIVE PREVIEW & EDIT WORKSPACE                                     */}
+        {/* STEP 3: LIVE PREVIEW & EDIT WORKSPACE                                     */}
         {/* ========================================================================= */}
-        {wizardStep === 'preview' && (
+        {wizardStep === 3 && (
           <div className="space-y-4 pt-1 animate-fadeIn">
             {/* Action Bar: Search, Subject Filter, Mode Toggle & Inline Add Button */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
@@ -1476,7 +1712,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                 {attachedQuestions.length === 0 && (
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                     <button
-                      onClick={() => setWizardStep('add')}
+                      onClick={() => setWizardStep(2)}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md"
                     >
                       <Plus className="w-4 h-4" />
@@ -1508,79 +1744,6 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
             )}
           </div>
         )}
-
-        {/* ========================================================================= */}
-        {/* STICKY FOOTER NAVIGATION & PUBLISH CONTROLS                               */}
-        {/* ========================================================================= */}
-        <div className="sticky bottom-0 -mx-5 -mb-5 sm:-mx-7 sm:-mb-7 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 z-20 rounded-b-3xl">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
-              মোট সংযুক্ত প্রশ্ন: <span className="text-emerald-600 dark:text-emerald-400 font-black">{attachedQuestions.length} টি</span>
-              {exam.question_count ? ` / ${exam.question_count} টি` : ''}
-            </span>
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
-                currentExamStatus === 'active'
-                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-              }`}
-            >
-              {currentExamStatus === 'active' ? '● লাইভ পাবলিশড' : '○ ড্রাফট মোড'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {wizardStep === 'add' ? (
-              <button
-                type="button"
-                onClick={() => setWizardStep('preview')}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer"
-              >
-                <span>পরবর্তী ধাপ: লাইভ প্রিভিউ ও সম্পাদনা ➜</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setWizardStep('add')}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>+ আরও প্রশ্ন যুক্ত করুন</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              disabled={togglingStatus}
-              onClick={handleToggleExamPublish}
-              className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all ${
-                currentExamStatus === 'active'
-                  ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-              }`}
-            >
-              {currentExamStatus === 'active' ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-500" />
-                  <span>পাবলিশড</span>
-                </>
-              ) : (
-                <>
-                  <Rocket className="w-4 h-4" />
-                  <span>🚀 পাবলিশ করুন</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-black rounded-xl transition-colors shadow"
-            >
-              সম্পন্ন
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

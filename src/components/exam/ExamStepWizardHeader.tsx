@@ -10,12 +10,14 @@ import {
   Layers,
   Clock,
   HelpCircle,
+  FileText,
+  PlusCircle,
 } from 'lucide-react';
 import { Exam, ExamStatus } from '../../types';
 
 interface ExamStepWizardHeaderProps {
-  currentStep: 'add' | 'preview';
-  onStepChange: (step: 'add' | 'preview') => void;
+  currentStep: 1 | 2 | 3;
+  onStepChange: (step: 1 | 2 | 3) => void;
   exam: Exam;
   attachedCount: number;
   targetCount: number;
@@ -77,7 +79,7 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
             {currentExamStatus === 'active' ? (
               <>
                 <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                <span>✓ লাইভ পাবলিশড (অনলাইন)</span>
+                <span>✓ লাইভ পাবলিশড</span>
               </>
             ) : (
               <>
@@ -89,45 +91,63 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
         </div>
       </div>
 
-      {/* STEP PROGRESS NAVIGATION BAR */}
-      <div className="bg-slate-50 dark:bg-slate-800/80 p-2 sm:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* STEP 3-STAGE WIZARD NAVIGATION BAR */}
+      <div className="bg-slate-50 dark:bg-slate-800/80 p-2 sm:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Step Tabs */}
-        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
-          {/* Step 1 Tab Button */}
+        <div className="grid grid-cols-3 gap-2 w-full md:w-auto">
+          {/* Step 1 Tab */}
           <button
             type="button"
-            onClick={() => onStepChange('add')}
-            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center sm:justify-start gap-2 transition-all ${
-              currentStep === 'add'
+            onClick={() => onStepChange(1)}
+            className={`px-3 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
+              currentStep === 1
                 ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-500/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-              currentStep === 'add' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              currentStep === 1 ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
             }`}>
               ১
             </span>
-            <span>প্রশ্ন নির্বাচন ও সংযোজন</span>
+            <span className="truncate">পরীক্ষার তথ্য</span>
           </button>
 
-          {/* Step 2 Tab Button (Preview) */}
+          {/* Step 2 Tab */}
           <button
             type="button"
-            onClick={() => onStepChange('preview')}
-            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center sm:justify-start gap-2 transition-all ${
-              currentStep === 'preview'
+            onClick={() => onStepChange(2)}
+            className={`px-3 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
+              currentStep === 2
                 ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-500/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-              currentStep === 'preview' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              currentStep === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
             }`}>
               ২
             </span>
-            <span className="flex items-center gap-1">
-              লাইভ প্রিভিউ ও সম্পাদনা
+            <span className="truncate">প্রশ্ন সংযোজন</span>
+          </button>
+
+          {/* Step 3 Tab */}
+          <button
+            type="button"
+            onClick={() => onStepChange(3)}
+            className={`px-3 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
+              currentStep === 3
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+              currentStep === 3 ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+            }`}>
+              ৩
+            </span>
+            <span className="flex items-center gap-1 truncate">
+              প্রিভিউ ও এডিট
               <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px]">
                 {attachedCount}
               </span>
@@ -135,49 +155,60 @@ export const ExamStepWizardHeader: React.FC<ExamStepWizardHeaderProps> = ({
           </button>
         </div>
 
-        {/* Target Progress & Next Button */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
-          <div className="text-right">
-            <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <span>সংযুক্ত:</span>
-              <strong className="text-emerald-600 dark:text-emerald-400 text-xs">
-                {attachedCount} টি
-              </strong>
-              {targetCount > 0 && (
-                <span className="text-slate-400 text-[10px]">
-                  / লক্ষ্য {targetCount} টি ({percentComplete}%)
-                </span>
-              )}
-            </div>
-            {targetCount > 0 && (
-              <div className="w-28 sm:w-36 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-1">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-300"
-                  style={{ width: `${percentComplete}%` }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* NEXT / PREV BUTTON */}
-          {currentStep === 'add' ? (
+        {/* Quick Next/Prev Action Buttons */}
+        <div className="flex items-center justify-end gap-2 w-full md:w-auto">
+          {currentStep === 1 && (
             <button
               type="button"
-              onClick={() => onStepChange('preview')}
-              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all group"
+              onClick={() => onStepChange(2)}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all group w-full md:w-auto justify-center"
             >
-              <span>পরবর্তী: লাইভ প্রিভিউ</span>
+              <span>পরবর্তী: প্রশ্ন যুক্ত করুন</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onStepChange('add')}
-              className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>+ আরও প্রশ্ন যুক্ত করুন</span>
-            </button>
+          )}
+
+          {currentStep === 2 && (
+            <div className="flex items-center gap-2 w-full md:w-auto justify-between">
+              <button
+                type="button"
+                onClick={() => onStepChange(1)}
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs rounded-xl flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>তথ্য</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onStepChange(3)}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all group"
+              >
+                <span>পরবর্তী: প্রিভিউ ও ফাইনাল</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="flex items-center gap-2 w-full md:w-auto justify-between">
+              <button
+                type="button"
+                onClick={() => onStepChange(2)}
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs rounded-xl flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>প্রশ্ন যোগ</span>
+              </button>
+              <button
+                type="button"
+                disabled={togglingStatus}
+                onClick={onTogglePublish}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1.5"
+              >
+                <Rocket className="w-4 h-4" />
+                <span>সেভ ও পাবলিশ</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
