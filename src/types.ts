@@ -27,6 +27,11 @@ export interface Exam {
   badge: string;
   badge_type: ExamBadgeType;
   subject: string;
+  topic?: string | null;
+  post?: string | null;
+  pass_mark?: number;
+  exam_type?: 'free' | 'course' | string;
+  category?: string;
   question_count: number;
   time_minutes: number;
   negative_marks: number;
@@ -38,6 +43,39 @@ export interface Exam {
   created_at?: string;
   updated_at?: string;
 }
+
+export const EXAM_CATEGORIES = [
+  'ফ্রি ট্রায়াল টেস্ট (Free Test)',
+  'দৈনিক মডেল টেস্ট (Daily Test)',
+  'সাপ্তাহিক মেগা টেস্ট (Weekly Mega)',
+  'বিষয়ভিত্তিক টেস্ট (Subject-wise)',
+  'লাইভ পরীক্ষা (Live Exam)',
+  'চাকরি প্রস্তুতি স্পেশাল',
+];
+
+export const QUICK_SUBJECT_SUGGESTIONS = [
+  'আল কুরআন ও তাফসির',
+  'হাদিস শরিফ ও উসুলুল হাদিস',
+  'ফিকহুল ইসলামী ও ফরায়েজ',
+  'আরবি ব্যাকরণ (নাহু ও সরফ)',
+  'আরবি সাহিত্য ও তরজমা',
+  'বাংলা সাহিত্য ও ব্যাকরণ',
+  'ইংরেজি ভাষা ও সাহিত্য',
+  'গণিত ও মানসিক দক্ষতা',
+  'সাধারণ জ্ঞান (বাংলাদেশ ও আন্তর্জাতিক)',
+  'তথ্যপ্রযুক্তি ও কম্পিউটার',
+];
+
+export const QUICK_POST_SUGGESTIONS = [
+  'সহকারী শিক্ষক',
+  'প্রভাষক',
+  'সহকারী মৌলভী',
+  'জুনিয়র মৌলভী',
+  'ইবতেদায়ী প্রধান',
+  'অফিস সহকারী',
+  'বিসিএস ও সরকারি চাকরি',
+  'সাধারণ',
+];
 
 export const EXAM_BADGE_OPTIONS: { type: ExamBadgeType; label: string; defaultBadgeText: string }[] = [
   { type: 'free', label: 'ফ্রি পরীক্ষা (Free)', defaultBadgeText: 'ফ্রি পরীক্ষা' },
