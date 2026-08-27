@@ -403,7 +403,7 @@ export const insertQuestion = async (
       const sanitizedPayload = { ...payload };
       delete sanitizedPayload.topic;
       delete sanitizedPayload.post;
-      delete sanitizedPayload.exam_id;
+      
       
       let retryResult = await client
         .from('questions')
@@ -532,7 +532,8 @@ export const insertBatchQuestions = async (
       error.code === '42703'
     )) {
       const fallbackPayload = payload.map((p: any) => {
-        const { subject, topic, post, exam_id, ...rest } = p;
+        const { subject, topic, post, ...rest } = p;
+        rest.exam_id = p.exam_id;
         return rest;
       });
       const retryResult = await client
@@ -644,6 +645,8 @@ export const updateQuestion = async (
     if (updatedFields.correct_answer !== undefined) payload.correct_answer = updatedFields.correct_answer;
     if (updatedFields.explanation !== undefined) payload.explanation = updatedFields.explanation;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
+    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
     if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
     if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
     if (updatedFields.post !== undefined) payload.post = updatedFields.post;
@@ -667,7 +670,7 @@ export const updateQuestion = async (
       const sanitized = { ...payload };
       delete sanitized.topic;
       delete sanitized.post;
-      delete sanitized.exam_id;
+      
       let retryResult = await client
         .from('questions')
         .update(sanitized)
@@ -851,8 +854,10 @@ export const insertExam = async (
     total_marks: newExam.total_marks,
     description: newExam.description || '',
     status: newExam.status,
-    question_ids: newExam.question_ids || [],
-    questions: newExam.questions || [],
+       
+       
+     
+     
     created_at: new Date().toISOString(),
   };
 
@@ -880,6 +885,8 @@ export const insertExam = async (
       total_marks: newExam.total_marks,
       description: newExam.description || '',
       status: newExam.status,
+       
+       
     };
 
     let { data, error } = await client
@@ -908,6 +915,8 @@ export const insertExam = async (
         total_marks: newExam.total_marks,
         description: newExam.description || '',
         status: newExam.status,
+       
+       
       };
 
       const retryResult = await client
@@ -1002,6 +1011,8 @@ export const updateExam = async (
     if (updatedFields.total_marks !== undefined) payload.total_marks = updatedFields.total_marks;
     if (updatedFields.description !== undefined) payload.description = updatedFields.description;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
+    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
 
     let { data, error } = await client
       .from('exams')
@@ -1025,6 +1036,8 @@ export const updateExam = async (
       delete basicPayload.pass_mark;
       delete basicPayload.category;
       delete basicPayload.exam_type;
+      delete basicPayload.questions;
+      delete basicPayload.question_ids;
 
       let retryResult = await client
         .from('exams')
@@ -2000,6 +2013,8 @@ export const updateCourse = async (
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
+    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
     if (updatedFields.is_upcoming !== undefined) payload.is_upcoming = Boolean(updatedFields.is_upcoming);
     if (updatedFields.upcoming_date !== undefined) {
       const formattedDate = formatTimestampOrNull(updatedFields.upcoming_date);

@@ -38,6 +38,7 @@ import {
 import {
   fetchAllExams,
   fetchAllQuestions,
+  fetchQuestionsByExamId,
   fetchPublishedCoursesForStudent,
   getSupabaseClient,
 } from '../lib/supabase';
@@ -133,11 +134,16 @@ export const StudentApp: React.FC = () => {
     let questions = exam.questions || [];
 
     if (questions.length === 0) {
-      const allQ = await fetchAllQuestions();
-      const matched = allQ.questions.filter(
-        (q) => String(q.exam_id) === String(exam.id) || q.subject === exam.subject
-      );
-      questions = matched.length > 0 ? matched : allQ.questions.slice(0, 10);
+      const res = await fetchQuestionsByExamId(exam.id);
+      if (res.questions && res.questions.length > 0) {
+        questions = res.questions;
+      } else {
+        const allQ = await fetchAllQuestions();
+        const matched = allQ.questions.filter(
+          (q) => String(q.exam_id) === String(exam.id) || q.subject === exam.subject
+        );
+        questions = matched.length > 0 ? matched : allQ.questions.slice(0, 10);
+      }
     }
 
     setExamQuestions(questions);
