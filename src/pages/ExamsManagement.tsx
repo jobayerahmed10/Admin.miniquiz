@@ -41,6 +41,9 @@ import {
   ExamBadgeType,
   ExamStatus,
   EXAM_BADGE_OPTIONS,
+  EXAM_CATEGORIES,
+  QUICK_SUBJECT_SUGGESTIONS,
+  QUICK_POST_SUGGESTIONS,
 } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AddQuestionsToExamModal } from '../components/AddQuestionsToExamModal';
@@ -73,6 +76,11 @@ export const ExamsManagement: React.FC = () => {
   const [availableSubjectsList, setAvailableSubjectsList] = useState<string[]>(() => getAllSubjects());
   const [subject, setSubject] = useState('বাংলা');
   const [customSubject, setCustomSubject] = useState('');
+  const [topic, setTopic] = useState('');
+  const [post, setPost] = useState('');
+  const [passMark, setPassMark] = useState<number>(0);
+  const [examType, setExamType] = useState<string>('free_exams');
+  const [category, setCategory] = useState<string>('ফ্রি ট্রায়াল টেস্ট (Free Test)');
   const [questionCount, setQuestionCount] = useState<number>(25);
   const [timeMinutes, setTimeMinutes] = useState<number>(20);
   const [negativeMarks, setNegativeMarks] = useState<number>(0.25);
@@ -134,6 +142,11 @@ export const ExamsManagement: React.FC = () => {
     setAvailableSubjectsList(subs);
     setSubject(subs[0] || 'বাংলা');
     setCustomSubject('');
+    setTopic('');
+    setPost('');
+    setPassMark(0);
+    setExamType('free_exams');
+    setCategory('ফ্রি ট্রায়াল টেস্ট (Free Test)');
     setQuestionCount(25);
     setTimeMinutes(20);
     setNegativeMarks(0.25);
@@ -160,6 +173,11 @@ export const ExamsManagement: React.FC = () => {
       setSubject('অন্যান্য');
       setCustomSubject(exam.subject);
     }
+    setTopic(exam.topic || '');
+    setPost(exam.post || '');
+    setPassMark(exam.pass_mark || 0);
+    setExamType(exam.exam_type || 'free_exams');
+    setCategory(exam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)');
     setQuestionCount(exam.question_count);
     setTimeMinutes(exam.time_minutes);
     setNegativeMarks(exam.negative_marks);
@@ -200,6 +218,11 @@ export const ExamsManagement: React.FC = () => {
       badge: badge.trim() || 'মডেল টেস্ট',
       badge_type: badgeType,
       subject: finalSubject,
+      topic: topic.trim() || null,
+      post: post.trim() || null,
+      pass_mark: Number(passMark),
+      exam_type: examType,
+      category: category,
       question_count: Number(questionCount),
       time_minutes: Number(timeMinutes),
       negative_marks: Number(negativeMarks),
@@ -917,6 +940,94 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
                     />
                   )}
+                </div>
+              </div>
+
+              {/* Topic, Post, Pass Mark & Exam Type / Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    টপিক বা অধ্যায় (Topic)
+                  </label>
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="যেমন: ধ্বনি ও বর্ণ, সমাস, আন্তর্জাতিক বিষয়াবলি"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    পদ বা ডেজিগনেশন (Post / Designation)
+                  </label>
+                  <input
+                    type="text"
+                    value={post}
+                    onChange={(e) => setPost(e.target.value)}
+                    placeholder="যেমন: সহকারী শিক্ষক, বিসিএস, প্রাইমারি শিক্ষক"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {QUICK_POST_SUGGESTIONS.slice(0, 4).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPost(p)}
+                        className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    পাস মার্ক (Pass Mark)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={passMark}
+                    onChange={(e) => setPassMark(Number(e.target.value))}
+                    placeholder="যেমন: ৪০"
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    পরীক্ষার ধরণ (Exam Type)
+                  </label>
+                  <select
+                    value={examType}
+                    onChange={(e) => setExamType(e.target.value)}
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 cursor-pointer"
+                  >
+                    <option value="free_exams">ফ্রি পরীক্ষা (Free Exam)</option>
+                    <option value="course_exams">কোর্স পরীক্ষা (Course Exam)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    ক্যাটাগরি (Category)
+                  </label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 cursor-pointer"
+                  >
+                    {EXAM_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
