@@ -63,30 +63,7 @@ export const ExamsManagement: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
 
   // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
-
-  // Form Fields
-  const [title, setTitle] = useState('');
-  const [badgeType, setBadgeType] = useState<ExamBadgeType>('daily');
-  const [badge, setBadge] = useState('দৈনিক মডেল টেস্ট');
-  const [availableSubjectsList, setAvailableSubjectsList] = useState<string[]>(() => getAllSubjects());
-  const [subject, setSubject] = useState('বাংলা');
-  const [customSubject, setCustomSubject] = useState('');
-  const [topic, setTopic] = useState('');
-  const [post, setPost] = useState('');
-  const [passMark, setPassMark] = useState<number>(0);
-  const [examType, setExamType] = useState<string>('free_exams');
-  const [category, setCategory] = useState<string>('ফ্রি ট্রায়াল টেস্ট (Free Test)');
-  const [questionCount, setQuestionCount] = useState<number>(25);
-  const [timeMinutes, setTimeMinutes] = useState<number>(20);
-  const [negativeMarks, setNegativeMarks] = useState<number>(0.25);
-  const [totalMarks, setTotalMarks] = useState<number>(25);
-  const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<ExamStatus>('active');
 
   // Delete State
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -99,7 +76,7 @@ export const ExamsManagement: React.FC = () => {
   // Details Modal
   const [viewingExam, setViewingExam] = useState<Exam | null>(null);
 
-  // Add Questions Modal State
+  // Add Questions Modal State (3-step wizard)
   const [questionsModalExam, setQuestionsModalExam] = useState<Exam | null>(null);
 
   // Load Exams
@@ -123,144 +100,39 @@ export const ExamsManagement: React.FC = () => {
     loadExams();
   }, []);
 
-  // Update badge text automatically when badgeType changes in form
-  const handleBadgeTypeChange = (type: ExamBadgeType) => {
-    setBadgeType(type);
-    const matched = EXAM_BADGE_OPTIONS.find((opt) => opt.type === type);
-    if (matched) {
-      setBadge(matched.defaultBadgeText);
-    }
-  };
-
-  // Open Create Modal
-  const handleOpenCreateModal = () => {
-    setEditingExam(null);
-    setTitle('');
-    setBadgeType('daily');
-    setBadge('দৈনিক মডেল টেস্ট');
-    const subs = getAllSubjects();
-    setAvailableSubjectsList(subs);
-    setSubject(subs[0] || 'বাংলা');
-    setCustomSubject('');
-    setTopic('');
-    setPost('');
-    setPassMark(0);
-    setExamType('free_exams');
-    setCategory('ফ্রি ট্রায়াল টেস্ট (Free Test)');
-    setQuestionCount(25);
-    setTimeMinutes(20);
-    setNegativeMarks(0.25);
-    setTotalMarks(25);
-    setDescription('প্রতিটি প্রশ্নের সঠিক উত্তরের জন্য ১ নম্বর। প্রতি ভুল উত্তরের জন্য ০.২৫ কাটা যাবে।');
-    setStatus('active');
-    setFormError(null);
-    setFormSuccess(null);
-    setIsModalOpen(true);
-  };
-
-  // Open Edit Modal
-  const handleOpenEditModal = (exam: Exam) => {
-    setEditingExam(exam);
-    setTitle(exam.title);
-    setBadgeType(exam.badge_type);
-    setBadge(exam.badge);
-    const subs = getAllSubjects(exam.subject ? [exam.subject] : []);
-    setAvailableSubjectsList(subs);
-    if (subs.includes(exam.subject)) {
-      setSubject(exam.subject);
-      setCustomSubject('');
-    } else {
-      setSubject('অন্যান্য');
-      setCustomSubject(exam.subject);
-    }
-    setTopic(exam.topic || '');
-    setPost(exam.post || '');
-    setPassMark(exam.pass_mark || 0);
-    setExamType(exam.exam_type || 'free_exams');
-    setCategory(exam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)');
-    setQuestionCount(exam.question_count);
-    setTimeMinutes(exam.time_minutes);
-    setNegativeMarks(exam.negative_marks);
-    setTotalMarks(exam.total_marks);
-    setDescription(exam.description || '');
-    setStatus(exam.status);
-    setFormError(null);
-    setFormSuccess(null);
-    setIsModalOpen(true);
-  };
-
-  // Handle Form Submit (Create / Edit)
-  const handleSubmitForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    setFormSuccess(null);
-
-    if (!title.trim()) {
-      setFormError('পরীক্ষার শিরোনাম দেয়া আবশ্যক।');
-      return;
-    }
-
-    let finalSubject = subject;
-    if (subject === 'অন্যান্য') {
-      const trimmed = customSubject.trim();
-      if (trimmed) {
-        addCustomSubject(trimmed);
-        finalSubject = trimmed;
-      } else {
-        finalSubject = 'বাংলা';
-      }
-    }
-
+  // Open Create Modal -> Instantly creates a new draft exam and opens 3-step wizard at Step 1
+  const handleOpenCreateModal = async () => {
     setFormSubmitting(true);
-
-    const payload = {
-      title: title.trim(),
-      badge: badge.trim() || 'মডেল টেস্ট',
-      badge_type: badgeType,
-      subject: finalSubject,
-      topic: topic.trim() || null,
-      post: post.trim() || null,
-      pass_mark: Number(passMark),
-      exam_type: examType,
-      category: category,
-      question_count: Number(questionCount),
-      time_minutes: Number(timeMinutes),
-      negative_marks: Number(negativeMarks),
-      total_marks: Number(totalMarks),
-      description: description.trim(),
-      status: status,
+    const defaultPayload = {
+      title: 'নতুন মডেল টেস্ট (শিরোনাম দিন)',
+      badge: 'দৈনিক মডেল টেস্ট',
+      badge_type: 'daily' as const,
+      subject: 'বাংলা',
+      topic: '',
+      post: '',
+      pass_mark: 0,
+      exam_type: 'free_exams',
+      category: 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
+      question_count: 25,
+      time_minutes: 20,
+      negative_marks: 0.25,
+      total_marks: 25,
+      description: 'প্রতিটি প্রশ্নের সঠিক উত্তরের জন্য ১ নম্বর। প্রতি ভুল উত্তরের জন্য ০.২৫ কাটা যাবে।',
+      status: 'active' as const,
     };
-
-    if (editingExam) {
-      const res = await updateExam(editingExam.id, payload);
-      setFormSubmitting(false);
-      if (res.success && res.data) {
-        setFormSuccess('পরীক্ষার তথ্য সফলভাবে আপডেট হয়েছে!');
-        setTimeout(() => {
-          setIsModalOpen(false);
-          loadExams();
-        }, 800);
-      } else {
-        setFormError(res.error || 'আপডেট করতে সমস্যা হয়েছে।');
-      }
+    const res = await insertExam(defaultPayload);
+    setFormSubmitting(false);
+    if (res.success && res.data) {
+      loadExams();
+      setQuestionsModalExam(res.data);
     } else {
-      const res = await insertExam(payload);
-      setFormSubmitting(false);
-      if (res.success && res.data) {
-        const created = res.data;
-        setFormSuccess('নতুন পরীক্ষা সফলভাবে তৈরি হয়েছে! এখন প্রশ্ন যুক্ত করুন...');
-        setTimeout(() => {
-          setIsModalOpen(false);
-          loadExams();
-          setQuestionsModalExam(created);
-        }, 600);
-      } else {
-        setFormError(res.error || 'পরীক্ষা তৈরি করতে ব্যর্থ হয়েছে।');
-        if (res.error?.includes('relation') || res.error?.includes('does not exist')) {
-          setIsTableMissing(true);
-        }
-      }
+      alert(res.error || 'নতুন পরীক্ষা তৈরি করতে সমস্যা হয়েছে।');
     }
+  };
+
+  // Open Edit Modal -> Opens 3-step wizard directly
+  const handleOpenEditModal = (exam: Exam) => {
+    setQuestionsModalExam(exam);
   };
 
   // Handle Delete Confirmation
@@ -818,380 +690,7 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
         </div>
       )}
 
-      {/* CREATE / EDIT EXAM MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh] relative space-y-6">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-2xl">
-                  <Award className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">
-                    {editingExam ? 'পরীক্ষা সম্পাদনা করুন' : 'নতুন পরীক্ষা তৈরি করুন'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    পরীক্ষার শিরোনাম, ব্যাজ, প্রশ্ন সংখ্যা ও সময় সেট করুন
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Error/Success Feedback */}
-            {formError && (
-              <div className="p-4 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-2xl text-xs text-red-800 dark:text-red-300 font-medium flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            {formSuccess && (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{formSuccess}</span>
-              </div>
-            )}
-
-            {/* Form */}
-            <form onSubmit={handleSubmitForm} className="space-y-5">
-              {/* Exam Title */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  পরীক্ষার শিরোনাম (Title) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder='যেমন: "১৯তম NTRCA সাধারণ জ্ঞান ও বাংলা বিশেষ মডেল টেস্ট"'
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-                />
-              </div>
-
-              {/* Badge Type & Badge Custom Text */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    ব্যাজের ধরন (Badge Type) <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={badgeType}
-                    onChange={(e) => handleBadgeTypeChange(e.target.value as ExamBadgeType)}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
-                  >
-                    {EXAM_BADGE_OPTIONS.map((opt) => (
-                      <option key={opt.type} value={opt.type}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    ব্যাজ কাস্টম টেক্সট (Badge Label)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={badge}
-                    onChange={(e) => setBadge(e.target.value)}
-                    placeholder="যেমন: দৈনিক মডেল টেস্ট"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-              </div>
-
-              {/* Subject Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  বিষয় (Subject) <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <select
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
-                  >
-                    {availableSubjectsList.map((sub) => (
-                      <option key={sub} value={sub}>
-                        {sub}
-                      </option>
-                    ))}
-                    <option value="অন্যান্য">+ নতুন বিষয় লিখুন...</option>
-                  </select>
-
-                  {subject === 'অন্যান্য' && (
-                    <input
-                      type="text"
-                      required
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      placeholder="কাস্টম বিষয় লিখুন (যেমন: ব্যাংক নিয়োগ প্রস্তুতি)"
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Topic, Post, Pass Mark & Exam Type / Category */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    টপিক বা অধ্যায় (Topic)
-                  </label>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="যেমন: ধ্বনি ও বর্ণ, সমাস, আন্তর্জাতিক বিষয়াবলি"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    পদ বা ডেজিগনেশন (Post / Designation)
-                  </label>
-                  <input
-                    type="text"
-                    value={post}
-                    onChange={(e) => setPost(e.target.value)}
-                    placeholder="যেমন: সহকারী শিক্ষক, বিসিএস, প্রাইমারি শিক্ষক"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                  />
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {QUICK_POST_SUGGESTIONS.slice(0, 4).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPost(p)}
-                        className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    পাস মার্ক (Pass Mark)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={passMark}
-                    onChange={(e) => setPassMark(Number(e.target.value))}
-                    placeholder="যেমন: ৪০"
-                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    পরীক্ষার ধরণ (Exam Type)
-                  </label>
-                  <select
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value)}
-                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 cursor-pointer"
-                  >
-                    <option value="free_exams">ফ্রি পরীক্ষা (Free Exam)</option>
-                    <option value="course_exams">কোর্স পরীক্ষা (Course Exam)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    ক্যাটাগরি (Category)
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-slate-100 cursor-pointer"
-                  >
-                    {EXAM_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Numerical Attributes: Question Count, Time, Total Marks, Negative Marks */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 mb-1">
-                    প্রশ্ন সংখ্যা
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={questionCount}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setQuestionCount(val);
-                      setTotalMarks(val);
-                    }}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
-                  />
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {[5, 10, 15, 20, 25, 30, 50, 100, 200].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => {
-                          setQuestionCount(num);
-                          setTotalMarks(num);
-                        }}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
-                          questionCount === num
-                            ? 'bg-emerald-600 text-white border-emerald-500'
-                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 mb-1">
-                    সময় (মিনিট)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={timeMinutes}
-                    onChange={(e) => setTimeMinutes(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 mb-1">
-                    মোট নম্বর
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={totalMarks}
-                    onChange={(e) => setTotalMarks(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 mb-1">
-                    নেগেটিভ মার্ক
-                  </label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    required
-                    value={negativeMarks}
-                    onChange={(e) => setNegativeMarks(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 text-center"
-                  />
-                </div>
-              </div>
-
-              {/* Description / Instructions */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  পরীক্ষার বিবরণ বা নির্দেশাবলী (Description)
-                </label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="পরীক্ষার নিয়মাবলী লিখুন..."
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              {/* Status Selector */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  পাবলিশ স্ট্যাটাস (Status)
-                </label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="exam_status"
-                      value="active"
-                      checked={status === 'active'}
-                      onChange={() => setStatus('active')}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">
-                      Active (লাইভ প্রকাশ থাকবে)
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="exam_status"
-                      value="draft"
-                      checked={status === 'draft'}
-                      onChange={() => setStatus('draft')}
-                      className="w-4 h-4 text-amber-600 focus:ring-amber-500"
-                    />
-                    <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200">
-                      Draft (ড্রাফট রাখা হবে)
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors"
-                >
-                  বাতিল করুন
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSubmitting}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all disabled:opacity-50"
-                >
-                  {formSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>সংরক্ষণ হচ্ছে...</span>
-                    </>
-                  ) : (
-                    <span>{editingExam ? 'তথ্য আপডেট করুন' : 'পরীক্ষা তৈরি করুন'}</span>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* VIEW DETAILS MODAL */}
       {viewingExam && (
