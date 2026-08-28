@@ -1,33 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Award,
+  Menu,
+  Layers,
   Plus,
+  RefreshCw,
+  MoreVertical,
+  ClipboardCheck,
+  CheckCircle2,
+  FileText,
+  Radio,
+  Clock,
   Search,
   Filter,
-  CheckCircle2,
-  FileEdit,
-  Trash2,
-  RefreshCw,
-  AlertCircle,
-  Clock,
-  HelpCircle,
-  MinusCircle,
   BookOpen,
-  Zap,
-  Radio,
+  Briefcase,
+  Flag,
   Calendar,
-  Layers,
+  Zap,
+  Lightbulb,
+  ArrowRight,
+  Code2,
   Copy,
   Check,
-  Code2,
   ExternalLink,
-  ChevronRight,
-  Eye,
   X,
-  ToggleLeft,
-  ToggleRight,
-  Sparkles,
-  Rocket,
+  Edit3,
+  Award,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   fetchAllExams,
@@ -36,49 +36,52 @@ import {
   deleteExam,
   toggleExamStatus,
 } from '../lib/supabase';
-import {
-  Exam,
-  ExamBadgeType,
-  ExamStatus,
-  EXAM_BADGE_OPTIONS,
-  EXAM_CATEGORIES,
-  QUICK_SUBJECT_SUGGESTIONS,
-  QUICK_POST_SUGGESTIONS,
-} from '../types';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { Exam, ExamBadgeType, ExamStatus } from '../types';
+import { ExamCard } from '../components/exam/ExamCard';
+import { ExamContextMenuModal } from '../components/exam/ExamContextMenuModal';
+import { LiveExamStudentPreviewModal } from '../components/exam/LiveExamStudentPreviewModal';
+import { ExamAnalyticsModal } from '../components/exam/ExamAnalyticsModal';
+import { ExamScheduleModal } from '../components/exam/ExamScheduleModal';
+import { ExamQuestionsListModal } from '../components/exam/ExamQuestionsListModal';
 import { CreateExamWizard } from '../components/exam/CreateExamWizard';
-import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export const ExamsManagement: React.FC = () => {
+  const navigate = useNavigate();
+
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTableMissing, setIsTableMissing] = useState(false);
+  const [lastUpdatedText, setLastUpdatedText] = useState('২ মিনিট আগে');
 
-  // Filters & Search
+  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
-  const [badgeTypeFilter, setBadgeTypeFilter] = useState<string>('all');
-  const [subjectFilter, setSubjectFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
+  const [activeChip, setActiveChip] = useState<'all' | 'free' | 'paid' | 'live' | 'draft' | 'scheduled'>('all');
+  const [subjectFilter, setSubjectFilter] = useState('all');
+  const [postFilter, setPostFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortOption, setSortOption] = useState<'latest' | 'oldest' | 'questions' | 'popular'>('latest');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Modal State
-  const [formSubmitting, setFormSubmitting] = useState(false);
-
-  // Delete State
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // SQL Helper Modal state
-  const [showSqlHelper, setShowSqlHelper] = useState(false);
-  const [sqlCopied, setSqlCopied] = useState(false);
-
-  // Details Modal
-  const [viewingExam, setViewingExam] = useState<Exam | null>(null);
-
-  // Add Questions / Create Wizard Modal State (3-step wizard)
+  // Modals & Sheets State
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardExamToEdit, setWizardExamToEdit] = useState<Exam | null>(null);
+
+  const [selectedExamForMenu, setSelectedExamForMenu] = useState<Exam | null>(null);
+  const [previewExam, setPreviewExam] = useState<Exam | null>(null);
+  const [analyticsExam, setAnalyticsExam] = useState<Exam | null>(null);
+  const [scheduleExam, setScheduleExam] = useState<Exam | null>(null);
+  const [questionsListExam, setQuestionsListExam] = useState<Exam | null>(null);
+
+  // Delete State
+  const [deletingExam, setDeletingExam] = useState<Exam | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // SQL Helper Modal
+  const [showSqlHelper, setShowSqlHelper] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
+  const [showHeaderExtraMenu, setShowHeaderExtraMenu] = useState(false);
 
   // Load Exams
   const loadExams = async () => {
@@ -93,6 +96,7 @@ export const ExamsManagement: React.FC = () => {
       }
     } else {
       setExams(result.exams);
+      setLastUpdatedText('এইমাত্র');
     }
     setLoading(false);
   };
@@ -101,35 +105,98 @@ export const ExamsManagement: React.FC = () => {
     loadExams();
   }, []);
 
-  // Open Create Modal -> Opens 3-step wizard starting at Step 1 with fresh form
+  // Compute Summary Statistics
+  const totalExams = exams.length;
+  const publishedCount = exams.filter((e) => e.status === 'active' || e.badge_type === 'live').length;
+  const draftCount = exams.filter((e) => e.status === 'draft').length;
+  const liveCount = exams.filter((e) => e.badge_type === 'live').length;
+  const publishedPercent = totalExams > 0 ? Math.round((publishedCount / totalExams) * 100) : 100;
+
+  // Filtered and Sorted Exams
+  const filteredExams = useMemo(() => {
+    let result = exams.filter((exam) => {
+      // 1. Search filter
+      const term = searchTerm.toLowerCase().trim();
+      const matchesSearch =
+        !term ||
+        exam.title.toLowerCase().includes(term) ||
+        exam.subject.toLowerCase().includes(term) ||
+        exam.badge.toLowerCase().includes(term) ||
+        (exam.post && exam.post.toLowerCase().includes(term)) ||
+        exam.id.toLowerCase().includes(term);
+
+      if (!matchesSearch) return false;
+
+      // 2. Chip filter
+      if (activeChip === 'free' && exam.badge_type !== 'free' && exam.exam_type !== 'free') {
+        return false;
+      }
+      if (activeChip === 'paid' && exam.exam_type !== 'course' && exam.badge_type === 'free') {
+        return false;
+      }
+      if (activeChip === 'live' && exam.badge_type !== 'live') {
+        return false;
+      }
+      if (activeChip === 'draft' && exam.status !== 'draft') {
+        return false;
+      }
+      if (
+        activeChip === 'scheduled' &&
+        exam.status !== 'upcoming' &&
+        !exam.badge?.toLowerCase().includes('schedule')
+      ) {
+        return false;
+      }
+
+      // 3. Subject filter
+      if (subjectFilter !== 'all' && exam.subject !== subjectFilter) {
+        return false;
+      }
+
+      // 4. Post filter
+      if (postFilter !== 'all') {
+        if (!exam.post || !exam.post.includes(postFilter)) return false;
+      }
+
+      // 5. Status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'published' && exam.status !== 'active') return false;
+        if (statusFilter === 'draft' && exam.status !== 'draft') return false;
+        if (statusFilter === 'live' && exam.badge_type !== 'live') return false;
+        if (statusFilter === 'scheduled' && exam.status !== 'upcoming') return false;
+      }
+
+      return true;
+    });
+
+    // Sort result
+    return result.sort((a, b) => {
+      if (sortOption === 'questions') {
+        return (b.question_count || 0) - (a.question_count || 0);
+      }
+      if (sortOption === 'oldest') {
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      }
+      // Latest default
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  }, [exams, searchTerm, activeChip, subjectFilter, postFilter, statusFilter, sortOption]);
+
+  // Unique Subjects for dropdown
+  const uniqueSubjects = Array.from(new Set(exams.map((e) => e.subject).filter(Boolean)));
+
+  // Handlers for Actions
   const handleOpenCreateModal = () => {
     setWizardExamToEdit(null);
     setIsWizardOpen(true);
   };
 
-  // Open Edit Modal -> Opens 3-step wizard directly with existing exam data
   const handleOpenEditModal = (exam: Exam) => {
     setWizardExamToEdit(exam);
     setIsWizardOpen(true);
   };
 
-  // Handle Delete Confirmation
-  const handleConfirmDelete = async () => {
-    if (!deletingId) return;
-    setIsDeleting(true);
-    const res = await deleteExam(deletingId);
-    setIsDeleting(false);
-    setDeletingId(null);
-    if (res.success) {
-      loadExams();
-    } else {
-      alert(`মুছে ফেলতে ব্যর্থ: ${res.error}`);
-    }
-  };
-
-  // Handle Quick Status Toggle
-  const handleToggleStatus = async (exam: Exam) => {
-    // Optimistic UI update
+  const handleTogglePublish = async (exam: Exam) => {
     const nextStatus: ExamStatus = exam.status === 'active' ? 'draft' : 'active';
     setExams((prev) =>
       prev.map((item) => (item.id === exam.id ? { ...item, status: nextStatus } : item))
@@ -137,7 +204,6 @@ export const ExamsManagement: React.FC = () => {
 
     const res = await toggleExamStatus(exam.id, exam.status);
     if (!res.success) {
-      // Rollback on error
       setExams((prev) =>
         prev.map((item) => (item.id === exam.id ? { ...item, status: exam.status } : item))
       );
@@ -145,24 +211,59 @@ export const ExamsManagement: React.FC = () => {
     }
   };
 
-  // Filtered Exams
-  const filteredExams = exams.filter((exam) => {
-    const matchesSearch =
-      exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exam.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exam.badge.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleDuplicateExam = async (exam: Exam) => {
+    const duplicatedExam: Omit<Exam, 'id' | 'created_at' | 'updated_at'> = {
+      title: `${exam.title} (কপি)`,
+      badge: exam.badge,
+      badge_type: exam.badge_type,
+      subject: exam.subject,
+      topic: exam.topic,
+      post: exam.post,
+      pass_mark: exam.pass_mark,
+      exam_type: exam.exam_type,
+      category: exam.category,
+      question_count: exam.question_count,
+      time_minutes: exam.time_minutes,
+      negative_marks: exam.negative_marks,
+      marks_per_question: exam.marks_per_question,
+      total_marks: exam.total_marks,
+      description: exam.description,
+      status: 'draft',
+      questions: exam.questions ? [...exam.questions] : [],
+    };
 
-    const matchesBadgeType = badgeTypeFilter === 'all' ? true : exam.badge_type === badgeTypeFilter;
-    const matchesSubject = subjectFilter === 'all' ? true : exam.subject === subjectFilter;
-    const matchesStatus = statusFilter === 'all' ? true : exam.status === statusFilter;
+    const res = await insertExam(duplicatedExam);
+    if (res.success) {
+      loadExams();
+    } else {
+      alert(`ডুপ্লিকেট করতে ব্যর্থ: ${res.error}`);
+    }
+  };
 
-    return matchesSearch && matchesBadgeType && matchesSubject && matchesStatus;
-  });
+  const handleSaveSchedule = async (examId: string, startDate: string, startTime: string) => {
+    const fullDateTime = `${startDate}T${startTime}:00`;
+    await updateExam(examId, {
+      start_date: fullDateTime,
+      status: 'upcoming',
+      badge: 'Scheduled',
+    });
+    loadExams();
+  };
 
-  // Unique Subjects present in list
-  const availableSubjects = Array.from(new Set(exams.map((e) => e.subject)));
+  const handleConfirmDelete = async () => {
+    if (!deletingExam) return;
+    setIsDeleting(true);
+    const res = await deleteExam(deletingExam.id);
+    setIsDeleting(false);
+    setDeletingExam(null);
+    if (res.success) {
+      loadExams();
+    } else {
+      alert(`মুছে ফেলতে ব্যর্থ: ${res.error}`);
+    }
+  };
 
-  // SQL snippet for creating exams table in Supabase
+  // SQL code for setup
   const createTableSql = `-- Supabase SQL Editor এ নিচের কমান্ডটি এক্সিকিউট করে public.exams টেবিল তৈরি করুন:
 
 CREATE TABLE IF NOT EXISTS public.exams (
@@ -181,7 +282,6 @@ CREATE TABLE IF NOT EXISTS public.exams (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RLS (Row Level Security) অকার্যকর করা যাতে সরাসরি প্রশ্ন পড়া ও লিখা যায়:
 ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
 
   const handleCopySql = () => {
@@ -190,90 +290,90 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
     setTimeout(() => setSqlCopied(false), 2000);
   };
 
-  // Helper styling for Badge type
-  const getBadgeStyle = (type: ExamBadgeType, customText: string) => {
-    switch (type) {
-      case 'free':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 font-extrabold text-[11px] border border-emerald-200 dark:border-emerald-800">
-            <Zap className="w-3 h-3 text-emerald-500 fill-emerald-500" />
-            {customText || 'ফ্রি পরীক্ষা'}
-          </span>
-        );
-      case 'daily':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 font-extrabold text-[11px] border border-indigo-200 dark:border-indigo-800">
-            <Calendar className="w-3 h-3 text-indigo-500" />
-            {customText || 'দৈনিক মডেল টেস্ট'}
-          </span>
-        );
-      case 'weekly':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 font-extrabold text-[11px] border border-amber-200 dark:border-amber-800">
-            <Award className="w-3 h-3 text-amber-500" />
-            {customText || 'সাপ্তাহিক টেস্ট'}
-          </span>
-        );
-      case 'live':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-extrabold text-[11px] border border-rose-200 dark:border-rose-800 animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
-            <Radio className="w-3 h-3 text-rose-600" />
-            {customText || 'লাইভ পরীক্ষা'}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
-            {customText}
-          </span>
-        );
-    }
-  };
-
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
-      {/* HEADER BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-2xl">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                পরীক্ষা ও মডেল টেস্ট ম্যানেজমেন্ট
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                ফ্রি পরীক্ষা, দৈনিক, সাপ্তাহিক ও লাইভ মডেল টেস্ট তৈরি ও লাইভ কন্ট্রোল করুন
-              </p>
-            </div>
+    <div className="space-y-5 animate-fadeIn pb-16 min-h-screen text-slate-100">
+      {/* ========================================================================= */}
+      {/* 2. TOP HEADER                                                             */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-[#09111e]/90 border border-slate-800/90 p-4 sm:p-5 rounded-3xl backdrop-blur-md shadow-xl">
+        {/* Left: Hamburger + Green Database Icon + Title & Subtitle */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.15)] shrink-0">
+            <Layers className="w-5 h-5" />
+          </div>
+
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+              <span>পরীক্ষা ও মডেল টেস্ট</span>
+            </h1>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              {totalExams}টি পরীক্ষা • {publishedCount}টি প্রকাশিত
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Right: Refresh Icon + Action Button */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Refresh Button */}
           <button
-            onClick={() => setShowSqlHelper(!showSqlHelper)}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-2xl flex items-center gap-1.5 transition-colors"
-            title="Supabase SQL Schema দেখুন"
+            onClick={loadExams}
+            disabled={loading}
+            className="p-2.5 text-slate-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-2xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="তালিকা রিফ্রেশ করুন"
           >
-            <Code2 className="w-4 h-4 text-indigo-500" />
-            <span>SQL টেবিল সেটআপ</span>
+            <RefreshCw className={`w-4 h-4 text-slate-300 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
           </button>
 
+          {/* Large Primary Green Button */}
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all"
+            className="px-4 py-2.5 bg-emerald-400 hover:bg-emerald-300 active:scale-95 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[3]" />
             <span>নতুন পরীক্ষা তৈরি করুন</span>
           </button>
+
+          {/* Header 3-dot Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowHeaderExtraMenu(!showHeaderExtraMenu)}
+              className="p-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-2xl text-slate-300 hover:text-white transition-colors"
+              title="অতিরিক্ত অপশন"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {showHeaderExtraMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-[#0b1322] border border-slate-800 rounded-2xl shadow-2xl p-1.5 z-30 space-y-1 text-xs font-semibold animate-scaleUp">
+                <button
+                  onClick={() => {
+                    setShowHeaderExtraMenu(false);
+                    setShowSqlHelper(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 hover:text-white text-left"
+                >
+                  <Code2 className="w-4 h-4 text-indigo-400" />
+                  <span>SQL টেবিল সেটআপ</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowHeaderExtraMenu(false);
+                    navigate('/admin/questions');
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 hover:text-white text-left"
+                >
+                  <BookOpen className="w-4 h-4 text-emerald-400" />
+                  <span>প্রশ্ন ব্যাংকে যান</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* SQL HELPER BANNER OR MODAL */}
+      {/* SQL Setup Guide Modal / Drawer if opened */}
       {(showSqlHelper || isTableMissing) && (
-        <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-800/80 rounded-3xl text-slate-100 shadow-lg space-y-3">
+        <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-800/80 rounded-3xl text-slate-100 shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
@@ -317,449 +417,357 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
               )}
             </button>
           </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span>
-              ধাপ ১: Supabase Dashboard &gt; SQL Editor &gt; New Query &gt; Paste SQL &gt; Click <strong>Run</strong>
-            </span>
-            <a
-              href="https://supabase.com/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-400 hover:text-indigo-300 font-bold inline-flex items-center gap-1"
-            >
-              Supabase Dashboard <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
         </div>
       )}
 
-      {/* STATS COUNTER BAR */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase text-slate-400 block">মোট পরীক্ষা</span>
-            <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">
-              {exams.length}
-            </span>
+      {/* ========================================================================= */}
+      {/* 3. SUMMARY STATISTICS (2-column mobile grid, 4-column desktop)            */}
+      {/* ========================================================================= */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-3.5">
+          {/* Card 1: মোট পরীক্ষা */}
+          <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                <ClipboardCheck className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold">মোট পরীক্ষা</span>
+            </div>
+            <div className="mt-2">
+              <span className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight block">
+                {String(totalExams).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium block mt-0.5">
+                সব পরীক্ষা
+              </span>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold">
-            <Layers className="w-5 h-5" />
+
+          {/* Card 2: প্রকাশিত */}
+          <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold">প্রকাশিত</span>
+            </div>
+            <div className="mt-2">
+              <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight block">
+                {String(publishedCount).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-emerald-400/80 font-medium block mt-0.5">
+                {publishedPercent}% প্রকাশিত
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: ড্রাফট */}
+          <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                <FileText className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold">ড্রাফট</span>
+            </div>
+            <div className="mt-2">
+              <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono tracking-tight block">
+                {String(draftCount).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-amber-400/80 font-medium block mt-0.5">
+                প্রকাশের অপেক্ষায়
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: লাইভ */}
+          <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg backdrop-blur-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+                <Radio className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold">লাইভ</span>
+            </div>
+            <div className="mt-2">
+              <span className="text-2xl sm:text-3xl font-black text-rose-400 font-mono tracking-tight block">
+                {String(liveCount).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-rose-400/80 font-medium block mt-0.5">
+                চলমান পরীক্ষা
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase text-slate-400 block">একটিভ টেস্ট</span>
-            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">
-              {exams.filter((e) => e.status === 'active').length}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase text-slate-400 block">দৈনিক ও ফ্রি</span>
-            <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1 block">
-              {exams.filter((e) => e.badge_type === 'daily' || e.badge_type === 'free').length}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
-            <Zap className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase text-slate-400 block">সাপ্তাহিক ও লাইভ</span>
-            <span className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1 block">
-              {exams.filter((e) => e.badge_type === 'weekly' || e.badge_type === 'live').length}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
-            <Radio className="w-5 h-5" />
-          </div>
+        {/* Last updated indicator below cards */}
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium pl-1">
+          <Clock className="w-3.5 h-3.5 text-slate-500" />
+          <span>সর্বশেষ আপডেট: {lastUpdatedText}</span>
         </div>
       </div>
 
-      {/* FILTER AND SEARCH BAR */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-        <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
-          {/* Search Bar */}
-          <div className="relative w-full lg:max-w-xs">
+      {/* ========================================================================= */}
+      {/* 4. SEARCH + FILTER SYSTEM                                                 */}
+      {/* ========================================================================= */}
+      <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-3xl p-4 sm:p-5 shadow-xl backdrop-blur-md space-y-3.5">
+        {/* Search input + Filter button */}
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="পরীক্ষার নাম বা বিষয় খুঁজুন..."
-              className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-900 dark:text-slate-100 placeholder-slate-400"
+              placeholder="পরীক্ষা খুঁজুন..."
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-900/90 border border-slate-800 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors font-medium"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-3 text-slate-500 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
-            {/* Badge Type Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <select
-                value={badgeTypeFilter}
-                onChange={(e) => setBadgeTypeFilter(e.target.value)}
-                className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer text-xs"
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`px-4 py-2.5 rounded-2xl border text-xs font-bold flex items-center gap-2 transition-all ${
+              showAdvancedFilters
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white'
+            }`}
+          >
+            <Filter className="w-4 h-4 text-slate-400" />
+            <span>ফিল্টার</span>
+          </button>
+        </div>
+
+        {/* Horizontal filter chips */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+          {(
+            [
+              { id: 'all', label: 'সব' },
+              { id: 'free', label: 'ফ্রি' },
+              { id: 'paid', label: 'পেইড' },
+              { id: 'live', label: 'লাইভ' },
+              { id: 'draft', label: 'Draft' },
+              { id: 'scheduled', label: 'Scheduled' },
+            ] as const
+          ).map((chip) => {
+            const isActive = activeChip === chip.id;
+            return (
+              <button
+                key={chip.id}
+                onClick={() => setActiveChip(chip.id)}
+                className={`px-4 py-1.5 rounded-full whitespace-nowrap transition-all ${
+                  isActive
+                    ? 'bg-emerald-400 text-slate-950 font-black shadow-md shadow-emerald-500/20'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
               >
-                <option value="all">সকল ধরন (All Badges)</option>
-                <option value="free">ফ্রি পরীক্ষা (Free)</option>
-                <option value="daily">দৈনিক মডেল টেস্ট (Daily)</option>
-                <option value="weekly">সাপ্তাহিক মডেল টেস্ট (Weekly)</option>
-                <option value="live">লাইভ পরীক্ষা (Live)</option>
-              </select>
-            </div>
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
 
-            {/* Subject Filter Dropdown */}
-            {availableSubjects.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs">
-                <Filter className="w-3.5 h-3.5 text-slate-500" />
-                <select
-                  value={subjectFilter}
-                  onChange={(e) => setSubjectFilter(e.target.value)}
-                  className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer text-xs"
-                >
-                  <option value="all">সকল বিষয় ({exams.length})</option>
-                  {availableSubjects.map((sub) => (
-                    <option key={sub} value={sub}>
-                      {sub} ({exams.filter((e) => e.subject === sub).length})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Status Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer text-xs"
-              >
-                <option value="all">সকল স্ট্যাটাস</option>
-                <option value="active">Active (একটিভ)</option>
-                <option value="draft">Draft (ড্রাফট)</option>
-              </select>
-            </div>
-
-            {/* Refresh Button */}
-            <button
-              onClick={loadExams}
-              className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
-              title="তালিকা রিফ্রেশ করুন"
+        {/* Filter Dropdowns Row (Scrollable on mobile) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-medium text-xs">
+          {/* Subject Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl">
+            <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="w-full bg-transparent text-slate-200 focus:outline-none cursor-pointer text-xs font-semibold"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+              <option value="all" className="bg-slate-900 text-slate-200">বিষয়: সব</option>
+              {uniqueSubjects.map((sub) => (
+                <option key={sub} value={sub} className="bg-slate-900 text-slate-200">
+                  {sub}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Post Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl">
+            <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <select
+              value={postFilter}
+              onChange={(e) => setPostFilter(e.target.value)}
+              className="w-full bg-transparent text-slate-200 focus:outline-none cursor-pointer text-xs font-semibold"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">পদ: সব</option>
+              <option value="BCS" className="bg-slate-900 text-slate-200">BCS</option>
+              <option value="NTRCA" className="bg-slate-900 text-slate-200">NTRCA</option>
+              <option value="Primary" className="bg-slate-900 text-slate-200">Primary</option>
+              <option value="Bank" className="bg-slate-900 text-slate-200">Bank</option>
+              <option value="Other" className="bg-slate-900 text-slate-200">অন্যান্য</option>
+            </select>
+          </div>
+
+          {/* Status Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl">
+            <Flag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full bg-transparent text-slate-200 focus:outline-none cursor-pointer text-xs font-semibold"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">স্ট্যাটাস: সব</option>
+              <option value="published" className="bg-slate-900 text-slate-200">প্রকাশিত (Online)</option>
+              <option value="draft" className="bg-slate-900 text-slate-200">ড্রাফট (Draft)</option>
+              <option value="live" className="bg-slate-900 text-slate-200">লাইভ (Live)</option>
+              <option value="scheduled" className="bg-slate-900 text-slate-200">Scheduled</option>
+            </select>
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as any)}
+              className="w-full bg-transparent text-slate-200 focus:outline-none cursor-pointer text-xs font-semibold"
+            >
+              <option value="latest" className="bg-slate-900 text-slate-200">সর্বশেষ</option>
+              <option value="oldest" className="bg-slate-900 text-slate-200">পুরাতন</option>
+              <option value="questions" className="bg-slate-900 text-slate-200">প্রশ্ন সংখ্যা</option>
+              <option value="popular" className="bg-slate-900 text-slate-200">জনপ্রিয়</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* ERROR MESSAGE DISPLAY */}
-      {error && (
-        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <button
-            onClick={loadExams}
-            className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 font-bold rounded-lg text-[11px]"
-          >
-            পুনরায় চেষ্টা করুন
-          </button>
-        </div>
-      )}
-
-      {/* LOADING STATE */}
+      {/* ========================================================================= */}
+      {/* 5. EXAM CARD LIST                                                         */}
+      {/* ========================================================================= */}
       {loading ? (
-        <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+        <div className="py-20 text-center space-y-3 bg-[#09111e]/90 rounded-3xl border border-slate-800">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-slate-500 font-medium">পরীক্ষার তালিকা লোড হচ্ছে...</p>
+          <p className="text-xs text-slate-400 font-medium">পরীক্ষার তালিকা লোড হচ্ছে...</p>
         </div>
       ) : filteredExams.length === 0 ? (
-        /* EMPTY STATE */
-        <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8">
-          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Award className="w-8 h-8" />
+        <div className="py-16 text-center bg-[#09111e]/90 rounded-3xl border border-slate-800 p-8 space-y-3">
+          <div className="w-14 h-14 bg-slate-900 text-slate-500 rounded-2xl flex items-center justify-center mx-auto border border-slate-800">
+            <Award className="w-7 h-7" />
           </div>
-          <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
-            কোনো পরীক্ষা পাওয়া যায়নি!
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            {searchTerm || badgeTypeFilter !== 'all' || subjectFilter !== 'all' || statusFilter !== 'all'
-              ? 'আপনার ফিল্টারের সাথে মিলে এমন কোনো পরীক্ষা নেই। সার্চ পরিবর্তন করে দেখুন।'
-              : 'এখনো কোনো পরীক্ষা তৈরি করা হয়নি। "নতুন পরীক্ষা তৈরি করুন" বাটনে ক্লিক করে নতুন টেস্ট যুক্ত করুন।'}
+          <h3 className="font-bold text-base text-white">কোনো পরীক্ষা পাওয়া যায়নি</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            আপনার ফিল্টারের সাথে মিলে এমন কোনো পরীক্ষা নেই। সার্চ পরিবর্তন করুন অথবা নতুন পরীক্ষা যোগ করুন।
           </p>
           <button
             onClick={handleOpenCreateModal}
-            className="mt-5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl inline-flex items-center gap-1.5"
+            className="mt-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow inline-flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" />
-            নতুন পরীক্ষা যোগ করুন
+            <Plus className="w-4 h-4" /> নতুন পরীক্ষা তৈরি করুন
           </button>
         </div>
       ) : (
-        /* EXAMS GRID CARDS VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3.5">
           {filteredExams.map((exam) => (
-            <div
+            <ExamCard
               key={exam.id}
-              className={`bg-white dark:bg-slate-900 rounded-3xl border transition-all duration-200 hover:shadow-lg flex flex-col justify-between overflow-hidden relative group ${
-                exam.status === 'active'
-                  ? 'border-slate-200 dark:border-slate-800'
-                  : 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/10'
-              }`}
-            >
-              {/* Card Header */}
-              <div className="p-5 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  {/* Badge */}
-                  {getBadgeStyle(exam.badge_type, exam.badge)}
-
-                  {/* Status / Publish Toggle Button */}
-                  <button
-                    onClick={() => handleToggleStatus(exam)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${
-                      exam.status === 'active'
-                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-200'
-                        : 'bg-gradient-to-r from-amber-500 to-emerald-600 text-white hover:from-amber-600 hover:to-emerald-700 animate-pulse'
-                    }`}
-                    title="স্ট্যাটাস পরিবর্তন বা পাবলিশ করুন"
-                  >
-                    {exam.status === 'active' ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>✓ পাবলিশড (Online)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Rocket className="w-3.5 h-3.5 text-white" />
-                        <span>🚀 পাবলিশ করুন</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Title & Clickable Area to Open Preview & Editor */}
-                <div
-                  onClick={() => handleOpenEditModal(exam)}
-                  className="cursor-pointer group/title"
-                  title="ক্লিক করে পুরো মডেল টেস্ট প্রিভিউ দেখুন ও প্রশ্ন এডিট করুন"
-                >
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 leading-snug group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
-                    {exam.title}
-                  </h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      বিষয়: <span className="text-slate-900 dark:text-slate-200">{exam.subject}</span>
-                    </span>
-                    <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <Eye className="w-3 h-3" /> ক্লিক করে প্রিভিউ ও এডিট
-                    </span>
-                  </div>
-                </div>
-
-                {/* Description Guidelines */}
-                {exam.description && (
-                  <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
-                    {exam.description}
-                  </p>
-                )}
-
-                {/* Attributes Grid */}
-                <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center gap-2">
-                    <HelpCircle className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <div>
-                      <span className="text-[9px] uppercase text-slate-400 block font-sans font-bold">
-                        প্রশ্ন সংখ্যা
-                      </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                        {exam.question_count} টি
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <div>
-                      <span className="text-[9px] uppercase text-slate-400 block font-sans font-bold">
-                        সময়সীমা
-                      </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                        {exam.time_minutes} মিনিট
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center gap-2">
-                    <Award className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <div>
-                      <span className="text-[9px] uppercase text-slate-400 block font-sans font-bold">
-                        মোট নম্বর
-                      </span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                        {exam.total_marks}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl flex items-center gap-2">
-                    <MinusCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                    <div>
-                      <span className="text-[9px] uppercase text-slate-400 block font-sans font-bold">
-                        নেগেটিভ মার্ক
-                      </span>
-                      <span className="font-extrabold text-rose-600 dark:text-rose-400">
-                        {exam.negative_marks}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Footer Actions */}
-              <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleOpenEditModal(exam)}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all"
-                    title="পুরো মডেল টেস্ট প্রিভিউ দেখুন, প্রশ্ন ও অপশন এডিট করুন"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>মডেল টেস্ট প্রিভিউ ও এডিট</span>
-                  </button>
-
-                  <button
-                    onClick={() => setViewingExam(exam)}
-                    className="px-2.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors"
-                  >
-                    ডিটেইলস
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleOpenEditModal(exam)}
-                    className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-xl transition-colors"
-                    title="সেটিংস সম্পাদনা করুন"
-                  >
-                    <FileEdit className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => setDeletingId(exam.id)}
-                    className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-xl transition-colors"
-                    title="মুছে ফেলুন"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              exam={exam}
+              onPreview={(target) => setPreviewExam(target)}
+              onEdit={(target) => handleOpenEditModal(target)}
+              onOpenMenu={(target) => setSelectedExamForMenu(target)}
+              onResults={(target) => setAnalyticsExam(target)}
+              onManageLive={(target) => setAnalyticsExam(target)}
+            />
           ))}
         </div>
       )}
 
-
-
-      {/* VIEW DETAILS MODAL */}
-      {viewingExam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                {getBadgeStyle(viewingExam.badge_type, viewingExam.badge)}
-                <span className="text-xs font-bold text-slate-500">ডিটেইলস</span>
-              </div>
-              <button
-                onClick={() => setViewingExam(null)}
-                className="p-1 text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div>
-              <h3 className="font-black text-lg text-slate-900 dark:text-white">
-                {viewingExam.title}
-              </h3>
-              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                বিষয়: {viewingExam.subject}
-              </p>
-            </div>
-
-            {viewingExam.description && (
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl text-xs text-slate-700 dark:text-slate-300">
-                <span className="font-bold block text-[10px] uppercase text-slate-400 mb-1">
-                  পরীক্ষার বিবরণ:
-                </span>
-                {viewingExam.description}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                <span className="text-[10px] text-slate-400 block font-sans font-bold">মোট প্রশ্ন:</span>
-                <span className="font-extrabold text-sm">{viewingExam.question_count} টি</span>
-              </div>
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                <span className="text-[10px] text-slate-400 block font-sans font-bold">সময়সীমা:</span>
-                <span className="font-extrabold text-sm">{viewingExam.time_minutes} মিনিট</span>
-              </div>
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                <span className="text-[10px] text-slate-400 block font-sans font-bold">মোট নম্বর:</span>
-                <span className="font-extrabold text-sm">{viewingExam.total_marks}</span>
-              </div>
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                <span className="text-[10px] text-slate-400 block font-sans font-bold">নেগেটিভ মার্ক:</span>
-                <span className="font-extrabold text-sm text-rose-500">{viewingExam.negative_marks}</span>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  const curr = viewingExam;
-                  setViewingExam(null);
-                  handleOpenEditModal(curr);
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow"
-              >
-                <Eye className="w-4 h-4" />
-                পূর্ণাঙ্গ মডেল টেস্ট প্রিভিউ ও এডিট করুন
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    handleToggleStatus(viewingExam);
-                    setViewingExam(null);
-                  }}
-                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl flex items-center gap-1"
-                >
-                  <Rocket className="w-3.5 h-3.5" />
-                  {viewingExam.status === 'active' ? 'ড্রাফট করুন' : 'পাবলিশ করুন'}
-                </button>
-                <button
-                  onClick={() => setViewingExam(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl"
-                >
-                  বন্ধ করুন
-                </button>
-              </div>
-            </div>
+      {/* ========================================================================= */}
+      {/* 10. PRO TIPS SECTION                                                      */}
+      {/* ========================================================================= */}
+      <div className="bg-[#09111e]/90 border border-slate-800/90 rounded-3xl p-4 sm:p-5 shadow-xl backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+            <Lightbulb className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-black text-sm text-white">প্রো টিপস</h4>
+            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              পরীক্ষার প্রশ্ন যোগ করতে ড্যাশবোর্ড থেকে “প্রশ্ন ব্যাংক” ব্যবহার করুন।
+            </p>
           </div>
         </div>
-      )}
 
-      {/* CREATE & EDIT EXAM WIZARD (3-STEP) */}
+        <button
+          onClick={() => navigate('/admin/questions')}
+          className="px-4 py-2 bg-emerald-950/40 hover:bg-emerald-900/60 active:scale-95 text-emerald-300 border border-emerald-800/50 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all shrink-0 self-end sm:self-auto"
+        >
+          <span>প্রশ্ন ব্যাংকে যান</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 9. QUICK CREATE FLOATING BUTTON (FAB)                                      */}
+      {/* ========================================================================= */}
+      <button
+        onClick={handleOpenCreateModal}
+        className="fixed bottom-6 right-6 z-40 w-13 h-13 rounded-full bg-emerald-400 hover:bg-emerald-300 active:scale-90 text-slate-950 flex items-center justify-center shadow-[0_0_25px_rgba(16,185,129,0.5)] transition-all group"
+        title="নতুন পরীক্ষা তৈরি করুন"
+      >
+        <Plus className="w-7 h-7 stroke-[3] group-hover:rotate-90 transition-transform duration-200" />
+      </button>
+
+      {/* ========================================================================= */}
+      {/* MODALS & BOTTOM SHEETS                                                    */}
+      {/* ========================================================================= */}
+
+      {/* 6. Context Menu Bottom Sheet */}
+      <ExamContextMenuModal
+        isOpen={Boolean(selectedExamForMenu)}
+        onClose={() => setSelectedExamForMenu(null)}
+        exam={selectedExamForMenu}
+        onEdit={(target) => handleOpenEditModal(target)}
+        onPreview={(target) => setPreviewExam(target)}
+        onDuplicate={(target) => handleDuplicateExam(target)}
+        onViewQuestions={(target) => setQuestionsListExam(target)}
+        onAddQuestions={(target) => handleOpenEditModal(target)}
+        onSchedule={(target) => setScheduleExam(target)}
+        onAnalytics={(target) => setAnalyticsExam(target)}
+        onTogglePublish={(target) => handleTogglePublish(target)}
+        onDelete={(target) => setDeletingExam(target)}
+      />
+
+      {/* Student Interactive Preview Modal */}
+      <LiveExamStudentPreviewModal
+        isOpen={Boolean(previewExam)}
+        onClose={() => setPreviewExam(null)}
+        exam={previewExam}
+      />
+
+      {/* Exam Analytics / Results Modal */}
+      <ExamAnalyticsModal
+        isOpen={Boolean(analyticsExam)}
+        onClose={() => setAnalyticsExam(null)}
+        exam={analyticsExam}
+      />
+
+      {/* Exam Schedule Modal */}
+      <ExamScheduleModal
+        isOpen={Boolean(scheduleExam)}
+        onClose={() => setScheduleExam(null)}
+        exam={scheduleExam}
+        onSaveSchedule={handleSaveSchedule}
+      />
+
+      {/* Exam Questions List Inspector */}
+      <ExamQuestionsListModal
+        isOpen={Boolean(questionsListExam)}
+        onClose={() => setQuestionsListExam(null)}
+        exam={questionsListExam}
+        onAddMoreQuestions={(target) => handleOpenEditModal(target)}
+      />
+
+      {/* 3-Step Create / Edit Wizard */}
       <CreateExamWizard
         isOpen={isWizardOpen}
         onClose={() => {
@@ -772,17 +780,17 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
         }}
       />
 
-      {/* CONFIRM DELETE MODAL */}
+      {/* Delete Confirmation Modal */}
       <ConfirmModal
-        isOpen={Boolean(deletingId)}
+        isOpen={Boolean(deletingExam)}
         title="পরীক্ষাটি মুছে ফেলতে চান?"
-        message="এই কাজটি একবার সম্পন্ন হলে আর ফিরিয়ে আনা সম্ভব হবে না।"
+        message={`"${deletingExam?.title}" পরীক্ষাটি মুছে ফেললে এর সকল তথ্য ও ফলাফল স্থায়ীভাবে মুছে যাবে।`}
         confirmText="হ্যাঁ, মুছে ফেলুন"
         cancelText="বাতিল"
         isDanger={true}
         loading={isDeleting}
         onConfirm={handleConfirmDelete}
-        onCancel={() => setDeletingId(null)}
+        onCancel={() => setDeletingExam(null)}
       />
     </div>
   );

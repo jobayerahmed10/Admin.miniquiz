@@ -109,12 +109,22 @@ export const setLocalCachedQuestions = (questions: Question[]) => {
   }
 };
 
+import { INITIAL_SEED_EXAMS } from './examSeedData';
+
 export const getLocalCachedExams = (): Exam[] => {
   try {
     const raw = localStorage.getItem(LOCAL_EXAMS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    // Initialize with seed exams if empty
+    localStorage.setItem(LOCAL_EXAMS_KEY, JSON.stringify(INITIAL_SEED_EXAMS));
+    return INITIAL_SEED_EXAMS;
   } catch (e) {
-    return [];
+    return INITIAL_SEED_EXAMS;
   }
 };
 
