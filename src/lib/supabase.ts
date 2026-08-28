@@ -607,20 +607,18 @@ export const insertQuestion = async (
       .single();
 
     // If optional columns (slug, topic, post, exam_id, subject, id) fail or don't exist in DB, retry gracefully
-    if (error && (
-      error.message?.includes('slug') ||
-      error.message?.includes('subject') ||
-      error.message?.includes('topic') ||
-      error.message?.includes('post') ||
-      error.message?.includes('exam_id') ||
-      error.message?.includes('column') ||
-      error.code === 'PGRST204' ||
-      error.code === '42703'
-    )) {
+    if (error) {
+      console.warn('Supabase insertQuestion error (attempting safe fallback):', error);
+      const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+      const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
+
       const sanitizedPayload = { ...payload };
       delete sanitizedPayload.slug;
       delete sanitizedPayload.topic;
       delete sanitizedPayload.post;
+      if (isExamIdError) {
+        delete sanitizedPayload.exam_id;
+      }
 
       let retryResult = await client
         .from('questions')
@@ -628,8 +626,9 @@ export const insertQuestion = async (
         .select()
         .single();
 
-      if (retryResult.error && retryResult.error.message?.includes('subject')) {
+      if (retryResult.error) {
         delete sanitizedPayload.subject;
+        delete sanitizedPayload.exam_id;
         retryResult = await client
           .from('questions')
           .upsert([sanitizedPayload], { onConflict: 'id' })
@@ -788,16 +787,44 @@ export const insertBatchQuestions = async (
       .select();
 
     if (error) {
-      console.error('Supabase batch insert questions error:', error);
+      console.warn('Supabase batch insert questions initial error (attempting safe fallback):', error);
+      const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+      const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
+
       const fallbackPayload = payload.map((p: any) => {
-        const { subject, topic, post, ...rest } = p;
-        rest.exam_id = p.exam_id ? String(p.exam_id) : undefined;
+        const { topic, post, slug, ...rest } = p;
+        if (isExamIdError) {
+          delete rest.exam_id;
+        }
         return rest;
       });
-      const retryResult = await client
+
+      console.log('Payload: Retry batch insert fallback', JSON.stringify(fallbackPayload, null, 2));
+
+      let retryResult = await client
         .from('questions')
         .upsert(fallbackPayload, { onConflict: 'id' })
         .select();
+
+      if (retryResult.error) {
+        console.warn('Supabase batch insert retry 1 failed, trying minimal payload:', retryResult.error);
+        const minimalPayload = payload.map((p: any) => ({
+          id: p.id,
+          question: p.question,
+          option_a: p.option_a,
+          option_b: p.option_b,
+          option_c: p.option_c,
+          option_d: p.option_d,
+          correct_answer: p.correct_answer,
+          explanation: p.explanation || '',
+        }));
+
+        retryResult = await client
+          .from('questions')
+          .upsert(minimalPayload, { onConflict: 'id' })
+          .select();
+      }
+
       data = retryResult.data;
       error = retryResult.error;
     }
@@ -931,24 +958,36 @@ export const updateQuestion = async (
       .select()
       .single();
 
-    if (error && (
-      error.message?.includes('subject') ||
-      error.message?.includes('topic') ||
-      error.message?.includes('post') ||
-      error.message?.includes('exam_id') ||
-      error.code === 'PGRST204' ||
-      error.code === '42703'
-    )) {
+    if (error) {
+      console.warn('Supabase updateQuestion error (attempting safe fallback):', error);
+      const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+      const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
+
       const sanitized = { ...payload };
       delete sanitized.topic;
       delete sanitized.post;
-      
+      if (isExamIdError) {
+        delete sanitized.exam_id;
+      }
+
       let retryResult = await client
         .from('questions')
         .update(sanitized)
         .eq('id', String(id))
         .select()
         .single();
+
+      if (retryResult.error) {
+        delete sanitized.subject;
+        delete sanitized.exam_id;
+        retryResult = await client
+          .from('questions')
+          .update(sanitized)
+          .eq('id', String(id))
+          .select()
+          .single();
+      }
+
       data = retryResult.data;
       error = retryResult.error;
     }

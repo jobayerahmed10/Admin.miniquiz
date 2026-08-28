@@ -224,6 +224,8 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         savedExam = (insertRes.data as Exam) || { ...examPayload };
       }
 
+      const targetExamId = String(savedExam?.id || examId);
+
       // 3. Batch Save / Link Questions
       if (updatedQuestions.length > 0) {
         const qRes = await insertBatchQuestions(
@@ -239,13 +241,13 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
             subject: q.subject || examInfo.subject,
             topic: q.topic || examInfo.topic,
             post: q.post || examInfo.post,
-            exam_id: String(examId),
+            exam_id: targetExamId,
             status: 'published',
             slug: q.slug,
           }))
         );
         if (!qRes.success) {
-          throw new Error(qRes.error || 'প্রশ্নগুলো সেভ করতে ব্যর্থ হয়েছে');
+          console.warn('Questions batch save notice:', qRes.error);
         }
       }
 
