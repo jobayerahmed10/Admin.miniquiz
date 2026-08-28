@@ -776,18 +776,11 @@ export const insertBatchQuestions = async (
 
     let { data, error } = await client
       .from('questions')
-      .insert(payload)
+      .upsert(payload, { onConflict: 'id' })
       .select();
 
-    if (error && (
-      error.message?.includes('subject') ||
-      error.message?.includes('topic') ||
-      error.message?.includes('post') ||
-      error.message?.includes('exam_id') ||
-      error.message?.includes('column') ||
-      error.code === 'PGRST204' ||
-      error.code === '42703'
-    )) {
+    if (error) {
+      console.error('Supabase batch insert questions error:', error);
       const fallbackPayload = payload.map((p: any) => {
         const { subject, topic, post, ...rest } = p;
         rest.exam_id = p.exam_id;
@@ -795,17 +788,20 @@ export const insertBatchQuestions = async (
       });
       const retryResult = await client
         .from('questions')
-        .insert(fallbackPayload)
+        .upsert(fallbackPayload, { onConflict: 'id' })
         .select();
       data = retryResult.data;
       error = retryResult.error;
     }
 
     if (error || !data) {
-      console.warn('Supabase batch insert failed, saved to local cache:', error);
-      const current = getLocalCachedQuestions();
-      setLocalCachedQuestions([...localItems, ...current]);
-      return { success: true, data: localItems, error: null, syncedToSupabase: false };
+      console.error('Supabase batch insert questions final error:', error);
+      return {
+        success: false,
+        data: localItems,
+        error: error?.message || 'সুপাবেসে প্রশ্নগুলো সেভ করতে ব্যর্থ হয়েছে।',
+        syncedToSupabase: false,
+      };
     }
 
     const normalized = (data || []).map((row, idx) =>
@@ -823,9 +819,13 @@ export const insertBatchQuestions = async (
 
     return { success: true, data: normalized, error: null, syncedToSupabase: true };
   } catch (err: any) {
-    const current = getLocalCachedQuestions();
-    setLocalCachedQuestions([...localItems, ...current]);
-    return { success: true, data: localItems, error: null, syncedToSupabase: false };
+    console.error('Supabase batch insert questions exception:', err);
+    return {
+      success: false,
+      data: localItems,
+      error: err?.message || 'সুপাবেসে প্রশ্ন সংরক্ষণ করার সময় ত্রুটি ঘটেছে।',
+      syncedToSupabase: false,
+    };
   }
 };
 
@@ -1206,19 +1206,12 @@ export const insertExam = async (
 
     let { data, error } = await client
       .from('exams')
-      .insert([payload])
+      .upsert([payload], { onConflict: 'id' })
       .select()
       .single();
 
-    if (error && (
-      error.message?.includes('topic') ||
-      error.message?.includes('post') ||
-      error.message?.includes('pass_mark') ||
-      error.message?.includes('category') ||
-      error.message?.includes('exam_type') ||
-      error.code === 'PGRST204' ||
-      error.code === '42703'
-    )) {
+    if (error) {
+      console.error('Supabase insertExam error:', error);
       const basicPayload = {
         ...(customId ? { id: customId } : {}),
         title: newExam.title,
@@ -1235,7 +1228,7 @@ export const insertExam = async (
 
       const retryResult = await client
         .from('exams')
-        .insert([basicPayload])
+        .upsert([basicPayload], { onConflict: 'id' })
         .select()
         .single();
 
@@ -1244,13 +1237,11 @@ export const insertExam = async (
     }
 
     if (error || !data) {
-      console.warn('Supabase insertExam failed, saving locally:', error);
-      const current = getLocalCachedExams();
-      setLocalCachedExams([localItem, ...current]);
+      console.error('Supabase insertExam final error:', error);
       return {
-        success: true,
+        success: false,
         data: localItem,
-        error: null,
+        error: error?.message || 'সুপাবেসে পরীক্ষা সংরক্ষণ করতে ব্যর্থ হয়েছে।',
         syncedToSupabase: false,
       };
     }
@@ -1274,12 +1265,11 @@ export const insertExam = async (
       syncedToSupabase: true,
     };
   } catch (err: any) {
-    const current = getLocalCachedExams();
-    setLocalCachedExams([localItem, ...current]);
+    console.error('Supabase insertExam exception:', err);
     return {
-      success: true,
+      success: false,
       data: localItem,
-      error: null,
+      error: err?.message || 'সুপাবেসে পরীক্ষা সংরক্ষণে ত্রুটি ঘটেছে।',
       syncedToSupabase: false,
     };
   }
