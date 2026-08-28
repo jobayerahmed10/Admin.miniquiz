@@ -572,14 +572,17 @@ export const insertQuestion = async (
 
   const client = getSupabaseClient();
   if (!client) {
-    // Save to local cache seamlessly
-    setLocalCachedQuestions([localItem, ...currentQuestions]);
-    return { success: true, data: localItem, error: null, syncedToSupabase: false };
+    return {
+      success: false,
+      data: localItem,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      syncedToSupabase: false,
+    };
   }
 
   try {
     const payload: any = {
-      id: finalId,
+      id: String(finalId),
       question: newQuestion.question,
       option_a: newQuestion.option_a,
       option_b: newQuestion.option_b,
@@ -592,12 +595,14 @@ export const insertQuestion = async (
       subject: newQuestion.subject || 'সাধারণ',
       topic: newQuestion.topic || '',
       post: newQuestion.post || '',
-      ...(newQuestion.exam_id !== undefined && newQuestion.exam_id !== null ? { exam_id: newQuestion.exam_id } : {}),
+      ...(newQuestion.exam_id !== undefined && newQuestion.exam_id !== null ? { exam_id: String(newQuestion.exam_id) } : {}),
     };
+
+    console.log('Payload: Question insert', JSON.stringify(payload, null, 2));
 
     let { data, error } = await client
       .from('questions')
-      .insert([payload])
+      .upsert([payload], { onConflict: 'id' })
       .select()
       .single();
 
@@ -619,7 +624,7 @@ export const insertQuestion = async (
 
       let retryResult = await client
         .from('questions')
-        .insert([sanitizedPayload])
+        .upsert([sanitizedPayload], { onConflict: 'id' })
         .select()
         .single();
 
@@ -627,7 +632,7 @@ export const insertQuestion = async (
         delete sanitizedPayload.subject;
         retryResult = await client
           .from('questions')
-          .insert([sanitizedPayload])
+          .upsert([sanitizedPayload], { onConflict: 'id' })
           .select()
           .single();
       }
@@ -637,12 +642,11 @@ export const insertQuestion = async (
     }
 
     if (error || !data) {
-      console.warn('Supabase insert failed, saving to local cache:', error);
-      setLocalCachedQuestions([localItem, ...currentQuestions]);
+      console.error('Supabase insertQuestion failed:', error);
       return {
-        success: true,
+        success: false,
         data: localItem,
-        error: null,
+        error: error?.message || 'সুপাবেসে প্রশ্ন সংরক্ষণ করতে ব্যর্থ হয়েছে।',
         syncedToSupabase: false,
       };
     }
@@ -669,12 +673,11 @@ export const insertQuestion = async (
       syncedToSupabase: true,
     };
   } catch (err: any) {
-    console.warn('Supabase insert exception, saving to local cache:', err);
-    setLocalCachedQuestions([localItem, ...currentQuestions]);
+    console.error('Supabase insertQuestion exception:', err);
     return {
-      success: true,
+      success: false,
       data: localItem,
-      error: null,
+      error: err?.message || 'সুপাবেসে প্রশ্ন সংরক্ষণে ত্রুটি ঘটেছে।',
       syncedToSupabase: false,
     };
   }
@@ -751,9 +754,12 @@ export const insertBatchQuestions = async (
 
   const client = getSupabaseClient();
   if (!client) {
-    const current = getLocalCachedQuestions();
-    setLocalCachedQuestions([...localItems, ...current]);
-    return { success: true, data: localItems, error: null, syncedToSupabase: false };
+    return {
+      success: false,
+      data: localItems,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      syncedToSupabase: false,
+    };
   }
 
   try {
@@ -891,7 +897,12 @@ export const updateQuestion = async (
 
   const client = getSupabaseClient();
   if (!client) {
-    return { success: true, data: updatedLocal || undefined, error: null, syncedToSupabase: false };
+    return {
+      success: false,
+      data: updatedLocal || undefined,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      syncedToSupabase: false,
+    };
   }
 
   try {
@@ -909,12 +920,14 @@ export const updateQuestion = async (
     if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
     if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
     if (updatedFields.post !== undefined) payload.post = updatedFields.post;
-    if (updatedFields.exam_id !== undefined) payload.exam_id = updatedFields.exam_id;
+    if (updatedFields.exam_id !== undefined) payload.exam_id = String(updatedFields.exam_id);
+
+    console.log('Payload: Question update', JSON.stringify(payload, null, 2));
 
     let { data, error } = await client
       .from('questions')
       .update(payload)
-      .eq('id', id)
+      .eq('id', String(id))
       .select()
       .single();
 
@@ -933,7 +946,7 @@ export const updateQuestion = async (
       let retryResult = await client
         .from('questions')
         .update(sanitized)
-        .eq('id', id)
+        .eq('id', String(id))
         .select()
         .single();
       data = retryResult.data;
@@ -941,10 +954,11 @@ export const updateQuestion = async (
     }
 
     if (error || !data) {
+      console.error('Supabase updateQuestion failed:', error);
       return {
-        success: true,
+        success: false,
         data: updatedLocal || undefined,
-        error: null,
+        error: error?.message || 'সুপাবেসে প্রশ্ন আপডেট করতে ব্যর্থ হয়েছে।',
         syncedToSupabase: false,
       };
     }
@@ -961,10 +975,11 @@ export const updateQuestion = async (
       syncedToSupabase: true,
     };
   } catch (err: any) {
+    console.error('Supabase updateQuestion exception:', err);
     return {
-      success: true,
+      success: false,
       data: updatedLocal || undefined,
-      error: null,
+      error: err?.message || 'সুপাবেসে প্রশ্ন আপডেটে ত্রুটি ঘটেছে।',
       syncedToSupabase: false,
     };
   }
@@ -1180,9 +1195,12 @@ export const insertExam = async (
 
   const client = getSupabaseClient();
   if (!client) {
-    const current = getLocalCachedExams();
-    setLocalCachedExams([localItem, ...current]);
-    return { success: true, data: localItem, error: null, syncedToSupabase: false };
+    return {
+      success: false,
+      data: localItem,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      syncedToSupabase: false,
+    };
   }
 
   try {
@@ -1301,7 +1319,12 @@ export const updateExam = async (
 
   const client = getSupabaseClient();
   if (!client) {
-    return { success: true, data: updatedLocal || undefined, error: null, syncedToSupabase: false };
+    return {
+      success: false,
+      data: updatedLocal || undefined,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      syncedToSupabase: false,
+    };
   }
 
   try {
@@ -1321,13 +1344,13 @@ export const updateExam = async (
     if (updatedFields.total_marks !== undefined) payload.total_marks = updatedFields.total_marks;
     if (updatedFields.description !== undefined) payload.description = updatedFields.description;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
-    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
-    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
+
+    console.log('Payload: Exam update', JSON.stringify(payload, null, 2));
 
     let { data, error } = await client
       .from('exams')
       .update(payload)
-      .eq('id', id)
+      .eq('id', String(id))
       .select()
       .single();
 
@@ -1346,13 +1369,11 @@ export const updateExam = async (
       delete basicPayload.pass_mark;
       delete basicPayload.category;
       delete basicPayload.exam_type;
-      delete basicPayload.questions;
-      delete basicPayload.question_ids;
 
       let retryResult = await client
         .from('exams')
         .update(basicPayload)
-        .eq('id', id)
+        .eq('id', String(id))
         .select()
         .single();
       data = retryResult.data;
@@ -1360,10 +1381,11 @@ export const updateExam = async (
     }
 
     if (error || !data) {
+      console.error('Supabase updateExam failed:', error);
       return {
-        success: true,
+        success: false,
         data: updatedLocal || undefined,
-        error: null,
+        error: error?.message || 'সুপাবেসে পরীক্ষা আপডেট করতে ব্যর্থ হয়েছে।',
         syncedToSupabase: false,
       };
     }
@@ -1380,10 +1402,11 @@ export const updateExam = async (
       syncedToSupabase: true,
     };
   } catch (err: any) {
+    console.error('Supabase updateExam exception:', err);
     return {
-      success: true,
+      success: false,
       data: updatedLocal || undefined,
-      error: null,
+      error: err?.message || 'সুপাবেসে পরীক্ষা আপডেটে ত্রুটি ঘটেছে।',
       syncedToSupabase: false,
     };
   }
