@@ -14,8 +14,10 @@ import {
   Check,
   Globe,
   PlusCircle,
+  Hash,
+  Tag,
 } from 'lucide-react';
-import { insertBatchQuestions } from '../lib/supabase';
+import { insertBatchQuestions, getDefaultSubjectPrefix, generateQuestionSlug } from '../lib/supabase';
 import { Question } from '../types';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 import { MultiPostSelector } from './MultiPostSelector';
@@ -61,6 +63,9 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   const [customSubjectInput, setCustomSubjectInput] = useState('');
   const [showAddSubjectInput, setShowAddSubjectInput] = useState(false);
 
+  // Custom ID Prefix Pattern State
+  const [customIdPattern, setCustomIdPattern] = useState<string>('');
+
   useEffect(() => {
     if (isOpen) {
       const currentSubjects = getAllSubjects(availableSubjects);
@@ -91,6 +96,14 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
   if (!isOpen) return null;
+
+  // Compute effective ID prefix based on user input or subject default
+  const defaultSubjectPrefix = getDefaultSubjectPrefix(subject);
+  const effectiveIdPrefix = customIdPattern.trim()
+    ? (customIdPattern.trim().toUpperCase().endsWith('-')
+        ? customIdPattern.trim().toUpperCase()
+        : `${customIdPattern.trim().toUpperCase()}-`)
+    : defaultSubjectPrefix;
 
   const handleSubjectChange = (newSub: string) => {
     setSubject(newSub);
@@ -249,7 +262,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         setExtractedQuestions(
           data.questions.map((q: any) => ({
             ...q,
-            subject: subject || 'ইংরেজি',
+            subject: subject || 'বাংলা',
             is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
           }))
         );
@@ -296,7 +309,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: topic.trim(),
-          subject: subject || 'ইংরেজি',
+          subject: subject || 'বাংলা',
           count: questionCount,
         }),
       });
@@ -315,7 +328,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         setGeneratedQuestions(
           data.questions.map((q: any) => ({
             ...q,
-            subject: subject || 'ইংরেজি',
+            subject: subject || 'বাংলা',
             is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
           }))
         );
@@ -348,7 +361,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       option_d: 'চতুর্থ অপশন',
       correct_answer: 'option_a',
       explanation: '',
-      subject: subject || 'ইংরেজি',
+      subject: subject || 'বাংলা',
       is_rtl: isArabicText('নতুন প্রশ্ন লিখুন...'),
     };
 
@@ -360,7 +373,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
     setEditingIdx(0);
   };
 
-  // Save previewed questions to Supabase public.questions
+  // Save previewed questions to Supabase public.questions with custom sequential IDs and slugs
   const handleSaveToQuestionBank = async (questionsList: any[]) => {
     if (!questionsList || questionsList.length === 0) return;
 
@@ -368,7 +381,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
     setSaveSuccess(null);
     setModalError(null);
 
-    const formattedForSave: Omit<Question, 'id' | 'created_at' | 'updated_at'>[] = questionsList.map((q) => ({
+    const formattedForSave: (Omit<Question, 'id' | 'created_at' | 'updated_at'> & { slug: string })[] = questionsList.map((q) => ({
       question: q.question,
       option_a: q.option_a,
       option_b: q.option_b,
@@ -377,17 +390,22 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       correct_answer: (q.correct_answer as any) || 'option_a',
       explanation: q.explanation || '',
       status: 'published',
-      subject: subject || q.subject || 'ইংরেজি',
+      subject: subject || q.subject || 'বাংলা',
       topic: q.topic || topic || '',
       post: q.post || formatPosts(selectedPosts) || '',
+      slug: generateQuestionSlug(q.question),
     }));
 
-    const { success, error } = await insertBatchQuestions(formattedForSave);
+    const { success, error } = await insertBatchQuestions(formattedForSave, {
+      custom_id_pattern: effectiveIdPrefix,
+    });
 
     setSaving(false);
 
     if (success) {
-      setSaveSuccess(`সফলভাবে ${questionsList.length} টি প্রশ্ন প্রশ্ন ব্যাংকে যুক্ত করা হয়েছে!`);
+      setSaveSuccess(
+        `সফলভাবে ${questionsList.length} টি প্রশ্ন কাস্টম আইডি সিকুয়েন্স (${effectiveIdPrefix}0001...) ও slug সহ প্রশ্ন ব্যাংকে যুক্ত করা হয়েছে!`
+      );
       setTimeout(() => {
         onQuestionsSaved();
         onClose();
@@ -413,7 +431,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 এআই প্রশ্ন মেকার (AI Question Generator)
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                সহজে কপি-পেস্ট করে অথবা টপিক নাম দিয়ে প্রশ্ন ব্যাংকে প্রশ্ন যোগ করুন
+                কপি-পেস্ট বা টপিক থেকে স্বয়ংক্রিয়ভাবে কাস্টম সিকুয়েন্স আইডি সহ প্রশ্ন তৈরি করুন
               </p>
             </div>
           </div>
@@ -476,9 +494,10 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             </div>
           )}
 
-          {/* Global Subject, Topic & Post Selector */}
-          <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Global Subject, Topic, Custom ID Pattern & Post Selector */}
+          <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl space-y-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              {/* Subject */}
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">বিষয় / Subject:</label>
                 <div className="flex items-center gap-1.5">
@@ -504,6 +523,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 </div>
               </div>
 
+              {/* Topic */}
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">টপিক / Topic:</label>
                 <input
@@ -515,6 +535,76 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 />
               </div>
 
+              {/* Custom ID Prefix / Pattern */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1">
+                    <Hash className="w-3.5 h-3.5 text-indigo-400" /> কাস্টম ID প্রেফিক্স:
+                  </label>
+                  <span className="text-[10px] text-indigo-400 font-semibold">
+                    {customIdPattern ? 'কাস্টম' : `অটো: ${defaultSubjectPrefix}`}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customIdPattern}
+                    onChange={(e) => setCustomIdPattern(e.target.value.toUpperCase())}
+                    placeholder={`যেমন: ${defaultSubjectPrefix} বা Q-BANGLA-`}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono font-bold focus:outline-none focus:border-indigo-500 placeholder-slate-600 uppercase"
+                  />
+                  {customIdPattern && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomIdPattern('')}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-[11px] font-bold"
+                      title="অটোতে রিসেট করুন"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* ID Sequence & Quick Tags */}
+              <div className="md:col-span-3 pt-1 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-400 text-[11px] font-medium">আইডি সিকুয়েন্স প্রিভিউ:</span>
+                  <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20 text-[11px]">
+                    {effectiveIdPrefix}0001, {effectiveIdPrefix}0002...
+                  </span>
+                </div>
+
+                {/* Quick preset chips */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-slate-500 text-[10px] mr-1">দ্রুত নির্বাচন:</span>
+                  {['Q-BANGLA-', 'Q-ENGLISH-', 'Q-MATH-', 'Q-GK-', 'Q-ICT-', 'Q-ISLAM-', 'Q-ARABIC-', 'Q-SCIENCE-'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCustomIdPattern(preset)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all border ${
+                        effectiveIdPrefix === preset
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                  {customIdPattern && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomIdPattern('')}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-indigo-400 bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800 transition-colors"
+                    >
+                      অটো রিসেট
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Post Selector */}
               <div className="md:col-span-3">
                 <MultiPostSelector
                   selectedPosts={selectedPosts}
@@ -551,7 +641,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 <span className="font-bold flex items-center gap-1.5 mb-1">
                   <Sparkles className="w-4 h-4 text-indigo-400" /> এআই অটো-ডিটেকশন নির্দেশিকা:
                 </span>
-                বাংলা, ইংরেজি বা আরবি ভাষার কাঁচা প্রশ্ন ও উত্তর নিচের বক্সে পেস্ট করুন। এআই প্রশ্ন, চারটি অপশন, সঠিক উত্তর এবং ব্যাখ্যা স্বয়ংক্রিয়ভাবে ডিটেক্ট করে ফেলবে!
+                বাংলা, ইংরেজি বা আরবি ভাষার কাঁচা প্রশ্ন ও উত্তর নিচের বক্সে পেস্ট করুন। এআই প্রশ্ন, চারটি অপশন, সঠিক উত্তর এবং ব্যাখ্যা স্বয়ংক্রিয়ভাবে ডিটেক্ট করে ফেলবে এবং কাস্টম আইডি ({effectiveIdPrefix}0001...) ও slug সহ সেভ করবে!
               </div>
 
               {extractError && (
@@ -610,7 +700,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 <span className="font-bold flex items-center gap-1.5 mb-1">
                   <Wand2 className="w-4 h-4 text-purple-400" /> টপিক থেকে অটো জেনারেটর:
                 </span>
-                শুধুমাত্র আপনার কাঙ্ক্ষিত টপিকের নাম লিখুন (বাংলা, আরবি বা ইংরেজি)। এআই ৪টি অপশন ও বিস্তারিত ব্যাখ্যাসহ সম্পূর্ণ সঠিক প্রশ্ন জেনারেট করে দেবে!
+                শুধুমাত্র আপনার কাঙ্ক্ষিত টপিকের নাম লিখুন (বাংলা, আরবি বা ইংরেজি)। এআই ৪টি অপশন, সঠিক উত্তর ও বিস্তারিত ব্যাখ্যাসহ সম্পূর্ণ সঠিক প্রশ্ন জেনারেট করে দেবে!
               </div>
 
               {genError && (
@@ -704,7 +794,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                     অ্যাপস প্রিভিউ কার্ডসমূহ ({currentQuestions.length} টি)
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    যেকোনো প্রশ্ন সম্পাদনা করতে এডিট বাটন চাপুন। আরবি প্রশ্ন স্বয়ংক্রিয়ভাবে ডান দিকে (RTL) সাজানো থাকবে।
+                    আইডি প্যাটার্ন: <span className="font-mono font-bold text-indigo-300">{effectiveIdPrefix}</span> | প্রতিটি প্রশ্নের জন্য স্বয়ংক্রিয় slug ও সিকুয়েন্স আইডি তৈরি হবে।
                   </p>
                 </div>
 
@@ -730,7 +820,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                     ) : (
                       <>
                         <Plus className="w-4 h-4" />
-                        প্রশ্ন ব্যাংকে সেভ করুন
+                        প্রশ্ন ব্যাংকে সেভ করুন ({currentQuestions.length})
                       </>
                     )}
                   </button>
@@ -741,6 +831,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                 {currentQuestions.map((q, idx) => {
                   const isEditing = editingIdx === idx;
                   const isArabic = q.is_rtl || isArabicText(q.question) || isArabicText(q.option_a);
+                  const previewId = `${effectiveIdPrefix}${String(idx + 1).padStart(4, '0')}`;
 
                   return (
                     <div
@@ -754,7 +845,11 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                       {/* Top Header Controls */}
                       <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/60">
                         <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-extrabold text-[11px] border border-indigo-500/30">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-extrabold text-[11px] border border-indigo-500/30 font-mono flex items-center gap-1">
+                            <Tag className="w-3 h-3" /> {previewId}
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-semibold">
                             প্রশ্ন #{idx + 1}
                           </span>
 
@@ -769,7 +864,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
                             title="লেখা ডান/বাম এলাইনমেন্ট পরিবর্তন করুন"
                           >
                             <Globe className="w-3 h-3" />
-                            {isArabic ? 'আরবি (RTL ডান)' : 'বাংলা/ENG (LTR বাম)'}
+                            {isArabic ? 'আরবি (RTL)' : 'বাংলা/ENG'}
                           </button>
                         </div>
 

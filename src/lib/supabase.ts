@@ -163,6 +163,39 @@ export const generateQuestionSlug = (questionText: string, customPrefix?: string
 };
 
 /**
+ * Maps subject name to standard sequential ID prefix (e.g. বাংলা -> Q-BANGLA-, ইসলাম -> Q-ISLAM-)
+ */
+export const getDefaultSubjectPrefix = (subjectName?: string): string => {
+  if (!subjectName || !subjectName.trim()) return 'Q-BANGLA-';
+  const sub = subjectName.trim().toLowerCase();
+
+  if (sub.includes('বাংলা') || sub.includes('bangla') || sub.includes('bengali')) return 'Q-BANGLA-';
+  if (sub.includes('ইংরেজি') || sub.includes('english') || sub.includes('ingreji')) return 'Q-ENGLISH-';
+  if (sub.includes('গণিত') || sub.includes('math') || sub.includes('gonit')) return 'Q-MATH-';
+  if (sub.includes('সাধারণ জ্ঞান') || sub.includes('সাধারন জ্ঞান') || sub.includes('gk') || sub.includes('general knowledge')) return 'Q-GK-';
+  if (sub.includes('আইসিটি') || sub.includes('কম্পিউটার') || sub.includes('ict') || sub.includes('computer')) return 'Q-ICT-';
+  if (sub.includes('ইসলাম') || sub.includes('দ্বীন') || sub.includes('ধর্ম') || sub.includes('islam')) return 'Q-ISLAM-';
+  if (sub.includes('আরবি') || sub.includes('arabic') || sub.includes('arbi') || sub.includes('কুরআন') || sub.includes('হাদিস') || sub.includes('মৌলভী')) return 'Q-ARABIC-';
+  if (sub.includes('বিজ্ঞান') || sub.includes('science')) return 'Q-SCIENCE-';
+  if (sub.includes('ভূগোল') || sub.includes('geography')) return 'Q-GEO-';
+  if (sub.includes('পদার্থ') || sub.includes('physics')) return 'Q-PHYSICS-';
+  if (sub.includes('রসায়ন') || sub.includes('chemistry')) return 'Q-CHEM-';
+  if (sub.includes('জীব') || sub.includes('biology')) return 'Q-BIO-';
+  if (sub.includes('হিসাব') || sub.includes('accounting')) return 'Q-ACCOUNTING-';
+  if (sub.includes('অর্থনীতি') || sub.includes('economics')) return 'Q-ECONOMICS-';
+  if (sub.includes('পৌরনীতি') || sub.includes('রাষ্ট্র') || sub.includes('civics')) return 'Q-CIVICS-';
+  if (sub.includes('ইতিহাস') || sub.includes('history')) return 'Q-HISTORY-';
+
+  // Fallback: create clean uppercase Latin tag or transliterate
+  const ascii = sub.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (ascii.length >= 2) {
+    return `Q-${ascii.substring(0, 10)}-`;
+  }
+
+  return 'Q-BANGLA-';
+};
+
+/**
  * Automatic Sequential ID Generator for Questions (e.g. Q-BANGLA-0001, Q-BANGLA-0002)
  */
 export const generateSequentialQuestionId = (
@@ -581,7 +614,10 @@ export const insertBatchQuestions = async (
   }
 
   const currentQuestions = getLocalCachedQuestions();
-  const pattern = options?.custom_id_pattern || options?.custom_prefix;
+  const pattern =
+    options?.custom_id_pattern ||
+    options?.custom_prefix ||
+    getDefaultSubjectPrefix(questionsToInsert[0]?.subject);
 
   const localItems: Question[] = questionsToInsert.map((q, idx) => {
     let finalId = q.custom_id || q.id;
