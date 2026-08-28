@@ -1230,10 +1230,20 @@ export const normalizeExamRow = (row: any): Exam => {
 // Fetch All Exams
 export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | null; isTableMissing?: boolean; isSynced?: boolean }> => {
   const localExams = getLocalCachedExams();
+  const localQuestions = getLocalCachedQuestions();
   const client = getSupabaseClient();
 
   if (!client) {
-    return { exams: localExams, error: null, isSynced: false };
+    const mergedLocal = localExams.map((ex) => {
+      const qMatches = localQuestions.filter((q) => String(q.exam_id) === String(ex.id));
+      const finalQs = qMatches.length > 0 ? qMatches : ex.questions || [];
+      return {
+        ...ex,
+        questions: finalQs,
+        question_count: finalQs.length || ex.question_count || 0,
+      };
+    });
+    return { exams: mergedLocal, error: null, isSynced: false };
   }
 
   try {
@@ -1245,8 +1255,17 @@ export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | 
     if (error) {
       console.warn('Supabase fetchAllExams error, returning local cache:', error);
       const isMissing = error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('exams');
+      const mergedLocal = localExams.map((ex) => {
+        const qMatches = localQuestions.filter((q) => String(q.exam_id) === String(ex.id));
+        const finalQs = qMatches.length > 0 ? qMatches : ex.questions || [];
+        return {
+          ...ex,
+          questions: finalQs,
+          question_count: finalQs.length || ex.question_count || 0,
+        };
+      });
       return {
-        exams: localExams,
+        exams: mergedLocal,
         error: isMissing ? error.message : null,
         isTableMissing: isMissing,
         isSynced: false,
@@ -1258,8 +1277,59 @@ export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | 
     localExams.forEach((e) => map.set(String(e.id), e));
     normalized.forEach((e) => map.set(String(e.id), e));
     const merged = Array.from(map.values());
-    setLocalCachedExams(merged);
 
+    // Fetch questions for all exams from public.questions table
+    const examIds = merged.map((e) => String(e.id));
+    if (examIds.length > 0) {
+      try {
+        const { data: qData } = await client
+          .from('questions')
+          .select('*')
+          .in('exam_id', examIds);
+
+        const questionsByExamId: Record<string, Question[]> = {};
+        if (qData && qData.length > 0) {
+          qData.forEach((row) => {
+            const eid = String(row.exam_id);
+            if (!questionsByExamId[eid]) questionsByExamId[eid] = [];
+            questionsByExamId[eid].push(normalizeQuestionRow(row));
+          });
+        }
+
+        // Merge with local questions
+        localQuestions.forEach((q) => {
+          if (q.exam_id) {
+            const eid = String(q.exam_id);
+            if (!questionsByExamId[eid]) questionsByExamId[eid] = [];
+            if (!questionsByExamId[eid].some((existing) => String(existing.id) === String(q.id))) {
+              questionsByExamId[eid].push(q);
+            }
+          }
+        });
+
+        // Attach questions to each exam
+        merged.forEach((ex) => {
+          const matchedQs = questionsByExamId[String(ex.id)] || [];
+          const existingQs = ex.questions || [];
+          const combined = [...existingQs];
+          const existingIds = new Set(existingQs.map((q) => String(q.id)));
+          matchedQs.forEach((mq) => {
+            if (!existingIds.has(String(mq.id))) {
+              combined.push(mq);
+              existingIds.add(String(mq.id));
+            }
+          });
+          ex.questions = combined;
+          if (combined.length > 0) {
+            ex.question_count = combined.length;
+          }
+        });
+      } catch (qErr) {
+        console.warn('Error fetching exam questions in fetchAllExams:', qErr);
+      }
+    }
+
+    setLocalCachedExams(merged);
     return { exams: merged, error: null, isSynced: true };
   } catch (err: any) {
     return { exams: localExams, error: null, isSynced: false };
@@ -1272,25 +1342,33 @@ export const fetchExamById = async (id: string): Promise<{ exam: Exam | null; er
   const localFound = localExams.find((e) => String(e.id) === String(id));
 
   const client = getSupabaseClient();
-  if (!client) {
-    return { exam: localFound || null, error: null };
-  }
+  let baseExam: Exam | null = localFound || null;
 
-  try {
-    const { data, error } = await client
-      .from('exams')
-      .select('*')
-      .eq('id', id)
-      .single();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('exams')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (error || !data) {
-      return { exam: localFound || null, error: null };
+      if (!error && data) {
+        baseExam = normalizeExamRow(data);
+      }
+    } catch (err: any) {
+      console.warn('fetchExamById error:', err);
     }
-
-    return { exam: normalizeExamRow(data), error: null };
-  } catch (err: any) {
-    return { exam: localFound || null, error: null };
   }
+
+  if (baseExam) {
+    const qRes = await fetchQuestionsByExamId(baseExam.id);
+    if (qRes.questions && qRes.questions.length > 0) {
+      baseExam.questions = qRes.questions;
+      baseExam.question_count = qRes.questions.length;
+    }
+  }
+
+  return { exam: baseExam, error: null };
 };
 
 // Insert New Exam
@@ -1409,6 +1487,9 @@ export const insertExam = async (
       pass_mark: data.pass_mark || newExam.pass_mark,
       category: data.category || newExam.category,
       exam_type: data.exam_type || newExam.exam_type,
+      questions: newExam.questions || [],
+      question_ids: newExam.question_ids || [],
+      question_count: newExam.question_count || (newExam.questions ? newExam.questions.length : 0),
     });
 
     const current = getLocalCachedExams();
@@ -1525,6 +1606,9 @@ export const updateExam = async (
     const normalized = normalizeExamRow({
       ...data,
       ...updatedFields,
+      questions: updatedFields.questions || (updatedLocal ? updatedLocal.questions : []),
+      question_ids: updatedFields.question_ids || (updatedLocal ? updatedLocal.question_ids : []),
+      question_count: updatedFields.question_count ?? (updatedFields.questions ? updatedFields.questions.length : (updatedLocal ? updatedLocal.question_count : 0)),
     });
 
     return {

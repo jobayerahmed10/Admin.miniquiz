@@ -40,7 +40,12 @@ export const ExamCard: React.FC<ExamCardProps> = ({
   onManageLive,
 }) => {
   // Determine actual attached questions count
-  const attachedCount = exam.questions?.length ?? exam.question_ids?.length ?? (exam.status === 'draft' ? 6 : exam.question_count);
+  const realCount = (exam.questions && exam.questions.length > 0)
+    ? exam.questions.length
+    : (exam.question_ids && exam.question_ids.length > 0)
+    ? exam.question_ids.length
+    : exam.question_count || 0;
+  const attachedCount = realCount;
   const targetCount = exam.question_count || 5;
 
   // Determine badge styling & icon
