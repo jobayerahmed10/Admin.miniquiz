@@ -339,54 +339,25 @@ export const testSupabaseConnection = async (): Promise<{ success: boolean; mess
 
 // Fetch Dashboard Stats
 export const fetchDashboardStats = async (): Promise<{ stats: DashboardStats; error: string | null }> => {
-  const client = getSupabaseClient();
-  const localQuestions = getLocalCachedQuestions();
-  const localExams = getLocalCachedExams();
-
-  if (!client) {
-    return {
-      stats: {
-        totalQuestions: localQuestions.length,
-        publishedQuestions: localQuestions.filter((q) => q.status === 'published').length,
-        draftQuestions: localQuestions.filter((q) => q.status === 'draft').length,
-        totalExams: localExams.length,
-        activeExams: localExams.filter((e) => e.status === 'active').length,
-      },
-      error: null,
-    };
-  }
-
   try {
-    const { data: questionsData, error: qError } = await client
-      .from('questions')
-      .select('id, status');
-
-    if (qError) {
-      return {
-        stats: {
-          totalQuestions: localQuestions.length,
-          publishedQuestions: localQuestions.filter((q) => q.status === 'published').length,
-          draftQuestions: localQuestions.filter((q) => q.status === 'draft').length,
-          totalExams: localExams.length,
-          activeExams: localExams.filter((e) => e.status === 'active').length,
-        },
-        error: `ডাটাবেস সতর্কতা: ${qError.message}`,
-      };
+    const { questions } = await fetchAllQuestions();
+    const localExams = getLocalCachedExams();
+    const client = getSupabaseClient();
+    let examsList = localExams;
+    if (client) {
+      try {
+        const { data } = await client.from('exams').select('*');
+        if (data && data.length > 0) {
+          examsList = data;
+        }
+      } catch (e) {}
     }
 
-    const totalQuestions = questionsData ? questionsData.length : 0;
-    const publishedQuestions = questionsData ? questionsData.filter((q) => q.status === 'published').length : 0;
-    const draftQuestions = questionsData ? questionsData.filter((q) => q.status === 'draft').length : 0;
-
-    let totalExams = localExams.length;
-    let activeExams = localExams.filter((e) => e.status === 'active').length;
-
-    // Fetch exams count if exams table exists
-    const { data: examsData } = await client.from('exams').select('id, status');
-    if (examsData) {
-      totalExams = Math.max(totalExams, examsData.length);
-      activeExams = Math.max(activeExams, examsData.filter((e) => e.status === 'active').length);
-    }
+    const totalQuestions = questions.length;
+    const publishedQuestions = questions.filter((q) => q.status === 'published' || !q.status).length;
+    const draftQuestions = questions.filter((q) => q.status === 'draft').length;
+    const totalExams = examsList.length;
+    const activeExams = examsList.filter((e) => e.status === 'active' || !e.status).length;
 
     return {
       stats: {
@@ -399,15 +370,17 @@ export const fetchDashboardStats = async (): Promise<{ stats: DashboardStats; er
       error: null,
     };
   } catch (err: any) {
+    const localQuestions = getLocalCachedQuestions();
+    const localExams = getLocalCachedExams();
     return {
       stats: {
         totalQuestions: localQuestions.length,
-        publishedQuestions: localQuestions.filter((q) => q.status === 'published').length,
+        publishedQuestions: localQuestions.filter((q) => q.status === 'published' || !q.status).length,
         draftQuestions: localQuestions.filter((q) => q.status === 'draft').length,
         totalExams: localExams.length,
-        activeExams: localExams.filter((e) => e.status === 'active').length,
+        activeExams: localExams.filter((e) => e.status === 'active' || !e.status).length,
       },
-      error: err?.message || 'পরিসংখ্যান লোড করতে সমস্যা হয়েছে।',
+      error: err?.message || null,
     };
   }
 };

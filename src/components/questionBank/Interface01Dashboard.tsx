@@ -81,19 +81,29 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       counts[subj] = (counts[subj] || 0) + 1;
     });
 
-    const defaultSubjects = [
-      { name: 'বাংলা', color: 'from-purple-500 to-indigo-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
-      { name: 'English', color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
-      { name: 'গণিত', color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
-      { name: 'সাধারণ জ্ঞান', color: 'from-blue-500 to-sky-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
-      { name: 'العربية', color: 'from-rose-500 to-pink-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
-      { name: 'ফিকহ', color: 'from-teal-500 to-cyan-600', text: 'text-teal-400', bg: 'bg-teal-950/40 border-teal-500/30' },
+    const colorPalettes = [
+      { color: 'from-purple-500 to-indigo-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
+      { color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
+      { color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
+      { color: 'from-blue-500 to-sky-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
+      { color: 'from-rose-500 to-pink-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
+      { color: 'from-teal-500 to-cyan-600', text: 'text-teal-400', bg: 'bg-teal-950/40 border-teal-500/30' },
+      { color: 'from-indigo-500 to-violet-600', text: 'text-indigo-400', bg: 'bg-indigo-950/40 border-indigo-500/30' },
+      { color: 'from-cyan-500 to-blue-600', text: 'text-cyan-400', bg: 'bg-cyan-950/40 border-cyan-500/30' },
     ];
 
-    return defaultSubjects.map((s) => ({
-      ...s,
-      count: counts[s.name] || 0,
-    }));
+    const uniqueSubjects = Array.from(
+      new Set([...Object.keys(counts), 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান', 'العربية', 'ফিকহ'])
+    ).filter(Boolean);
+
+    return uniqueSubjects.map((name, idx) => {
+      const palette = colorPalettes[idx % colorPalettes.length];
+      return {
+        name,
+        count: counts[name] || 0,
+        ...palette,
+      };
+    });
   }, [questions]);
 
   // Filter questions for the list table
@@ -377,13 +387,12 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               onChange={(e) => setSelectedSubject(e.target.value)}
               className="bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
             >
-              <option value="all">সকল বিষয়</option>
-              <option value="বাংলা">বাংলা</option>
-              <option value="English">English</option>
-              <option value="গণিত">গণিত</option>
-              <option value="সাধারণ জ্ঞান">সাধারণ জ্ঞান</option>
-              <option value="العربية">العربية</option>
-              <option value="ফিকহ">ফিকহ</option>
+              <option value="all">সকল বিষয় ({questions.length})</option>
+              {subjectStats.map((sub) => (
+                <option key={sub.name} value={sub.name}>
+                  {sub.name} ({sub.count})
+                </option>
+              ))}
             </select>
 
             {/* Status Select */}
