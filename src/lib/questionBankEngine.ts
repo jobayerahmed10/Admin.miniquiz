@@ -1,6 +1,21 @@
 import { Question } from '../types';
 import { WorkingQuestion, DuplicateCheckResult, AiAutoGenerateConfig } from '../types/questionBank';
 import { getDefaultSubjectPrefix } from './supabase';
+import {
+  lookupSubjectPrefixAndSequence,
+  generateProposedPrefixForSubject,
+  saveSubjectPrefixMapping,
+  normalizePrefixString,
+  PrefixLookupResult,
+} from './subjectPrefixManager';
+
+export {
+  lookupSubjectPrefixAndSequence,
+  generateProposedPrefixForSubject,
+  saveSubjectPrefixMapping,
+  normalizePrefixString,
+};
+export type { PrefixLookupResult };
 
 /**
  * Detects if a given string contains Arabic characters
@@ -29,27 +44,15 @@ export const getLanguageDirection = (
 };
 
 /**
- * Maps subject to Smart Batch Prefix
+ * Maps subject to Smart Batch Prefix with dynamic lookup fallback
  */
-export const getSmartPrefixForSubject = (subjectName?: string): string => {
+export const getSmartPrefixForSubject = (
+  subjectName?: string,
+  existingQuestions: Question[] = []
+): string => {
   if (!subjectName || !subjectName.trim()) return 'Q-BANGLA-';
-  const sub = subjectName.trim().toLowerCase();
-
-  if (sub.includes('বাংলা') || sub.includes('bangla')) return 'Q-BANGLA-';
-  if (sub.includes('ইংরেজি') || sub.includes('english')) return 'Q-ENGLISH-';
-  if (sub.includes('গণিত') || sub.includes('math')) return 'Q-MATH-';
-  if (sub.includes('সাধারণ জ্ঞান') || sub.includes('gk')) return 'Q-GK-';
-  if (sub.includes('বাংলাদেশ') || sub.includes('bangladesh')) return 'Q-BD-';
-  if (sub.includes('আন্তর্জাতিক') || sub.includes('international')) return 'Q-INT-';
-  if (sub.includes('বিজ্ঞান') || sub.includes('science')) return 'Q-SCIENCE-';
-  if (sub.includes('কম্পিউটার') || sub.includes('তথ্যপ্রযুক্তি') || sub.includes('ict')) return 'Q-ICT-';
-  if (sub.includes('ভূগোল') || sub.includes('পরিবেশ') || sub.includes('geography')) return 'Q-GEO-';
-  if (sub.includes('ইসলাম') || sub.includes('দ্বীন')) return 'Q-ISLAM-';
-  if (sub.includes('আরবি') || sub.includes('arabic') || sub.includes('العربية')) return 'Q-ARABIC-';
-  if (sub.includes('কুরআন') || sub.includes('হাদিস') || sub.includes('তাফসির')) return 'Q-QURAN-';
-  if (sub.includes('ফিকহ') || sub.includes('fiqh')) return 'Q-FIQH-';
-
-  return getDefaultSubjectPrefix(subjectName);
+  const lookup = lookupSubjectPrefixAndSequence(subjectName, existingQuestions);
+  return lookup.prefix;
 };
 
 /**
@@ -57,20 +60,24 @@ export const getSmartPrefixForSubject = (subjectName?: string): string => {
  */
 export const getNextNumberForPrefix = (
   prefix: string,
-  existingQuestions: Question[] = []
+  existingQuestions: Question[] = [],
+  isNewSubject = false
 ): number => {
   let cleanPrefix = prefix.trim().toUpperCase();
   if (!/[-\_:\.]$/.test(cleanPrefix)) {
     cleanPrefix += '-';
   }
 
-  let maxNum = 1245; // Start baseline reference as in screenshots (e.g. 01246)
+  let foundMatch = false;
+  let maxNum = 0;
+
   existingQuestions.forEach((item) => {
     const idStr = String(item.id || '').toUpperCase();
     if (idStr.startsWith(cleanPrefix)) {
       const suffix = idStr.substring(cleanPrefix.length);
       const match = suffix.match(/^(\d+)/);
       if (match) {
+        foundMatch = true;
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNum) {
           maxNum = num;
@@ -79,11 +86,21 @@ export const getNextNumberForPrefix = (
     }
   });
 
-  return maxNum + 1;
+  if (foundMatch) {
+    return maxNum + 1;
+  }
+
+  // If new subject and no prefix match exists in db, start from 1
+  if (isNewSubject) {
+    return 1;
+  }
+
+  // Default baseline for known preset subjects if empty
+  return 1246;
 };
 
 /**
- * Formats prefix and number into standard sequential ID string (e.g. Q-BANGLA-01246)
+ * Formats prefix and number into standard sequential ID string (e.g. Q-BANGLA-01246 or Q-INT-00001)
  */
 export const formatSequentialId = (prefix: string, num: number): string => {
   let cleanPrefix = prefix.trim().toUpperCase();

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { saveSubjectPrefixMapping } from './subjectPrefixManager';
 import {
   Question,
   SupabaseConfig,
@@ -201,7 +202,8 @@ export const getDefaultSubjectPrefix = (subjectName?: string): string => {
 export const generateSequentialQuestionId = (
   prefixPattern: string,
   existingQuestionsOrIds: (Question | string | number)[] = [],
-  indexOffset = 0
+  indexOffset = 0,
+  startNumberOverride?: number
 ): string => {
   if (!prefixPattern || !prefixPattern.trim()) {
     return `q_${Date.now()}_${indexOffset}_${Math.random().toString(36).substring(2, 6)}`;
@@ -212,22 +214,29 @@ export const generateSequentialQuestionId = (
     cleanPrefix += '-';
   }
 
-  let maxNum = 0;
-  existingQuestionsOrIds.forEach((item) => {
-    const idStr = typeof item === 'object' && item !== null ? String(item.id) : String(item);
-    if (idStr.toUpperCase().startsWith(cleanPrefix)) {
-      const suffix = idStr.substring(cleanPrefix.length);
-      const match = suffix.match(/^(\d+)/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
+  let baseNum: number;
+
+  if (typeof startNumberOverride === 'number' && startNumberOverride >= 1) {
+    baseNum = startNumberOverride;
+  } else {
+    let maxNum = 0;
+    existingQuestionsOrIds.forEach((item) => {
+      const idStr = typeof item === 'object' && item !== null ? String(item.id) : String(item);
+      if (idStr.toUpperCase().startsWith(cleanPrefix)) {
+        const suffix = idStr.substring(cleanPrefix.length);
+        const match = suffix.match(/^(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
         }
       }
-    }
-  });
+    });
+    baseNum = maxNum + 1;
+  }
 
-  const nextNum = maxNum + 1 + indexOffset;
+  const nextNum = baseNum + indexOffset;
   const paddedNum = String(nextNum).padStart(4, '0');
   return `${cleanPrefix}${paddedNum}`;
 };
@@ -607,7 +616,12 @@ export const insertBatchQuestions = async (
     custom_id?: string | number;
     slug?: string;
   })[],
-  options?: { custom_id_pattern?: string; custom_prefix?: string }
+  options?: {
+    custom_id_pattern?: string;
+    custom_prefix?: string;
+    custom_start_number?: number;
+    startNumber?: number;
+  }
 ): Promise<{ success: boolean; data?: Question[]; error: string | null; syncedToSupabase?: boolean }> => {
   if (!questionsToInsert || questionsToInsert.length === 0) {
     return { success: true, data: [], error: null };
@@ -619,10 +633,25 @@ export const insertBatchQuestions = async (
     options?.custom_prefix ||
     getDefaultSubjectPrefix(questionsToInsert[0]?.subject);
 
+  const startNum = options?.custom_start_number ?? options?.startNumber;
+
+  // Auto-save subject prefix mapping if custom prefix is used
+  if (pattern) {
+    const subjectsMap = new Set<string>();
+    questionsToInsert.forEach((q) => {
+      if (q.subject && q.subject.trim()) {
+        subjectsMap.add(q.subject.trim());
+      }
+    });
+    subjectsMap.forEach((subj) => {
+      saveSubjectPrefixMapping(subj, pattern);
+    });
+  }
+
   const localItems: Question[] = questionsToInsert.map((q, idx) => {
     let finalId = q.custom_id || q.id;
     if (!finalId && pattern) {
-      finalId = generateSequentialQuestionId(pattern, currentQuestions, idx);
+      finalId = generateSequentialQuestionId(pattern, currentQuestions, idx, startNum);
     }
     if (!finalId) {
       finalId = `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;

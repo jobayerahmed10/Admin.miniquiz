@@ -75,7 +75,7 @@ export const QuestionsList: React.FC = () => {
   // Publish handler to batch insert into Supabase + local cache
   const handlePublishQuestions = async (
     workingList: WorkingQuestion[],
-    options?: { custom_prefix?: string }
+    options?: { custom_prefix?: string; custom_start_number?: number }
   ) => {
     const prefix = options?.custom_prefix || getDefaultSubjectPrefix(workingList[0]?.subject);
 
@@ -101,6 +101,7 @@ export const QuestionsList: React.FC = () => {
 
     const res = await insertBatchQuestions(questionsToInsert, {
       custom_prefix: prefix,
+      custom_start_number: options?.custom_start_number,
     });
 
     // Reload questions in background
@@ -211,6 +212,7 @@ export const QuestionsList: React.FC = () => {
           onPublish={async (finalList) => {
             await handlePublishQuestions(finalList, {
               custom_prefix: manualMeta?.prefix,
+              custom_start_number: manualMeta?.nextNumber,
             });
           }}
           onGoToBank={() => setCurrentView('dashboard')}
@@ -240,6 +242,7 @@ export const QuestionsList: React.FC = () => {
           onPublish={async (finalList) => {
             await handlePublishQuestions(finalList, {
               custom_prefix: copyPasteMeta?.prefix,
+              custom_start_number: copyPasteMeta?.nextNumber,
             });
           }}
           onGoToBank={() => setCurrentView('dashboard')}
@@ -269,6 +272,7 @@ export const QuestionsList: React.FC = () => {
           onPublish={async (finalList) => {
             await handlePublishQuestions(finalList, {
               custom_prefix: aiGenConfig.prefix,
+              custom_start_number: aiGenConfig.startNumber,
             });
           }}
           onGoToBank={() => setCurrentView('dashboard')}

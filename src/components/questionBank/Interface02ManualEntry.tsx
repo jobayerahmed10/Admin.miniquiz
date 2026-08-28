@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Info,
   Plus,
@@ -18,9 +18,9 @@ import { StepIndicator } from './StepIndicator';
 import { SmartBatchPrefixCard } from './SmartBatchPrefixCard';
 import { AddCategoryModal } from './AddCategoryModal';
 import {
-  getSmartPrefixForSubject,
-  getNextNumberForPrefix,
+  lookupSubjectPrefixAndSequence,
   isArabicText,
+  PrefixLookupResult,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
 import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject } from '../../lib/subjectManager';
@@ -54,9 +54,24 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
   // Modal for adding new subject, topic, post
   const [addModalType, setAddModalType] = useState<'subject' | 'topic' | 'post' | null>(null);
 
-  // Prefix calculation
-  const currentPrefix = getSmartPrefixForSubject(subject);
-  const nextNumber = getNextNumberForPrefix(currentPrefix, existingQuestions);
+  // Dynamic Prefix Lookup State
+  const [prefix, setPrefix] = useState('Q-BANGLA-');
+  const [nextNumber, setNextNumber] = useState(1246);
+  const [lookupInfo, setLookupInfo] = useState<PrefixLookupResult | undefined>(undefined);
+  const [hasManuallyEditedPrefix, setHasManuallyEditedPrefix] = useState(false);
+
+  // Re-calculate prefix and next number whenever subject or existing questions change
+  const refreshPrefixLookup = useCallback((subj: string) => {
+    const result = lookupSubjectPrefixAndSequence(subj, existingQuestions);
+    setLookupInfo(result);
+    setPrefix(result.prefix);
+    setNextNumber(result.nextNumber);
+    setHasManuallyEditedPrefix(false);
+  }, [existingQuestions]);
+
+  useEffect(() => {
+    refreshPrefixLookup(subject);
+  }, [subject, refreshPrefixLookup]);
 
   // Working questions state
   const [questionsList, setQuestionsList] = useState<WorkingQuestion[]>(() => {
@@ -187,8 +202,9 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
       language,
       questionType,
       difficulty,
-      prefix: currentPrefix,
+      prefix,
       nextNumber,
+      lookupInfo,
     });
   };
 
@@ -340,7 +356,20 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
       </div>
 
       {/* 4. Smart Batch Prefix Card (Screenshot 2) */}
-      <SmartBatchPrefixCard prefix={currentPrefix} nextNumber={nextNumber} />
+      <SmartBatchPrefixCard
+        prefix={prefix}
+        nextNumber={nextNumber}
+        lookupInfo={lookupInfo}
+        subjectName={subject}
+        onPrefixChange={(newP) => {
+          setPrefix(newP);
+          setHasManuallyEditedPrefix(true);
+        }}
+        onNextNumberChange={(newN) => {
+          setNextNumber(newN);
+        }}
+        onRefresh={() => refreshPrefixLookup(subject)}
+      />
 
       {/* 5. Dynamic MCQ Question Input Cards */}
       <div className="space-y-4">

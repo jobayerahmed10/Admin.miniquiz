@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles,
   Info,
@@ -20,10 +20,10 @@ import { StepIndicator } from './StepIndicator';
 import { SmartBatchPrefixCard } from './SmartBatchPrefixCard';
 import { AddCategoryModal } from './AddCategoryModal';
 import {
-  getSmartPrefixForSubject,
-  getNextNumberForPrefix,
+  lookupSubjectPrefixAndSequence,
   generateAiQuestions,
   isArabicText,
+  PrefixLookupResult,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
 import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject } from '../../lib/subjectManager';
@@ -65,11 +65,24 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
   const [allPosts, setAllPosts] = useState<string[]>([]);
   const [addModalType, setAddModalType] = useState<'subject' | 'topic' | 'post' | null>(null);
 
+  // Dynamic Prefix Lookup
+  const [prefix, setPrefix] = useState('Q-BANGLA-');
+  const [nextNumber, setNextNumber] = useState(1246);
+  const [lookupInfo, setLookupInfo] = useState<PrefixLookupResult | undefined>(undefined);
+
+  const refreshPrefixLookup = useCallback((subj: string) => {
+    const result = lookupSubjectPrefixAndSequence(subj, existingQuestions);
+    setLookupInfo(result);
+    setPrefix(result.prefix);
+    setNextNumber(result.nextNumber);
+  }, [existingQuestions]);
+
+  useEffect(() => {
+    refreshPrefixLookup(subject);
+  }, [subject, refreshPrefixLookup]);
+
   // Example Carousel
   const [exampleIndex, setExampleIndex] = useState(0);
-
-  const currentPrefix = getSmartPrefixForSubject(subject);
-  const nextNumber = getNextNumberForPrefix(currentPrefix, existingQuestions);
 
   useEffect(() => {
     const customSubs = getCustomSubjects();
@@ -112,7 +125,7 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
       questionsPerTopic,
       features,
       additionalInstructions,
-      prefix: currentPrefix,
+      prefix,
       startNumber: nextNumber,
     };
 
@@ -417,7 +430,16 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
           </div>
 
           {/* Smart Batch Prefix Card */}
-          <SmartBatchPrefixCard prefix={currentPrefix} nextNumber={nextNumber} isAutoLabel />
+          <SmartBatchPrefixCard
+            prefix={prefix}
+            nextNumber={nextNumber}
+            lookupInfo={lookupInfo}
+            subjectName={subject}
+            onPrefixChange={(newP) => setPrefix(newP)}
+            onNextNumberChange={(newN) => setNextNumber(newN)}
+            onRefresh={() => refreshPrefixLookup(subject)}
+            isAutoLabel
+          />
 
           {/* Notice Box */}
           <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-3.5 text-xs text-emerald-300 flex items-start gap-2.5">
