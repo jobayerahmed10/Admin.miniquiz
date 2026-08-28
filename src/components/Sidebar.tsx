@@ -11,7 +11,6 @@ import {
   BookOpen,
   Users,
   X,
-  Flame,
   ChevronLeft,
   Layers,
 } from 'lucide-react';
@@ -160,23 +159,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Special Banner / Pill */}
-        <div className="px-3.5 pt-3.5 pb-1">
-          <div className="bg-gradient-to-r from-emerald-50 via-slate-50 to-emerald-50 dark:from-emerald-950/80 dark:via-slate-900 dark:to-emerald-950/80 border border-emerald-200 dark:border-emerald-500/30 rounded-2xl p-3 flex items-start gap-2.5 shadow-sm">
-            <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
-              <Flame className="w-4 h-4 text-emerald-600 dark:text-emerald-400 fill-emerald-500/20 animate-pulse" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200 leading-snug">
-                ১৮তম NTRCA ক্যাডার স্পেশাল
-              </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                প্রভাষক ও সহকারী শিক্ষক (আরবি)
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Navigation Items */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
           {menuItems.map((item) => {
@@ -260,13 +242,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Sidebar Footer & Student App Link */}
         <div className="p-3.5 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-[#070c16] space-y-2">
-          <Link
-            to="/app"
-            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 dark:from-emerald-600/20 dark:to-teal-500/20 dark:hover:from-emerald-600/30 dark:hover:to-teal-500/30 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
-          >
-            <GraduationCap className="w-3.5 h-3.5" />
-            <span>শিক্ষার্থী অ্যাপে যান (Student App)</span>
-          </Link>
           <div className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-between px-1">
             <span className="font-semibold">v2.5 Full-Stack</span>
             <span className="text-emerald-600 dark:text-emerald-400/80 font-mono font-medium">Supabase Auth</span>
