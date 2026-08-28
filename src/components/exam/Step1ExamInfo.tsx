@@ -140,36 +140,6 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
           </h2>
         </div>
 
-        {/* পরীক্ষার আইডি (Exam ID) */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
-            <span>পরীক্ষার আইডি (Exam ID) <span className="text-rose-500">*</span></span>
-            <button
-              type="button"
-              onClick={() => {
-                fetchAllExams().then(({ exams }) => {
-                  const prefix = getDefaultExamPrefix(formData.subject, formData.exam_format);
-                  const nextId = generateSequentialExamId(prefix, exams);
-                  setFormData({ ...formData, custom_id: nextId });
-                });
-              }}
-              className="text-[11px] text-[#5B36F5] dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
-            >
-              <Sparkles className="w-3 h-3" /> নতুন আইডি জেনারেট করুন
-            </button>
-          </label>
-          <input
-            type="text"
-            value={formData.custom_id || ''}
-            onChange={(e) => setFormData({ ...formData, custom_id: e.target.value })}
-            placeholder="যেমন: EXAM-FREE-0001"
-            className="w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
-          />
-          <p className="text-[11px] text-slate-400 mt-1">
-            অটোমেটিক প্রেফিক্স ও সিকুয়েন্স নম্বরযুক্ত আইডি (ম্যানুয়ালি এডিটেবল)।
-          </p>
-        </div>
-
         {/* 1. পরীক্ষার নাম */}
         <div>
           <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
@@ -200,7 +170,12 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               type="text"
               value={formData.subject}
               onChange={(e) => {
-                setFormData({ ...formData, subject: e.target.value });
+                const newSubj = e.target.value;
+                fetchAllExams().then(({ exams }) => {
+                  const prefix = getDefaultExamPrefix(newSubj, formData.exam_format);
+                  const nextId = generateSequentialExamId(prefix, exams);
+                  setFormData(prev => ({ ...prev, subject: newSubj, custom_id: nextId }));
+                });
                 if (errors.subject) setErrors({ ...errors, subject: '' });
               }}
               placeholder="যেমন: বাংলা"
@@ -229,6 +204,36 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
             />
             {errors.topic && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.topic}</p>}
           </div>
+        </div>
+
+        {/* পরীক্ষার আইডি (Exam ID) - placed right after name & subject */}
+        <div>
+          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
+            <span>পরীক্ষার আইডি (Exam ID) <span className="text-rose-500">*</span></span>
+            <button
+              type="button"
+              onClick={() => {
+                fetchAllExams().then(({ exams }) => {
+                  const prefix = getDefaultExamPrefix(formData.subject, formData.exam_format);
+                  const nextId = generateSequentialExamId(prefix, exams);
+                  setFormData({ ...formData, custom_id: nextId });
+                });
+              }}
+              className="text-[11px] text-[#5B36F5] dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
+            >
+              <Sparkles className="w-3 h-3" /> নতুন আইডি জেনারেট করুন
+            </button>
+          </label>
+          <input
+            type="text"
+            value={formData.custom_id || ''}
+            onChange={(e) => setFormData({ ...formData, custom_id: e.target.value })}
+            placeholder="যেমন: EXAM-FREE-0001"
+            className="w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
+          />
+          <p className="text-[11px] text-slate-400 mt-1">
+            বিষয় ও টাইপের উপর ভিত্তি করে অটোমেটিক প্রেফিক্স ও সিকুয়েন্স নম্বরযুক্ত আইডি (ম্যানুয়ালি এডিটেবল)।
+          </p>
         </div>
 
         {/* 2-col Grid: পদ / যাদের জন্য প্রযোজ্য & পরীক্ষার ধরন */}

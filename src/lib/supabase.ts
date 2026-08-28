@@ -1220,6 +1220,7 @@ export const insertExam = async (
       error.code === '42703'
     )) {
       const basicPayload = {
+        ...(customId ? { id: customId } : {}),
         title: newExam.title,
         badge: newExam.badge,
         badge_type: newExam.badge_type,
@@ -1230,8 +1231,6 @@ export const insertExam = async (
         total_marks: newExam.total_marks,
         description: newExam.description || '',
         status: newExam.status,
-       
-       
       };
 
       const retryResult = await client
