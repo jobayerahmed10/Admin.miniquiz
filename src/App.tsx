@@ -32,19 +32,28 @@ const AdminLayout: React.FC<{
 }> = ({ isAuthenticated, onLogout, userEmail }) => {
   const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : true));
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [stats, setStats] = useState({ questionsCount: 30, examsCount: 2 });
+  const [stats, setStats] = useState({ questionsCount: 0, examsCount: 0 });
+
+  const loadStats = async () => {
+    const { stats: fetchedStats } = await fetchDashboardStats();
+    if (fetchedStats) {
+      setStats({
+        questionsCount: fetchedStats.totalQuestions ?? 0,
+        examsCount: fetchedStats.totalExams ?? 0,
+      });
+    }
+  };
 
   useEffect(() => {
-    const loadStats = async () => {
-      const { stats: fetchedStats } = await fetchDashboardStats();
-      if (fetchedStats) {
-        setStats({
-          questionsCount: fetchedStats.totalQuestions || 30,
-          examsCount: fetchedStats.totalExams || 2,
-        });
-      }
-    };
     loadStats();
+
+    const handleUpdated = () => {
+      loadStats();
+    };
+    window.addEventListener('questions_updated', handleUpdated);
+    return () => {
+      window.removeEventListener('questions_updated', handleUpdated);
+    };
   }, []);
 
   if (!isAuthenticated) {
@@ -89,14 +98,7 @@ const AdminLayout: React.FC<{
         onClose={() => setAiModalOpen(false)}
         onQuestionsSaved={() => {
           setAiModalOpen(false);
-          fetchDashboardStats().then(({ stats: fetchedStats }) => {
-            if (fetchedStats) {
-              setStats({
-                questionsCount: fetchedStats.totalQuestions || 30,
-                examsCount: fetchedStats.totalExams || 2,
-              });
-            }
-          });
+          loadStats();
           window.dispatchEvent(new CustomEvent('questions_updated'));
         }}
       />

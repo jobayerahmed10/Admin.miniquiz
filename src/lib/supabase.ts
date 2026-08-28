@@ -738,6 +738,60 @@ export const deleteQuestion = async (id: string | number): Promise<{ success: bo
   }
 };
 
+// Delete Batch Questions
+export const deleteBatchQuestions = async (
+  ids: (string | number)[]
+): Promise<{ success: boolean; error: string | null }> => {
+  if (!ids || ids.length === 0) return { success: true, error: null };
+
+  const current = getLocalCachedQuestions();
+  const idStrSet = new Set(ids.map((id) => String(id)));
+  setLocalCachedQuestions(current.filter((q) => !idStrSet.has(String(q.id))));
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { error } = await client
+      .from('questions')
+      .delete()
+      .in('id', ids);
+
+    if (error) {
+      console.warn('Supabase deleteBatchQuestions warning:', error);
+    }
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: true, error: null };
+  }
+};
+
+// Clear All Questions
+export const clearAllQuestions = async (): Promise<{ success: boolean; error: string | null }> => {
+  setLocalCachedQuestions([]);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { error } = await client
+      .from('questions')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      console.warn('Supabase clearAllQuestions warning:', error);
+    }
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: true, error: null };
+  }
+};
+
 /* ==========================================================================
    PUBLIC.EXAMS TABLE CRUD FUNCTIONS + LOCAL CACHE & RESILIENCE
    ========================================================================== */

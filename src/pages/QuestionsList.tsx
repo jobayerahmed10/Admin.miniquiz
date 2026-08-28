@@ -22,7 +22,13 @@ import {
   X,
   Tag,
 } from 'lucide-react';
-import { fetchAllQuestions, deleteQuestion, updateQuestion } from '../lib/supabase';
+import {
+  fetchAllQuestions,
+  deleteQuestion,
+  updateQuestion,
+  clearAllQuestions,
+  deleteBatchQuestions,
+} from '../lib/supabase';
 import { Question } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
@@ -60,6 +66,9 @@ export const QuestionsList: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
   // Expanded details modal
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null);
@@ -215,9 +224,31 @@ export const QuestionsList: React.FC = () => {
     if (success) {
       setQuestions((prev) => prev.filter((q) => q.id !== deletingId));
       setDeletingId(null);
+      window.dispatchEvent(new CustomEvent('questions_updated'));
     } else {
       setDeleteError(err || 'প্রশ্ন মুছে ফেলার প্রক্রিয়ায় ত্রুটি ঘটেছে।');
     }
+  };
+
+  const handleConfirmClearAll = async () => {
+    setIsClearingAll(true);
+    await clearAllQuestions();
+    setIsClearingAll(false);
+    setIsClearAllModalOpen(false);
+    setQuestions([]);
+    setSelectedIds([]);
+    window.dispatchEvent(new CustomEvent('questions_updated'));
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setIsDeleting(true);
+    await deleteBatchQuestions(selectedIds);
+    setIsDeleting(false);
+    setIsBulkDeleteModalOpen(false);
+    setQuestions((prev) => prev.filter((q) => !selectedIds.includes(q.id)));
+    setSelectedIds([]);
+    window.dispatchEvent(new CustomEvent('questions_updated'));
   };
 
   // Filter & search logic
@@ -277,6 +308,16 @@ export const QuestionsList: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {questions.length > 0 && (
+            <button
+              onClick={() => setIsClearAllModalOpen(true)}
+              className="px-3.5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl border border-red-500/30 transition-all flex items-center gap-1.5"
+              title="সকল প্রশ্ন একসাথে মুছে ফেলুন"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              সকল প্রশ্ন মুছে ফেলুন
+            </button>
+          )}
           <button
             onClick={loadQuestions}
             disabled={loading}
@@ -512,6 +553,15 @@ export const QuestionsList: React.FC = () => {
                 <CheckCircle2 className="w-3.5 h-3.5" />
               )}
               বিষয় পরিবর্তন করুন
+            </button>
+
+            <button
+              onClick={() => setIsBulkDeleteModalOpen(true)}
+              disabled={isDeleting}
+              className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-extrabold rounded-xl transition-all shadow flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              সিলেক্টকৃত প্রশ্ন মুছুন ({selectedIds.length})
             </button>
 
             <button
@@ -1022,6 +1072,32 @@ export const QuestionsList: React.FC = () => {
         onClose={() => setIsAiModalOpen(false)}
         onQuestionsSaved={() => loadQuestions()}
         availableSubjects={allAvailableSubjects}
+      />
+
+      {/* Clear All Confirm Modal */}
+      <ConfirmModal
+        isOpen={isClearAllModalOpen}
+        onClose={() => setIsClearAllModalOpen(false)}
+        onConfirm={handleConfirmClearAll}
+        title="সকল প্রশ্ন মুছে ফেলার বিষয়ে নিশ্চিতকরণ"
+        message={`আপনি কি নিশ্চিত যে ডাটাবেস এবং ক্যাশ থেকে সকল (${questions.length}টি) প্রশ্ন একবারে মুছে ফেলতে চান? নতুন করে প্রশ্ন যোগ করার জন্য এটি খালি করা হবে।`}
+        confirmText="হ্যাঁ, সকল প্রশ্ন মুছে ফেলুন"
+        cancelText="বাতিল"
+        type="danger"
+        isLoading={isClearingAll}
+      />
+
+      {/* Bulk Delete Selected Confirm Modal */}
+      <ConfirmModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="সিলেক্টকৃত প্রশ্ন মুছে ফেলার নিশ্চয়তা"
+        message={`আপনি সিলেক্ট করা ${selectedIds.length}টি প্রশ্ন স্থায়ীভাবে মুছে ফেলতে চাচ্ছেন। এটি পরবর্তীতে পুনরুদ্ধার করা যাবে না।`}
+        confirmText="হ্যাঁ, সিলেক্টকৃত প্রশ্নগুলো মুছুন"
+        cancelText="বাতিল"
+        type="danger"
+        isLoading={isDeleting}
       />
     </div>
   );

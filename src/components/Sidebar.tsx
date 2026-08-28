@@ -28,8 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   onOpenAiModal,
-  questionsCount = 30,
-  examsCount = 2,
+  questionsCount = 0,
+  examsCount = 0,
 }) => {
   const location = useLocation();
 

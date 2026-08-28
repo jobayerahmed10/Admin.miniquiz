@@ -164,7 +164,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
 
             <div className="mt-4">
               <span className="text-4xl font-black text-white tracking-tight">
-                {loading ? '...' : stats.totalQuestions || 30}
+                {loading ? '...' : stats.totalQuestions ?? 0}
               </span>
             </div>
 
