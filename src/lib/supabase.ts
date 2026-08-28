@@ -762,22 +762,36 @@ export const insertBatchQuestions = async (
   }
 
   try {
-    const payload = localItems.map((q) => ({
-      id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
-      question: q.question,
-      option_a: q.option_a,
-      option_b: q.option_b,
-      option_c: q.option_c,
-      option_d: q.option_d,
-      correct_answer: q.correct_answer,
-      explanation: q.explanation || '',
-      slug: q.slug || generateQuestionSlug(q.question),
-      status: q.status || 'published',
-      subject: q.subject || 'সাধারণ',
-      topic: q.topic || '',
-      post: q.post || '',
-      ...(q.exam_id ? { exam_id: String(q.exam_id) } : {}),
-    }));
+    const payload = localItems.map((q) => {
+      const qText = q.question || (q as any).question_text || '';
+      const optA = q.option_a || (Array.isArray((q as any).options) ? (q as any).options[0] : '') || '';
+      const optB = q.option_b || (Array.isArray((q as any).options) ? (q as any).options[1] : '') || '';
+      const optC = q.option_c || (Array.isArray((q as any).options) ? (q as any).options[2] : '') || '';
+      const optD = q.option_d || (Array.isArray((q as any).options) ? (q as any).options[3] : '') || '';
+      const optsArray = (q as any).options && Array.isArray((q as any).options) ? (q as any).options : [optA, optB, optC, optD];
+
+      const item: any = {
+        id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+        question: qText,
+        question_text: qText,
+        option_a: optA,
+        option_b: optB,
+        option_c: optC,
+        option_d: optD,
+        options: optsArray,
+        correct_answer: q.correct_answer || (q as any).correctAnswer || 'option_a',
+        explanation: q.explanation || '',
+        slug: q.slug || generateQuestionSlug(qText),
+        status: q.status || 'published',
+        subject: q.subject || 'সাধারণ',
+        topic: q.topic || '',
+        post: q.post || '',
+      };
+      if (q.exam_id) {
+        item.exam_id = String(q.exam_id);
+      }
+      return item;
+    });
 
     console.log('Payload: Questions batch insert', JSON.stringify(payload, null, 2));
 
@@ -787,19 +801,20 @@ export const insertBatchQuestions = async (
       .select();
 
     if (error) {
-      console.warn('Supabase batch insert questions initial error (attempting safe fallback):', error);
+      console.error('Questions Insert Error (initial attempt failed):', error);
       const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
       const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
 
+      // Fallback 1: Standard columns without options array / question_text if those caused schema issues
       const fallbackPayload = payload.map((p: any) => {
-        const { topic, post, slug, ...rest } = p;
+        const { topic, post, slug, options, question_text, ...rest } = p;
         if (isExamIdError) {
           delete rest.exam_id;
         }
         return rest;
       });
 
-      console.log('Payload: Retry batch insert fallback', JSON.stringify(fallbackPayload, null, 2));
+      console.log('Payload: Retry batch insert fallback 1', JSON.stringify(fallbackPayload, null, 2));
 
       let retryResult = await client
         .from('questions')
@@ -807,17 +822,24 @@ export const insertBatchQuestions = async (
         .select();
 
       if (retryResult.error) {
-        console.warn('Supabase batch insert retry 1 failed, trying minimal payload:', retryResult.error);
-        const minimalPayload = payload.map((p: any) => ({
-          id: p.id,
-          question: p.question,
-          option_a: p.option_a,
-          option_b: p.option_b,
-          option_c: p.option_c,
-          option_d: p.option_d,
-          correct_answer: p.correct_answer,
-          explanation: p.explanation || '',
-        }));
+        console.error('Questions Insert Error (retry 1 failed):', retryResult.error);
+        // Fallback 2: Minimal columns
+        const minimalPayload = payload.map((p: any) => {
+          const minItem: any = {
+            id: p.id,
+            question: p.question,
+            option_a: p.option_a,
+            option_b: p.option_b,
+            option_c: p.option_c,
+            option_d: p.option_d,
+            correct_answer: p.correct_answer,
+            explanation: p.explanation || '',
+          };
+          if (!isExamIdError && p.exam_id) {
+            minItem.exam_id = p.exam_id;
+          }
+          return minItem;
+        });
 
         retryResult = await client
           .from('questions')
@@ -830,7 +852,7 @@ export const insertBatchQuestions = async (
     }
 
     if (error || !data) {
-      console.error('Supabase batch insert questions final error:', error);
+      console.error('Questions Insert Error:', error);
       return {
         success: false,
         data: localItems,

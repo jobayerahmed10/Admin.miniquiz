@@ -226,28 +226,39 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
 
       const targetExamId = String(savedExam?.id || examId);
 
-      // 3. Batch Save / Link Questions
+      // 3. Batch Save Questions linked to the Exam ID
       if (updatedQuestions.length > 0) {
-        const qRes = await insertBatchQuestions(
-          updatedQuestions.map((q) => ({
-            id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+        const questionsPayload = updatedQuestions.map((q, idx) => {
+          const customQuestionId = String(q.id || `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`);
+          return {
+            id: customQuestionId,
+            exam_id: targetExamId,
+            subject: examInfo.subject || q.subject || 'সাধারণ',
+            question_text: q.question,
             question: q.question,
             option_a: q.option_a,
             option_b: q.option_b,
             option_c: q.option_c,
             option_d: q.option_d,
+            options: [q.option_a, q.option_b, q.option_c, q.option_d],
             correct_answer: q.correct_answer,
-            explanation: q.explanation || null,
-            subject: q.subject || examInfo.subject,
-            topic: q.topic || examInfo.topic,
-            post: q.post || examInfo.post,
-            exam_id: targetExamId,
+            explanation: q.explanation || '',
             status: 'published',
-            slug: q.slug,
-          }))
-        );
+            slug: q.slug || generateQuestionSlug(q.question),
+            topic: q.topic || examInfo.topic || '',
+            post: q.post || examInfo.post || '',
+          };
+        });
+
+        console.log(`Saving ${questionsPayload.length} questions for Exam ID (${targetExamId}):`, questionsPayload);
+
+        const qRes = await insertBatchQuestions(questionsPayload as any);
+
         if (!qRes.success) {
-          console.warn('Questions batch save notice:', qRes.error);
+          const qErr = qRes.error || 'প্রশ্নগুলো টেবিলে সেভ করতে সমস্যা হয়েছে।';
+          console.error(`Questions Insert Error: ${qErr}`);
+          alert(`Questions Insert Error: ${qErr}`);
+          throw new Error(`Questions Insert Error: ${qErr}`);
         }
       }
 
