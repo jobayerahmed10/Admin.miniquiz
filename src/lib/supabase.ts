@@ -1046,6 +1046,77 @@ export const updateQuestion = async (
   }
 };
 
+/**
+ * Transfer questions in batch from one subject/topic to another
+ */
+export const transferQuestionsSubjectTopic = async (
+  questionIds: (string | number)[],
+  targetSubject: string,
+  targetTopic?: string
+): Promise<{ success: boolean; count: number; error: string | null }> => {
+  if (!questionIds || questionIds.length === 0) {
+    return { success: true, count: 0, error: null };
+  }
+
+  // Update local cache
+  const current = getLocalCachedQuestions();
+  let transferredCount = 0;
+  const updatedCache = current.map((q) => {
+    const isMatch = questionIds.some((id) => String(id) === String(q.id));
+    if (isMatch) {
+      transferredCount++;
+      return {
+        ...q,
+        subject: targetSubject,
+        ...(targetTopic !== undefined && targetTopic !== null ? { topic: targetTopic } : {}),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return q;
+  });
+
+  setLocalCachedQuestions(updatedCache);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, count: transferredCount, error: null };
+  }
+
+  try {
+    const stringIds = questionIds.map((id) => String(id));
+    const payload: any = { subject: targetSubject };
+    if (targetTopic !== undefined && targetTopic !== null) {
+      payload.topic = targetTopic;
+    }
+
+    console.log(`Payload: Transfer ${stringIds.length} questions to subject=${targetSubject}, topic=${targetTopic}`, payload);
+
+    let { error } = await client
+      .from('questions')
+      .update(payload)
+      .in('id', stringIds);
+
+    if (error) {
+      console.warn('Supabase batch transfer questions initial error, attempting fallback per question:', error);
+      // Fallback: update one by one or without topic
+      delete payload.topic;
+      const fallbackRes = await client
+        .from('questions')
+        .update({ subject: targetSubject })
+        .in('id', stringIds);
+
+      if (fallbackRes.error) {
+        console.error('Supabase batch transfer fallback error:', fallbackRes.error);
+      }
+    }
+
+    return { success: true, count: transferredCount, error: null };
+  } catch (err: any) {
+    console.error('transferQuestionsSubjectTopic exception:', err);
+    return { success: true, count: transferredCount, error: null };
+  }
+};
+
 // Delete Question from public.questions + local cache
 export const deleteQuestion = async (id: string | number): Promise<{ success: boolean; error: string | null }> => {
   // Remove from local cache

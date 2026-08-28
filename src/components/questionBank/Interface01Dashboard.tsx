@@ -21,10 +21,17 @@ import {
   ChevronRight,
   RefreshCw,
   Plus,
+  ArrowRightLeft,
+  Tag,
+  X,
+  CheckSquare,
+  Square,
+  FolderSync,
 } from 'lucide-react';
 import { Question } from '../../types';
 import { QuestionBankHeader } from './Header';
 import { isArabicText, getQuestionBankDirectionality } from '../../lib/questionBankEngine';
+import { transferQuestionsSubjectTopic } from '../../lib/supabase';
 
 interface Interface01DashboardProps {
   questions: Question[];
@@ -48,13 +55,22 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   onClearAll,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'subject' | 'topic'>('subject');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedTopic, setSelectedTopic] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
-  const [viewAllQuestionsModal, setViewAllQuestionsModal] = useState(false);
-  const [viewQuestionDetail, setViewQuestionDetail] = useState<Question | null>(null);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<(string | number)[]>([]);
 
-  // Dynamic calculations based on real questions (no fake mock inflation)
+  // Transfer modal state
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferSourceSubject, setTransferSourceSubject] = useState<string>('all');
+  const [transferSourceTopic, setTransferSourceTopic] = useState<string>('all');
+  const [transferTargetSubject, setTransferTargetSubject] = useState<string>('উসূলুল ফিকহ');
+  const [transferTargetTopic, setTransferTargetTopic] = useState<string>('');
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  // Dynamic calculations based on real questions
   const stats = useMemo(() => {
     const total = questions.length;
     const published = questions.filter((q) => q.status === 'published').length;
@@ -71,6 +87,24 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       duplicates,
       addedToday,
     };
+  }, [questions]);
+
+  // Unique topics list
+  const allUniqueTopics = useMemo(() => {
+    const set = new Set<string>();
+    questions.forEach((q) => {
+      if (q.topic) set.add(q.topic);
+    });
+    return Array.from(set);
+  }, [questions]);
+
+  // Unique subjects list from actual questions
+  const availableSubjectsFromQuestions = useMemo(() => {
+    const set = new Set<string>();
+    questions.forEach((q) => {
+      if (q.subject) set.add(q.subject);
+    });
+    return Array.from(set);
   }, [questions]);
 
   // Subject counts based on real questions
@@ -93,10 +127,39 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
     ];
 
     const uniqueSubjects = Array.from(
-      new Set([...Object.keys(counts), 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান', 'العربية', 'ফিকহ'])
+      new Set([...Object.keys(counts), 'উসূলুল ফিকহ', 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান', 'العربية', 'ফিকহ'])
     ).filter(Boolean);
 
     return uniqueSubjects.map((name, idx) => {
+      const palette = colorPalettes[idx % colorPalettes.length];
+      return {
+        name,
+        count: counts[name] || 0,
+        ...palette,
+      };
+    });
+  }, [questions]);
+
+  // Topic counts based on real questions
+  const topicStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    questions.forEach((q) => {
+      const top = q.topic || 'সাধারণ টপিক';
+      counts[top] = (counts[top] || 0) + 1;
+    });
+
+    const colorPalettes = [
+      { color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
+      { color: 'from-purple-500 to-indigo-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
+      { color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
+      { color: 'from-blue-500 to-sky-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
+      { color: 'from-rose-500 to-pink-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
+      { color: 'from-cyan-500 to-teal-600', text: 'text-cyan-400', bg: 'bg-cyan-950/40 border-cyan-500/30' },
+    ];
+
+    const uniqueTopics = Object.keys(counts).filter(Boolean);
+
+    return uniqueTopics.map((name, idx) => {
       const palette = colorPalettes[idx % colorPalettes.length];
       return {
         name,
@@ -110,6 +173,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
       if (selectedSubject !== 'all' && q.subject !== selectedSubject) return false;
+      if (selectedTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== selectedTopic) return false;
       if (selectedStatus !== 'all' && q.status !== selectedStatus) return false;
       if (selectedLanguage !== 'all') {
         const isArab = isArabicText(q.question);
@@ -122,14 +186,91 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       }
       return true;
     });
-  }, [questions, selectedSubject, selectedStatus, selectedLanguage, searchQuery]);
+  }, [questions, selectedSubject, selectedTopic, selectedStatus, selectedLanguage, searchQuery]);
+
+  // Count matching questions for transfer preview
+  const transferMatchingCount = useMemo(() => {
+    if (selectedQuestionIds.length > 0) return selectedQuestionIds.length;
+    return questions.filter((q) => {
+      if (transferSourceSubject !== 'all' && q.subject !== transferSourceSubject) return false;
+      if (transferSourceTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== transferSourceTopic) return false;
+      return true;
+    }).length;
+  }, [questions, selectedQuestionIds, transferSourceSubject, transferSourceTopic]);
+
+  // Selection handlers
+  const handleToggleSelectQuestion = (id: string | number) => {
+    setSelectedQuestionIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const allFilteredIds = filteredQuestions.map((q) => q.id);
+    const isAllSelected = allFilteredIds.every((id) => selectedQuestionIds.includes(id));
+    if (isAllSelected) {
+      setSelectedQuestionIds((prev) => prev.filter((id) => !allFilteredIds.includes(id)));
+    } else {
+      setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allFilteredIds])));
+    }
+  };
+
+  // Perform transfer action
+  const handlePerformTransfer = async () => {
+    if (!transferTargetSubject.trim()) {
+      alert('অনুগ্রহ করে একটি লক্ষ্য বিষয় (Target Subject) সিলেক্ট করুন বা লিখুন।');
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      let idsToTransfer: (string | number)[] = [];
+
+      if (selectedQuestionIds.length > 0) {
+        idsToTransfer = selectedQuestionIds;
+      } else {
+        idsToTransfer = questions
+          .filter((q) => {
+            if (transferSourceSubject !== 'all' && q.subject !== transferSourceSubject) return false;
+            if (transferSourceTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== transferSourceTopic) return false;
+            return true;
+          })
+          .map((q) => q.id);
+      }
+
+      if (idsToTransfer.length === 0) {
+        alert('ট্রান্সফারের জন্য কোনো প্রশ্ন পাওয়া যায়নি।');
+        setIsTransferring(false);
+        return;
+      }
+
+      const res = await transferQuestionsSubjectTopic(
+        idsToTransfer,
+        transferTargetSubject.trim(),
+        transferTargetTopic.trim() || undefined
+      );
+
+      if (res.success) {
+        alert(`সফলভাবে ${res.count} টি প্রশ্ন '${transferTargetSubject.trim()}' বিষয়ে স্থানান্তরিত করা হয়েছে!`);
+        setSelectedQuestionIds([]);
+        setIsTransferModalOpen(false);
+        onRefresh();
+      } else {
+        alert(res.error || 'প্রশ্ন ট্রান্সফার করতে সমস্যা হয়েছে।');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'প্রশ্ন স্থানান্তরে ত্রুটি ঘটেছে।');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Header */}
       <QuestionBankHeader title="মাস্টার প্রশ্ন ব্যাংক" subTitle="QUESTION BANK" />
 
-      {/* 2. Three Creation Method Cards (Exactly like Screenshot 1) */}
+      {/* 2. Three Creation Method Cards */}
       <div className="space-y-3">
         <h2 className="text-sm font-black text-white px-1">
           প্রশ্ন যুক্ত করার উপায় নির্বাচন করুন
@@ -158,7 +299,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             </div>
           </div>
 
-          {/* Card 2: AI Copy-Paste (Glowing Recommended) */}
+          {/* Card 2: AI Copy-Paste */}
           <div
             onClick={onSelectCopyPaste}
             className="group cursor-pointer bg-[#081d22] hover:bg-[#0c282f] border border-emerald-500/50 hover:border-emerald-400 rounded-3xl p-5 sm:p-6 transition-all duration-200 shadow-xl shadow-emerald-950/30 relative overflow-hidden flex flex-col justify-between ring-1 ring-emerald-500/30"
@@ -209,7 +350,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. Summary Stats (6 Cards, exactly like Screenshot 1) */}
+      {/* 3. Summary Stats */}
       <div className="space-y-3">
         <h2 className="text-sm font-black text-white px-1">সারসংক্ষেপ</h2>
 
@@ -294,46 +435,163 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. Subject Breakdown with 'সব দেখুন' */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-black text-white">বিষয় ভিত্তিক প্রশ্ন সংখ্যা</h2>
+      {/* Subject Transfer Assistance Banner if needed */}
+      {questions.some((q) => q.subject === 'উসুলুল') && (
+        <div className="bg-gradient-to-r from-indigo-950/80 via-[#0b152d] to-indigo-950/80 border border-indigo-500/40 rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <ArrowRightLeft className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-white">
+                'উসুলুল' বিষয়ের প্রশ্নগুলো 'উসূলুল ফিকহ' এ স্থানান্তর করুন
+              </h4>
+              <p className="text-[11px] text-slate-300">
+                ডাটাবেসে ২০ টি প্রশ্ন 'উসুলুল' বিষয় হিসেবে আছে। ট্রান্সফার টুল ব্যবহার করে এক ক্লিকেই সেগুলো 'উসূলুল ফিকহ' এ নিয়ে নিতে পারেন।
+              </p>
+            </div>
+          </div>
           <button
-            onClick={() => setSelectedSubject('all')}
-            className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+            onClick={() => {
+              setTransferSourceSubject('উসুলুল');
+              setTransferTargetSubject('উসূলুল ফিকহ');
+              setIsTransferModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black shadow-lg shadow-indigo-600/30 flex items-center gap-2 shrink-0 transition-all"
           >
-            <span>সব দেখুন</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ArrowRightLeft className="w-4 h-4" />
+            <span>এখনই স্থানান্তর করুন</span>
           </button>
         </div>
+      )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {subjectStats.map((sub) => (
-            <div
-              key={sub.name}
-              onClick={() => setSelectedSubject(selectedSubject === sub.name ? 'all' : sub.name)}
-              className={`cursor-pointer rounded-3xl p-4 border transition-all ${
-                selectedSubject === sub.name
-                  ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
-                  : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs font-black ${sub.text}`}>{sub.name}</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              </div>
-              <p className="text-base font-black text-white font-mono mb-2">
-                {sub.count.toLocaleString()} টি
-              </p>
-              <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full bg-gradient-to-r ${sub.color}`}
-                  style={{ width: `${Math.min(100, (sub.count / 3500) * 100)}%` }}
-                />
-              </div>
+      {/* 4. Subject & Topic Breakdown with Switch & Transfer Action */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-black text-white">
+              {viewMode === 'subject' ? 'বিষয় ভিত্তিক প্রশ্ন সংখ্যা' : 'টপিক ভিত্তিক প্রশ্ন সংখ্যা'}
+            </h2>
+
+            {/* View Switcher: Subject vs Topic */}
+            <div className="flex items-center bg-[#050914] border border-slate-800 rounded-xl p-0.5 text-xs font-bold">
+              <button
+                onClick={() => setViewMode('subject')}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+                  viewMode === 'subject'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                <span>বিষয় ভিত্তিক</span>
+              </button>
+              <button
+                onClick={() => setViewMode('topic')}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+                  viewMode === 'topic'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Tag className="w-3 h-3" />
+                <span>টপিক ভিত্তিক</span>
+              </button>
             </div>
-          ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Transfer Questions Button */}
+            <button
+              onClick={() => setIsTransferModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition-all shadow-md"
+              title="এক বিষয়/টপিক থেকে অন্য বিষয়/টপিক এ ট্রান্সফার করুন"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>বিষয় / টপিক ট্রান্সফার</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedSubject('all');
+                setSelectedTopic('all');
+              }}
+              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+            >
+              <span>সব দেখুন</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
+
+        {/* Breakdown Cards Grid */}
+        {viewMode === 'subject' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {subjectStats.map((sub) => (
+              <div
+                key={sub.name}
+                onClick={() => setSelectedSubject(selectedSubject === sub.name ? 'all' : sub.name)}
+                className={`cursor-pointer rounded-3xl p-4 border transition-all ${
+                  selectedSubject === sub.name
+                    ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
+                    : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-xs font-black ${sub.text} truncate max-w-[100px]`} title={sub.name}>
+                    {sub.name}
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                </div>
+                <p className="text-base font-black text-white font-mono mb-2">
+                  {sub.count.toLocaleString()} টি
+                </p>
+                <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${sub.color}`}
+                    style={{ width: `${Math.min(100, (sub.count / Math.max(1, questions.length)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {topicStats.length === 0 ? (
+              <div className="col-span-full text-center py-6 bg-[#0b1322] border border-slate-800 rounded-3xl text-slate-400 text-xs">
+                কোনো টপিক পাওয়া যায়নি।
+              </div>
+            ) : (
+              topicStats.map((top) => (
+                <div
+                  key={top.name}
+                  onClick={() => setSelectedTopic(selectedTopic === top.name ? 'all' : top.name)}
+                  className={`cursor-pointer rounded-3xl p-4 border transition-all ${
+                    selectedTopic === top.name
+                      ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
+                      : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-black ${top.text} truncate max-w-[100px]`} title={top.name}>
+                      {top.name}
+                    </span>
+                    <span className="w-2 h-2 rounded-full bg-teal-400" />
+                  </div>
+                  <p className="text-base font-black text-white font-mono mb-2">
+                    {top.count.toLocaleString()} টি
+                  </p>
+                  <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${top.color}`}
+                      style={{ width: `${Math.min(100, (top.count / Math.max(1, questions.length)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* 5. Latest Questions Section with Filter Toolbar & Table/List */}
@@ -344,6 +602,25 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
               {filteredQuestions.length} টি
             </span>
+
+            {/* Multi select helper */}
+            <button
+              onClick={handleSelectAllFiltered}
+              className="text-[11px] font-bold text-slate-400 hover:text-emerald-400 flex items-center gap-1 ml-2 transition-colors"
+            >
+              {filteredQuestions.length > 0 &&
+              filteredQuestions.every((q) => selectedQuestionIds.includes(q.id)) ? (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>সব আনসিলেক্ট</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-3.5 h-3.5" />
+                  <span>সব সিলেক্ট</span>
+                </>
+              )}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             {questions.length > 0 && onClearAll && (
@@ -395,6 +672,20 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               ))}
             </select>
 
+            {/* Topic Select */}
+            <select
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+            >
+              <option value="all">সকল টপিক</option>
+              {allUniqueTopics.map((top) => (
+                <option key={top} value={top}>
+                  {top}
+                </option>
+              ))}
+            </select>
+
             {/* Status Select */}
             <select
               value={selectedStatus}
@@ -414,7 +705,8 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                 <p className="text-xs text-slate-400">কোনো প্রশ্ন পাওয়া যায়নি।</p>
               </div>
             ) : (
-              filteredQuestions.slice(0, 10).map((q, idx) => {
+              filteredQuestions.slice(0, 15).map((q) => {
+                const isChecked = selectedQuestionIds.includes(q.id);
                 const dirInfo = getQuestionBankDirectionality({
                   question: q.question,
                   options: [q.option_a, q.option_b, q.option_c, q.option_d],
@@ -426,42 +718,59 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                 return (
                   <div
                     key={String(q.id)}
-                    className="bg-[#050914] border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-4 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className={`bg-[#050914] border rounded-2xl p-4 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      isChecked ? 'border-indigo-500/80 bg-indigo-950/20' : 'border-slate-800/80 hover:border-slate-700/80'
+                    }`}
                   >
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
-                          #{q.id}
-                        </span>
-                        {q.subject && (
-                          <span className="text-[10px] font-bold text-slate-300 bg-slate-800/90 px-2 py-0.5 rounded-lg">
-                            {q.subject}
-                          </span>
-                        )}
-                        {q.topic && (
-                          <span className="text-[10px] font-medium text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg">
-                            {q.topic}
-                          </span>
-                        )}
-                        {isArab && (
-                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                            Arabic RTL
-                          </span>
-                        )}
-                      </div>
-
-                      <p
-                        className={`text-xs font-bold text-white leading-relaxed ${
-                          qDir === 'rtl' ? 'font-amiri text-sm text-right' : 'text-left'
-                        }`}
-                        dir={qDir}
+                    <div className="flex items-start gap-3 flex-1">
+                      {/* Checkbox */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSelectQuestion(q.id)}
+                        className="mt-1 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
                       >
-                        {q.question}
-                      </p>
+                        {isChecked ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-600" />
+                        )}
+                      </button>
 
-                      <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                        <span>উত্তর: <strong className="text-emerald-400">{q.correct_answer}</strong></span>
-                        {q.post && <span>• পদ: {q.post}</span>}
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
+                            #{q.id}
+                          </span>
+                          {q.subject && (
+                            <span className="text-[10px] font-bold text-slate-300 bg-slate-800/90 px-2 py-0.5 rounded-lg">
+                              {q.subject}
+                            </span>
+                          )}
+                          {q.topic && (
+                            <span className="text-[10px] font-medium text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg">
+                              {q.topic}
+                            </span>
+                          )}
+                          {isArab && (
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                              Arabic RTL
+                            </span>
+                          )}
+                        </div>
+
+                        <p
+                          className={`text-xs font-bold text-white leading-relaxed ${
+                            qDir === 'rtl' ? 'font-amiri text-sm text-right' : 'text-left'
+                          }`}
+                          dir={qDir}
+                        >
+                          {q.question}
+                        </p>
+
+                        <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                          <span>উত্তর: <strong className="text-emerald-400">{q.correct_answer}</strong></span>
+                          {q.post && <span>• পদ: {q.post}</span>}
+                        </div>
                       </div>
                     </div>
 
@@ -501,7 +810,37 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         </div>
       </div>
 
-      {/* 6. Quick Actions Row at Bottom (4 Clickable Cards) */}
+      {/* Floating Selection Action Bar */}
+      {selectedQuestionIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#0c1222] border border-indigo-500/50 shadow-2xl rounded-2xl px-4 py-3 flex items-center gap-4 text-xs animate-in slide-in-from-bottom-5">
+          <span className="font-bold text-white flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-emerald-400" />
+            <span>{selectedQuestionIds.length} টি প্রশ্ন সিলেক্ট করা হয়েছে</span>
+          </span>
+
+          <div className="h-4 w-px bg-slate-700" />
+
+          <button
+            onClick={() => {
+              setIsTransferModalOpen(true);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>অন্য বিষয়ে স্থানান্তর করুন</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedQuestionIds([])}
+            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            title="নির্বাচন বাতিল করুন"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 6. Quick Actions Row at Bottom */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
         {/* 1. View All Questions */}
         <div
@@ -521,7 +860,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
         {/* 2. Filter Questions */}
         <div
-          onClick={() => setSelectedSubject(selectedSubject === 'all' ? 'বাংলা' : 'all')}
+          onClick={() => setSelectedSubject(selectedSubject === 'all' ? 'উসূলুল ফিকহ' : 'all')}
           className="cursor-pointer bg-[#0b1322] hover:bg-[#101b30] border border-slate-800 hover:border-slate-700 rounded-3xl p-4 transition-all group flex flex-col justify-between"
         >
           <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
@@ -567,6 +906,154 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* QUESTION SUBJECT & TOPIC TRANSFER MODAL */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0c1222] border border-slate-700/80 rounded-3xl p-6 shadow-2xl max-w-lg w-full space-y-5 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">বিষয় ও টপিক পরিবর্তন (Transfer)</h3>
+                  <p className="text-xs text-slate-400">প্রশ্নগুলোর বিষয় ও টপিক পরিবর্তন করুন</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTransferModalOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Selection Scope Info */}
+            {selectedQuestionIds.length > 0 ? (
+              <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-3 text-xs text-emerald-300 font-bold flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <span>আপনি {selectedQuestionIds.length} টি নির্দিষ্ট প্রশ্ন সিলেক্ট করেছেন</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-slate-300 block">১. উৎস বিষয় সিলেক্ট করুন (Source Subject)</label>
+                <select
+                  value={transferSourceSubject}
+                  onChange={(e) => setTransferSourceSubject(e.target.value)}
+                  className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="all">সকল বিষয় ({questions.length} টি প্রশ্ন)</option>
+                  {subjectStats.map((sub) => (
+                    <option key={sub.name} value={sub.name}>
+                      {sub.name} ({sub.count} টি প্রশ্ন)
+                    </option>
+                  ))}
+                </select>
+
+                <label className="text-xs font-bold text-slate-300 block pt-1">উৎস টপিক (অপশনাল filter)</label>
+                <select
+                  value={transferSourceTopic}
+                  onChange={(e) => setTransferSourceTopic(e.target.value)}
+                  className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="all">সকল টপিক</option>
+                  {allUniqueTopics.map((top) => (
+                    <option key={top} value={top}>
+                      {top}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Target Subject & Topic */}
+            <div className="space-y-3 pt-2 border-t border-slate-800/80">
+              <label className="text-xs font-bold text-slate-300 block">
+                ২. লক্ষ্য বিষয় নির্বাচন বা নাম লিখুন (Target Subject)
+              </label>
+
+              {/* Quick Presets */}
+              <div className="flex flex-wrap gap-1.5 pb-1">
+                {['উসূলুল ফিকহ', 'ফিকহ', 'আরবি', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি', 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান'].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setTransferTargetSubject(preset)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                      transferTargetSubject === preset
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="text"
+                value={transferTargetSubject}
+                onChange={(e) => setTransferTargetSubject(e.target.value)}
+                placeholder="বিষয়ের নাম লিখুন (যেমন: উসূলুল ফিকহ)"
+                className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+
+              <label className="text-xs font-bold text-slate-300 block pt-1">
+                লক্ষ্য টপিক (Target Topic - অপশনাল)
+              </label>
+              <input
+                type="text"
+                value={transferTargetTopic}
+                onChange={(e) => setTransferTargetTopic(e.target.value)}
+                placeholder="টপিকের নাম লিখুন (যেমন: ফিকহ ও উসুলুল ফিকহ)"
+                className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Summary preview badge */}
+            <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3 text-xs text-indigo-300 space-y-1">
+              <div className="flex items-center justify-between">
+                <span>ট্রান্সফারের বিবরণ:</span>
+                <span className="font-mono font-bold text-white">{transferMatchingCount} টি প্রশ্ন</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                উৎস: <strong className="text-white">{selectedQuestionIds.length > 0 ? 'সিলেক্টেড প্রশ্ন' : transferSourceSubject}</strong> ➔ লক্ষ্য বিষয়: <strong className="text-emerald-400">{transferTargetSubject || '...'}</strong>
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsTransferModalOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-colors"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={isTransferring || transferMatchingCount === 0 || !transferTargetSubject.trim()}
+                onClick={handlePerformTransfer}
+                className="px-5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-black shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all"
+              >
+                {isTransferring ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>ট্রান্সফার হচ্ছে...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="w-4 h-4" />
+                    <span>স্থানান্তর সম্পন্ন করুন</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
