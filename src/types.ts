@@ -9,6 +9,7 @@ export interface Question {
   option_d: string;
   correct_answer: string; // 'option_a' | 'option_b' | 'option_c' | 'option_d' or 'a' | 'b' | 'c' | 'd' or exact option text
   explanation?: string | null;
+  slug?: string | null;
   status: QuestionStatus;
   subject?: string | null; // বিষয় (যেমন: বাংলা, ইংরেজি, ইত্যাদি)
   topic?: string | null; // টপিক (যেমন: কারক ও বিভক্তি, ব্যাকরণ)
@@ -37,6 +38,7 @@ export interface Exam {
   negative_marks: number;
   total_marks: number;
   description?: string | null;
+  id_pattern?: string | null; // e.g. 'Q-BANGLA-'
   status: ExamStatus;
   question_ids?: (string | number)[];
   questions?: Question[];

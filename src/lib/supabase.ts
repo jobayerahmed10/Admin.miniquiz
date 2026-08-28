@@ -125,17 +125,93 @@ export const setLocalCachedExams = (exams: Exam[]) => {
   }
 };
 
+/**
+ * SEO Dynamic Slug Generator for Question Title
+ */
+export const generateQuestionSlug = (questionText: string, customPrefix?: string): string => {
+  if (!questionText || !questionText.trim()) {
+    const defaultPrefix = customPrefix ? customPrefix.toLowerCase().replace(/[^a-z0-9-]/g, '') : '';
+    return defaultPrefix ? `${defaultPrefix}-question` : 'question-item';
+  }
+
+  // Strip HTML tags if present
+  let cleanText = questionText.replace(/<[^>]*>/g, '').trim().toLowerCase();
+
+  // Keep Bengali letters (\u0980-\u09FF), English letters, numbers, spaces & hyphens
+  let slug = cleanText
+    .replace(/[^\w\s\u0980-\u09FF-]/g, ' ')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (!slug) {
+    slug = 'question-item';
+  }
+
+  if (slug.length > 90) {
+    slug = slug.substring(0, 90).replace(/-[^-]*$/, '');
+  }
+
+  if (customPrefix) {
+    const cleanPrefix = customPrefix.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
+    if (cleanPrefix) {
+      return `${cleanPrefix}-${slug}`;
+    }
+  }
+
+  return slug;
+};
+
+/**
+ * Automatic Sequential ID Generator for Questions (e.g. Q-BANGLA-0001, Q-BANGLA-0002)
+ */
+export const generateSequentialQuestionId = (
+  prefixPattern: string,
+  existingQuestionsOrIds: (Question | string | number)[] = [],
+  indexOffset = 0
+): string => {
+  if (!prefixPattern || !prefixPattern.trim()) {
+    return `q_${Date.now()}_${indexOffset}_${Math.random().toString(36).substring(2, 6)}`;
+  }
+
+  let cleanPrefix = prefixPattern.trim().toUpperCase();
+  if (!/[-\_:\.]$/.test(cleanPrefix)) {
+    cleanPrefix += '-';
+  }
+
+  let maxNum = 0;
+  existingQuestionsOrIds.forEach((item) => {
+    const idStr = typeof item === 'object' && item !== null ? String(item.id) : String(item);
+    if (idStr.toUpperCase().startsWith(cleanPrefix)) {
+      const suffix = idStr.substring(cleanPrefix.length);
+      const match = suffix.match(/^(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  });
+
+  const nextNum = maxNum + 1 + indexOffset;
+  const paddedNum = String(nextNum).padStart(4, '0');
+  return `${cleanPrefix}${paddedNum}`;
+};
+
 // Helper function to map database row to Question interface cleanly
 function normalizeQuestionRow(row: any): Question {
+  const qText = row.question || row.question_text || row.title || '';
   return {
     id: row.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-    question: row.question || row.question_text || row.title || '',
+    question: qText,
     option_a: row.option_a || (Array.isArray(row.options) ? row.options[0] : '') || '',
     option_b: row.option_b || (Array.isArray(row.options) ? row.options[1] : '') || '',
     option_c: row.option_c || (Array.isArray(row.options) ? row.options[2] : '') || '',
     option_d: row.option_d || (Array.isArray(row.options) ? row.options[3] : '') || '',
     correct_answer: row.correct_answer || row.correct_option || row.answer || 'option_a',
     explanation: row.explanation || row.description || '',
+    slug: row.slug || generateQuestionSlug(qText),
     status: row.status === 'published' ? 'published' : 'draft',
     subject: row.subject || row.category || row.subject_name || 'ইংরেজি',
     topic: row.topic || row.topic_name || '',
@@ -340,11 +416,31 @@ export const fetchQuestionById = async (id: string | number): Promise<{ question
 
 // Insert New Question into public.questions + local cache
 export const insertQuestion = async (
-  newQuestion: Omit<Question, 'id' | 'created_at' | 'updated_at'>
+  newQuestion: Omit<Question, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string | number;
+    custom_id?: string | number;
+    custom_id_pattern?: string;
+    custom_prefix?: string;
+    slug?: string;
+  }
 ): Promise<{ success: boolean; data?: Question; error: string | null; syncedToSupabase?: boolean }> => {
-  const generatedId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const currentQuestions = getLocalCachedQuestions();
+
+  let finalId = newQuestion.custom_id || newQuestion.id;
+  const pattern = newQuestion.custom_id_pattern || newQuestion.custom_prefix;
+
+  if (!finalId && pattern) {
+    finalId = generateSequentialQuestionId(pattern, currentQuestions);
+  }
+
+  if (!finalId) {
+    finalId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  }
+
+  const generatedSlug = newQuestion.slug || generateQuestionSlug(newQuestion.question);
+
   const localItem: Question = {
-    id: generatedId,
+    id: finalId,
     question: newQuestion.question,
     option_a: newQuestion.option_a,
     option_b: newQuestion.option_b,
@@ -352,6 +448,7 @@ export const insertQuestion = async (
     option_d: newQuestion.option_d,
     correct_answer: newQuestion.correct_answer,
     explanation: newQuestion.explanation || '',
+    slug: generatedSlug,
     status: newQuestion.status || 'published',
     subject: newQuestion.subject || 'সাধারণ',
     topic: newQuestion.topic || '',
@@ -363,13 +460,13 @@ export const insertQuestion = async (
   const client = getSupabaseClient();
   if (!client) {
     // Save to local cache seamlessly
-    const current = getLocalCachedQuestions();
-    setLocalCachedQuestions([localItem, ...current]);
+    setLocalCachedQuestions([localItem, ...currentQuestions]);
     return { success: true, data: localItem, error: null, syncedToSupabase: false };
   }
 
   try {
     const payload: any = {
+      id: finalId,
       question: newQuestion.question,
       option_a: newQuestion.option_a,
       option_b: newQuestion.option_b,
@@ -377,6 +474,7 @@ export const insertQuestion = async (
       option_d: newQuestion.option_d,
       correct_answer: newQuestion.correct_answer,
       explanation: newQuestion.explanation || '',
+      slug: generatedSlug,
       status: newQuestion.status || 'published',
       subject: newQuestion.subject || 'সাধারণ',
       topic: newQuestion.topic || '',
@@ -390,8 +488,9 @@ export const insertQuestion = async (
       .select()
       .single();
 
-    // If optional columns (topic, post, exam_id, subject) do not exist in the Postgres table, retry gracefully
+    // If optional columns (slug, topic, post, exam_id, subject, id) fail or don't exist in DB, retry gracefully
     if (error && (
+      error.message?.includes('slug') ||
       error.message?.includes('subject') ||
       error.message?.includes('topic') ||
       error.message?.includes('post') ||
@@ -401,10 +500,10 @@ export const insertQuestion = async (
       error.code === '42703'
     )) {
       const sanitizedPayload = { ...payload };
+      delete sanitizedPayload.slug;
       delete sanitizedPayload.topic;
       delete sanitizedPayload.post;
-      
-      
+
       let retryResult = await client
         .from('questions')
         .insert([sanitizedPayload])
@@ -426,8 +525,7 @@ export const insertQuestion = async (
 
     if (error || !data) {
       console.warn('Supabase insert failed, saving to local cache:', error);
-      const current = getLocalCachedQuestions();
-      setLocalCachedQuestions([localItem, ...current]);
+      setLocalCachedQuestions([localItem, ...currentQuestions]);
       return {
         success: true,
         data: localItem,
@@ -438,7 +536,9 @@ export const insertQuestion = async (
 
     const normalized = normalizeQuestionRow({
       ...data,
-      // Ensure exam_id, topic, post are preserved if DB stripped them
+      id: data.id || localItem.id,
+      explanation: data.explanation || localItem.explanation,
+      slug: data.slug || localItem.slug,
       exam_id: data.exam_id || newQuestion.exam_id,
       topic: data.topic || newQuestion.topic,
       post: data.post || newQuestion.post,
@@ -446,8 +546,7 @@ export const insertQuestion = async (
     });
 
     // Update local cache
-    const current = getLocalCachedQuestions();
-    const updatedCache = [normalized, ...current.filter((q) => String(q.id) !== String(normalized.id))];
+    const updatedCache = [normalized, ...currentQuestions.filter((q) => String(q.id) !== String(normalized.id))];
     setLocalCachedQuestions(updatedCache);
 
     return {
@@ -458,8 +557,7 @@ export const insertQuestion = async (
     };
   } catch (err: any) {
     console.warn('Supabase insert exception, saving to local cache:', err);
-    const current = getLocalCachedQuestions();
-    setLocalCachedQuestions([localItem, ...current]);
+    setLocalCachedQuestions([localItem, ...currentQuestions]);
     return {
       success: true,
       data: localItem,
@@ -471,28 +569,49 @@ export const insertQuestion = async (
 
 // Batch Insert Multiple Questions
 export const insertBatchQuestions = async (
-  questionsToInsert: Omit<Question, 'id' | 'created_at' | 'updated_at'>[]
+  questionsToInsert: (Omit<Question, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string | number;
+    custom_id?: string | number;
+    slug?: string;
+  })[],
+  options?: { custom_id_pattern?: string; custom_prefix?: string }
 ): Promise<{ success: boolean; data?: Question[]; error: string | null; syncedToSupabase?: boolean }> => {
   if (!questionsToInsert || questionsToInsert.length === 0) {
     return { success: true, data: [], error: null };
   }
 
-  const localItems: Question[] = questionsToInsert.map((q, idx) => ({
-    id: `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
-    question: q.question,
-    option_a: q.option_a,
-    option_b: q.option_b,
-    option_c: q.option_c,
-    option_d: q.option_d,
-    correct_answer: q.correct_answer,
-    explanation: q.explanation || '',
-    status: q.status || 'published',
-    subject: q.subject || 'সাধারণ',
-    topic: q.topic || '',
-    post: q.post || '',
-    exam_id: q.exam_id || null,
-    created_at: new Date().toISOString(),
-  }));
+  const currentQuestions = getLocalCachedQuestions();
+  const pattern = options?.custom_id_pattern || options?.custom_prefix;
+
+  const localItems: Question[] = questionsToInsert.map((q, idx) => {
+    let finalId = q.custom_id || q.id;
+    if (!finalId && pattern) {
+      finalId = generateSequentialQuestionId(pattern, currentQuestions, idx);
+    }
+    if (!finalId) {
+      finalId = `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+    }
+
+    const generatedSlug = q.slug || generateQuestionSlug(q.question);
+
+    return {
+      id: finalId,
+      question: q.question,
+      option_a: q.option_a,
+      option_b: q.option_b,
+      option_c: q.option_c,
+      option_d: q.option_d,
+      correct_answer: q.correct_answer,
+      explanation: q.explanation || '',
+      slug: generatedSlug,
+      status: q.status || 'published',
+      subject: q.subject || 'সাধারণ',
+      topic: q.topic || '',
+      post: q.post || '',
+      exam_id: q.exam_id || null,
+      created_at: new Date().toISOString(),
+    };
+  });
 
   const client = getSupabaseClient();
   if (!client) {
@@ -502,7 +621,8 @@ export const insertBatchQuestions = async (
   }
 
   try {
-    const payload = questionsToInsert.map((q) => ({
+    const payload = localItems.map((q) => ({
+      id: q.id,
       question: q.question,
       option_a: q.option_a,
       option_b: q.option_b,
@@ -510,6 +630,7 @@ export const insertBatchQuestions = async (
       option_d: q.option_d,
       correct_answer: q.correct_answer,
       explanation: q.explanation || '',
+      slug: q.slug || generateQuestionSlug(q.question),
       status: q.status || 'published',
       subject: q.subject || 'সাধারণ',
       topic: q.topic || '',
@@ -889,10 +1010,17 @@ export const fetchExamById = async (id: string): Promise<{ exam: Exam | null; er
 
 // Insert New Exam
 export const insertExam = async (
-  newExam: Omit<Exam, 'id' | 'created_at' | 'updated_at'>
+  newExam: Omit<Exam, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    custom_id?: string;
+    id_pattern?: string;
+  }
 ): Promise<{ success: boolean; data?: Exam; error: string | null; syncedToSupabase?: boolean }> => {
+  const customId = (newExam.custom_id || newExam.id || '').trim();
+  const examId = customId || `exam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
   const localItem: Exam = {
-    id: `exam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: examId,
     title: newExam.title,
     badge: newExam.badge,
     badge_type: newExam.badge_type,
@@ -907,11 +1035,8 @@ export const insertExam = async (
     negative_marks: newExam.negative_marks,
     total_marks: newExam.total_marks,
     description: newExam.description || '',
+    id_pattern: newExam.id_pattern || null,
     status: newExam.status,
-       
-       
-     
-     
     created_at: new Date().toISOString(),
   };
 
@@ -924,6 +1049,7 @@ export const insertExam = async (
 
   try {
     const payload: any = {
+      ...(customId ? { id: customId } : {}),
       title: newExam.title,
       badge: newExam.badge,
       badge_type: newExam.badge_type,
@@ -938,9 +1064,8 @@ export const insertExam = async (
       negative_marks: newExam.negative_marks,
       total_marks: newExam.total_marks,
       description: newExam.description || '',
+      ...(newExam.id_pattern ? { id_pattern: newExam.id_pattern } : {}),
       status: newExam.status,
-       
-       
     };
 
     let { data, error } = await client
@@ -1792,10 +1917,14 @@ export const syncCourseSubTables = async (course: Partial<Course> & { id: string
 
 // Insert New Course
 export const insertCourse = async (
-  newCourse: Omit<Course, 'id' | 'created_at' | 'updated_at'>
+  newCourse: Omit<Course, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    custom_id?: string;
+  }
 ): Promise<{ success: boolean; data?: Course; error: string | null }> => {
   const client = getSupabaseClient();
-  const fallbackId = generateStandardUUID();
+  const customId = (newCourse.custom_id || newCourse.id || '').trim();
+  const fallbackId = customId || generateStandardUUID();
 
   const courseData: Course = {
     ...newCourse,

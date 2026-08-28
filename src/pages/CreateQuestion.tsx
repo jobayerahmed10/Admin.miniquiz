@@ -12,7 +12,7 @@ import {
   Layers,
   BookOpen,
 } from 'lucide-react';
-import { insertQuestion } from '../lib/supabase';
+import { insertQuestion, generateQuestionSlug } from '../lib/supabase';
 import { QuestionStatus, DEFAULT_TOPICS, SubjectPost } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
@@ -39,6 +39,7 @@ export const CreateQuestion: React.FC = () => {
   const [optionD, setOptionD] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState<string>('option_a');
   const [explanation, setExplanation] = useState('');
+  const [customIdPattern, setCustomIdPattern] = useState('');
   const [status, setStatus] = useState<QuestionStatus>('published');
 
   const [loading, setLoading] = useState(false);
@@ -129,6 +130,8 @@ export const CreateQuestion: React.FC = () => {
       subject: finalSubject,
       topic: finalTopic,
       post: finalPost,
+      custom_id_pattern: customIdPattern.trim() || undefined,
+      slug: generateQuestionSlug(questionText.trim()),
     };
 
     const result = await insertQuestion(newQuestionData);
@@ -334,19 +337,56 @@ export const CreateQuestion: React.FC = () => {
             </div>
           </div>
 
-          {/* Question Field */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
-              প্রশ্ন <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={3}
-              required
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="যেমন: বাংলাদেশের বর্তমান রাজধানীর নাম কী?"
-              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-900 dark:text-slate-100 placeholder-slate-400"
-            />
+          {/* Question Field & SEO Slug Preview */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
+                  প্রশ্ন <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={questionText}
+                  onChange={(e) => setQuestionText(e.target.value)}
+                  placeholder="যেমন: বাংলাদেশের বর্তমান রাজধানীর নাম কী?"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">
+                  কাস্টম প্রশ্ন ID / সিকুয়েন্স প্যাটার্ন
+                </label>
+                <input
+                  type="text"
+                  value={customIdPattern}
+                  onChange={(e) => setCustomIdPattern(e.target.value)}
+                  placeholder="যেমন: Q-BANGLA- বা Q-BANGLA-0001"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+                <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                  প্যাটার্ন দিলে (যেমন: <code className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">Q-BANGLA-</code>) অটোমেটিক <code className="font-mono">Q-BANGLA-0001</code> আইডি জেনারেট হবে।
+                </p>
+              </div>
+            </div>
+
+            {questionText.trim() && (
+              <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span className="font-extrabold text-indigo-950 dark:text-indigo-200 shrink-0">
+                    SEO Dynamic Slug:
+                  </span>
+                  <code className="text-[11px] font-mono font-bold bg-white dark:bg-slate-900 px-3 py-1 rounded-xl border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 truncate">
+                    {generateQuestionSlug(questionText, customIdPattern)}
+                  </code>
+                </div>
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold shrink-0">
+                  ✓ Supabase `slug` কলামে অটো সেভ হবে
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Options Grid (ক, খ, গ, ঘ) */}

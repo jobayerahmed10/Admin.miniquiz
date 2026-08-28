@@ -68,6 +68,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [infoNegativeMarks, setInfoNegativeMarks] = useState(exam.negative_marks || 0.25);
   const [infoTotalMarks, setInfoTotalMarks] = useState(exam.total_marks || 25);
   const [infoDescription, setInfoDescription] = useState(exam.description || '');
+  const [infoIdPattern, setInfoIdPattern] = useState(exam.id_pattern || '');
   const [savingInfo, setSavingInfo] = useState(false);
 
   // Sub-tabs inside Step 2 ('add'): 'aitopic' | 'copypaste' | 'manual' | 'bank'
@@ -183,6 +184,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setInfoNegativeMarks(exam.negative_marks || 0.25);
       setInfoTotalMarks(exam.total_marks || 25);
       setInfoDescription(exam.description || '');
+      setInfoIdPattern(exam.id_pattern || '');
 
       if (exam && exam.question_count) {
         setTopicCount(exam.question_count);
@@ -213,6 +215,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       negative_marks: Number(infoNegativeMarks),
       total_marks: Number(infoTotalMarks),
       description: infoDescription.trim(),
+      id_pattern: infoIdPattern.trim() || null,
     };
     const res = await updateExam(exam.id, payload);
     setSavingInfo(false);
@@ -384,6 +387,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       topic: finalTopic,
       post: finalPost,
       exam_id: exam.id,
+      custom_id_pattern: infoIdPattern.trim() || exam.id_pattern || undefined,
     };
 
     const res = await insertQuestion(newQ);
@@ -587,7 +591,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       exam_id: exam.id,
     }));
 
-    const res = await insertBatchQuestions(payload);
+    const res = await insertBatchQuestions(payload, { custom_id_pattern: infoIdPattern.trim() || exam.id_pattern });
     setSavingExtracted(false);
 
     if (res.success) {
@@ -662,7 +666,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       exam_id: exam.id,
     }));
 
-    const res = await insertBatchQuestions(payload);
+    const res = await insertBatchQuestions(payload, { custom_id_pattern: infoIdPattern.trim() || exam.id_pattern });
     setSavingGenerated(false);
 
     if (res.success) {
@@ -856,19 +860,37 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                 </div>
               </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-                  পরীক্ষার শিরোনাম (Title) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={infoTitle}
-                  onChange={(e) => setInfoTitle(e.target.value)}
-                  placeholder='যেমন: "১৯তম NTRCA সাধারণ জ্ঞান ও বাংলা বিশেষ মডেল টেস্ট"'
-                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
-                />
+              {/* Title & Question ID Pattern */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    পরীক্ষার শিরোনাম (Title) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={infoTitle}
+                    onChange={(e) => setInfoTitle(e.target.value)}
+                    placeholder='যেমন: "১৯তম NTRCA সাধারণ জ্ঞান ও বাংলা বিশেষ মডেল টেস্ট"'
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    প্রশ্ন সিকুয়েন্স ID ফরম্যাট
+                  </label>
+                  <input
+                    type="text"
+                    value={infoIdPattern}
+                    onChange={(e) => setInfoIdPattern(e.target.value)}
+                    placeholder="যেমন: Q-BANGLA-"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ফলাফল: <code className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">Q-BANGLA-0001</code>
+                  </p>
+                </div>
               </div>
 
               {/* Subject Selection & Quick Chips */}

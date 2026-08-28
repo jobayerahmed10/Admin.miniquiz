@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw, BookOpen } from 'lucide-react';
-import { fetchQuestionById, updateQuestion } from '../lib/supabase';
+import { fetchQuestionById, updateQuestion, generateQuestionSlug } from '../lib/supabase';
 import { QuestionStatus, DEFAULT_TOPICS, SubjectPost } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
@@ -164,6 +164,7 @@ export const EditQuestion: React.FC = () => {
       subject: finalSubject,
       topic: finalTopic,
       post: finalPost,
+      slug: generateQuestionSlug(questionText.trim()),
     };
 
     const result = await updateQuestion(id, updatedData);

@@ -53,6 +53,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
   }, [isOpen, initialTab]);
 
   const [formData, setFormData] = useState({
+    custom_id: '',
     title: '',
     category: 'আরবি প্রভাষক',
     badge: 'রেকর্ড ব্যাচ',
@@ -97,6 +98,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
     if (editingCourse) {
       const desc = editingCourse.about_text || editingCourse.description || '';
       setFormData({
+        custom_id: editingCourse.id || '',
         title: editingCourse.title || '',
         category: editingCourse.category || 'আরবি প্রভাষক',
         badge: editingCourse.badge || 'রেকর্ড ব্যাচ',
@@ -239,7 +241,11 @@ export const CourseModal: React.FC<CourseModalProps> = ({
 
     setIsSaving(true);
     try {
-      await onSave(formData);
+      const payload = {
+        ...formData,
+        ...(formData.custom_id.trim() ? { id: formData.custom_id.trim(), custom_id: formData.custom_id.trim() } : {}),
+      };
+      await onSave(payload);
       onClose();
     } finally {
       setIsSaving(false);
@@ -347,6 +353,22 @@ export const CourseModal: React.FC<CourseModalProps> = ({
           {activeTab === 'basic' && (
             <div className="space-y-5 animate-in fade-in duration-150">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    কাস্টম কোর্স আইডি (Custom Course ID) <span className="text-slate-400 font-normal text-[11px]">(ঐচ্ছিক, যেমন: COURSE-NTRCA বা COURSE-BANGLA-01)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="যেমন: COURSE-NTRCA বা COURSE-BANGLA-01"
+                    value={formData.custom_id}
+                    onChange={(e) => setFormData({ ...formData, custom_id: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-emerald-400 font-mono font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ফাঁকা রাখলে অটো জেনারেট র্যান্ডম আইডি ব্যবহার করা হবে। কাস্টম আইডি দিলে ডাটাবেজে ও ইউআরএলে সেটিই প্রধান আইডি হিসেবে থাকবে।
+                  </p>
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-300 mb-1">
                     কোর্সের পূর্ণাঙ্গ নাম (Course Title) <span className="text-rose-400">*</span>
