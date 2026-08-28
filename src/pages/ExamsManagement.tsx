@@ -28,6 +28,7 @@ import {
   Edit3,
   Award,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import {
   fetchAllExams,
@@ -35,6 +36,7 @@ import {
   updateExam,
   deleteExam,
   toggleExamStatus,
+  clearAllExams,
 } from '../lib/supabase';
 import { Exam, ExamBadgeType, ExamStatus } from '../types';
 import { ExamCard } from '../components/exam/ExamCard';
@@ -263,6 +265,13 @@ export const ExamsManagement: React.FC = () => {
     }
   };
 
+  const handleClearAllExams = async () => {
+    if (window.confirm('আপনি কি নিশ্চিতভাবে সব পরীক্ষা ও মডেল টেস্ট মুছে ফেলতে চান?')) {
+      await clearAllExams();
+      setExams([]);
+    }
+  };
+
   // SQL code for setup
   const createTableSql = `-- Supabase SQL Editor এ নিচের কমান্ডটি এক্সিকিউট করে public.exams টেবিল তৈরি করুন:
 
@@ -323,6 +332,17 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
           >
             <RefreshCw className={`w-4 h-4 text-slate-300 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
           </button>
+
+          {exams.length > 0 && (
+            <button
+              onClick={handleClearAllExams}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold transition-colors"
+              title="সব পরীক্ষা মুছে ফেলুন"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">সব মুছুন</span>
+            </button>
+          )}
 
           {/* Large Primary Green Button */}
           <button

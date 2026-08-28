@@ -116,15 +116,13 @@ export const getLocalCachedExams = (): Exam[] => {
     const raw = localStorage.getItem(LOCAL_EXAMS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
-    // Initialize with seed exams if empty
-    localStorage.setItem(LOCAL_EXAMS_KEY, JSON.stringify(INITIAL_SEED_EXAMS));
-    return INITIAL_SEED_EXAMS;
+    return [];
   } catch (e) {
-    return INITIAL_SEED_EXAMS;
+    return [];
   }
 };
 
@@ -133,6 +131,29 @@ export const setLocalCachedExams = (exams: Exam[]) => {
     localStorage.setItem(LOCAL_EXAMS_KEY, JSON.stringify(exams));
   } catch (e) {
     console.warn('Failed to save exams to localStorage:', e);
+  }
+};
+
+export const clearAllExams = async (): Promise<{ success: boolean; error: string | null }> => {
+  setLocalCachedExams([]);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { error } = await client
+      .from('exams')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      console.warn('Supabase clearAllExams warning:', error);
+    }
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: true, error: null };
   }
 };
 
