@@ -18,13 +18,224 @@ export {
 export type { PrefixLookupResult };
 
 /**
- * Detects if a given string contains Arabic characters
+ * Unicode Script Detection Helpers
+ */
+export const ARABIC_UNICODE_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+export const BENGALI_UNICODE_REGEX = /[\u0980-\u09FF]/;
+export const LATIN_UNICODE_REGEX = /[a-zA-Z]/;
+
+/**
+ * Strips bracketed/parenthetical content e.g. (বাংলা অর্থ), [অনুবাদ], {টিকা}
+ */
+export const stripBracketedContent = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}|（[^）]*）|【[^】]*】|«[^»]*»|“[^”]*”|'[^']*'/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/**
+ * Checks if text contains Arabic characters
+ */
+export const isArabicScript = (text?: string | null): boolean => {
+  if (!text) return false;
+  return ARABIC_UNICODE_REGEX.test(text);
+};
+
+/**
+ * Checks if text contains Bengali characters
+ */
+export const isBengaliScript = (text?: string | null): boolean => {
+  if (!text) return false;
+  return BENGALI_UNICODE_REGEX.test(text);
+};
+
+/**
+ * Checks if text contains Latin / English characters
+ */
+export const isLatinScript = (text?: string | null): boolean => {
+  if (!text) return false;
+  return LATIN_UNICODE_REGEX.test(text);
+};
+
+/**
+ * Rule 5 Check:
+ * "৫। যদি সম্পূর্ণ প্রশ্ন আরবি এবং এর অর্থ ব্রাকেটে থাকে তাহলে সেটাকে আরবি ধরবে।"
+ * When bracketed gloss/translation is stripped, is the remaining main text purely Arabic?
+ */
+export const isPureArabicWithOptionalBracketedGloss = (text?: string | null): boolean => {
+  if (!text || !text.trim()) return false;
+  const stripped = stripBracketedContent(text);
+  if (!stripped) {
+    // If entire string was inside brackets, check if raw text has Arabic without Bengali/Latin
+    return isArabicScript(text) && !isBengaliScript(text) && !isLatinScript(text);
+  }
+  return isArabicScript(stripped) && !isBengaliScript(stripped) && !isLatinScript(stripped);
+};
+
+/**
+ * Rule 1, 2, 4, 5: Question Directionality Engine
+ * ১। সম্পূর্ণ বাংলা বা ইংরেজি বা মিশ্রণ: LTR
+ * ২। সম্পূর্ণ আরবি প্রশ্ন: RTL
+ * ৪। আরবি ও বাংলা মিশ্রণ (আরবি দিয়ে শুরু পরে বাংলা বা বাংলা দিয়ে শুরু পরে আরবি): বাংলা ধরে LTR
+ * ৫। সম্পূর্ণ আরবি এবং অর্থ ব্রাকেটে: আরবি ধরে RTL
+ */
+export const getQuestionDirection = (
+  question?: string | null,
+  fallbackLanguage?: string | null
+): 'rtl' | 'ltr' => {
+  if (!question || !question.trim()) {
+    if (fallbackLanguage === 'العربية' || fallbackLanguage === 'আরবি' || fallbackLanguage === 'Arabic') {
+      return 'rtl';
+    }
+    return 'ltr';
+  }
+
+  // Check Rule 5 first: Arabic question with bracketed Bengali/English meaning
+  if (isPureArabicWithOptionalBracketedGloss(question)) {
+    return 'rtl';
+  }
+
+  const hasArabic = isArabicScript(question);
+  const hasBengali = isBengaliScript(question);
+  const hasLatin = isLatinScript(question);
+
+  // Rule 4: Mixed Arabic & Bengali/English outside bracketed gloss -> treat as Bengali (LTR)
+  if (hasArabic && (hasBengali || hasLatin)) {
+    return 'ltr';
+  }
+
+  // Rule 2: Pure Arabic question -> RTL
+  if (hasArabic && !hasBengali && !hasLatin) {
+    return 'rtl';
+  }
+
+  // Rule 1: Bengali, English, or mix of both -> LTR
+  return 'ltr';
+};
+
+/**
+ * Checks if a single option is considered Arabic under the language rules
+ */
+export const isOptionArabic = (optionText?: string | null): boolean => {
+  if (!optionText || !optionText.trim()) return false;
+  if (isPureArabicWithOptionalBracketedGloss(optionText)) return true;
+  const hasAr = isArabicScript(optionText);
+  const hasBn = isBengaliScript(optionText);
+  const hasEn = isLatinScript(optionText);
+  if (hasAr && !hasBn && !hasEn) return true;
+  // Mixed Arabic and Bengali in option -> treated as Bengali per Rule 4
+  return false;
+};
+
+/**
+ * Rule 1, 3, 6: Options Directionality Engine
+ * ৩। সম্পূর্ণ আরবি ৪ টাই অপশন হলে: RTL (ডান দিকে)
+ * ৬। ৩ টা আরবি ১ টা বাংলা: RTL (ডান দিকে)
+ *    ৩ টা বাংলা ১ টা আরবি: LTR (বাম দিকে)
+ *    ২ টা বাংলা ২ টা আরবি: প্রশ্ন দেখবে (প্রশ্ন আরবি হলে RTL, বাংলা হলে LTR)
+ * ১। সম্পূর্ণ বাংলা/ইংরেজি বা মিশ্রণ: LTR (বাম দিকে)
+ */
+export const getOptionsDirection = (
+  options: (string | undefined | null)[] | Record<string, string | undefined | null>,
+  questionText?: string | null,
+  fallbackLanguage?: string | null
+): 'rtl' | 'ltr' => {
+  let optList: string[] = [];
+  if (Array.isArray(options)) {
+    optList = options.filter((o): o is string => Boolean(o && o.trim()));
+  } else if (options && typeof options === 'object') {
+    optList = Object.values(options).filter((o): o is string => Boolean(o && o.trim()));
+  }
+
+  const questionDir = getQuestionDirection(questionText, fallbackLanguage);
+
+  if (optList.length === 0) {
+    return questionDir;
+  }
+
+  let arabicCount = 0;
+  let nonArabicCount = 0;
+
+  optList.forEach((opt) => {
+    if (isOptionArabic(opt)) {
+      arabicCount++;
+    } else {
+      nonArabicCount++;
+    }
+  });
+
+  // Rule 3 & Rule 6: Majority Arabic (e.g. 4 vs 0, 3 vs 1, or 3 vs 0)
+  if (arabicCount > nonArabicCount) {
+    return 'rtl';
+  }
+
+  // Rule 1 & Rule 6: Majority non-Arabic (e.g. 3 vs 1, 4 vs 0)
+  if (nonArabicCount > arabicCount) {
+    return 'ltr';
+  }
+
+  // Rule 6: Equal split (e.g. 2 Arabic vs 2 Bengali) -> follow Question direction!
+  return questionDir;
+};
+
+/**
+ * Comprehensive Directionality Resolver for a Question Bank Item
+ */
+export const getQuestionBankDirectionality = (data: {
+  question?: string | null;
+  options?: (string | undefined | null)[] | Record<string, string | undefined | null>;
+  explanation?: string | null;
+  language?: string | null;
+}) => {
+  const questionDir = getQuestionDirection(data.question, data.language);
+  const optionsDir = getOptionsDirection(data.options || [], data.question, data.language);
+  
+  let explanationDir: 'rtl' | 'ltr' = 'ltr';
+  if (data.explanation) {
+    if (isPureArabicWithOptionalBracketedGloss(data.explanation)) {
+      explanationDir = 'rtl';
+    } else if (isArabicScript(data.explanation) && !isBengaliScript(data.explanation) && !isLatinScript(data.explanation)) {
+      explanationDir = 'rtl';
+    } else {
+      explanationDir = 'ltr';
+    }
+  }
+
+  let arabicOptionsCount = 0;
+  let nonArabicOptionsCount = 0;
+  const optList = Array.isArray(data.options)
+    ? data.options
+    : data.options
+    ? Object.values(data.options)
+    : [];
+
+  optList.forEach((opt) => {
+    if (isOptionArabic(opt)) {
+      arabicOptionsCount++;
+    } else if (opt && opt.trim()) {
+      nonArabicOptionsCount++;
+    }
+  });
+
+  return {
+    questionDir,
+    optionsDir,
+    explanationDir,
+    isQuestionArabic: questionDir === 'rtl',
+    isOptionsArabic: optionsDir === 'rtl',
+    arabicOptionsCount,
+    nonArabicOptionsCount,
+  };
+};
+
+/**
+ * Detects if a given string contains Arabic characters or complies with Arabic direction
  */
 export const isArabicText = (text?: string | null): boolean => {
   if (!text) return false;
-  // Arabic Unicode ranges: \u0600-\u06FF, \u0750-\u077F, \u08A0-\u08FF, \uFB50-\uFDFF, \uFE70-\uFEFF
-  const arabicRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  return arabicRegex.test(text);
+  return isArabicScript(text);
 };
 
 /**
@@ -34,13 +245,7 @@ export const getLanguageDirection = (
   language?: string | null,
   content?: string | null
 ): 'rtl' | 'ltr' => {
-  if (language === 'العربية' || language === 'আরবি' || language === 'Arabic') {
-    return 'rtl';
-  }
-  if (content && isArabicText(content)) {
-    return 'rtl';
-  }
-  return 'ltr';
+  return getQuestionDirection(content, language);
 };
 
 /**
@@ -276,7 +481,12 @@ export const validateAndCheckDuplicates = (
       validCount++;
     }
 
-    const arabicDetected = isArabicText(qText) || isArabicText(optA) || wq.language === 'العربية';
+    const dirInfo = getQuestionBankDirectionality({
+      question: qText,
+      options: [optA, optB, optC, optD],
+      explanation: wq.explanation,
+      language: wq.language,
+    });
 
     return {
       ...wq,
@@ -286,7 +496,10 @@ export const validateAndCheckDuplicates = (
       duplicateScore,
       hasErrors,
       errorMessage,
-      isArabic: arabicDetected,
+      isArabic: dirInfo.isQuestionArabic,
+      questionDir: dirInfo.questionDir,
+      optionsDir: dirInfo.optionsDir,
+      explanationDir: dirInfo.explanationDir,
     };
   });
 
@@ -345,6 +558,13 @@ export const parsePastedQuestionsText = (
       const optC = (options.C || '').trim();
       const optD = (options.D || '').trim();
 
+      const dirInfo = getQuestionBankDirectionality({
+        question: qText,
+        options: [optA, optB, optC, optD],
+        explanation: currentQ.explanation,
+        language: defaultMeta.language,
+      });
+
       const finalCorrect = (currentQ.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D';
       const hasErrors = !qText || !optA || !optB || !optC || !optD || !currentQ.correctAnswer;
       const errorMessage = hasErrors
@@ -376,7 +596,10 @@ export const parsePastedQuestionsText = (
         status: 'published',
         hasErrors,
         errorMessage,
-        isArabic,
+        isArabic: dirInfo.isQuestionArabic,
+        questionDir: dirInfo.questionDir,
+        optionsDir: dirInfo.optionsDir,
+        explanationDir: dirInfo.explanationDir,
       });
     }
   };
@@ -650,23 +873,32 @@ export const generateAiQuestions = (
 
   for (let i = 0; i < count; i++) {
     const t = templates[i % templates.length];
-    const isArab = isArabic || isArabicText(t.q);
+    const qText = `${t.q}${i >= templates.length ? ` (ভ্যারিয়েন্ট ${Math.floor(i / templates.length) + 1})` : ''}`;
+    const dirInfo = getQuestionBankDirectionality({
+      question: qText,
+      options: t.opts,
+      explanation: t.exp,
+      language: config.language,
+    });
 
     result.push({
       tempId: `gen_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
-      question: `${t.q}${i >= templates.length ? ` (ভ্যারিয়েন্ট ${Math.floor(i / templates.length) + 1})` : ''}`,
+      question: qText,
       options: { ...t.opts },
       correctAnswer: t.ans,
       explanation: t.exp,
       reference: `${config.post || 'BCS/NTRCA'} সিলেবাস অনুযায়ী`,
-      subject: config.subject || (isArab ? 'আরবি' : 'বাংলা'),
-      topic: config.topic || (isArab ? 'عام' : 'সাহিত্য'),
+      subject: config.subject || (dirInfo.isQuestionArabic ? 'আরবি' : 'বাংলা'),
+      topic: config.topic || (dirInfo.isQuestionArabic ? 'عام' : 'সাহিত্য'),
       post: config.post || 'বিসিএস ক্যাডার (BCS)',
       language: config.language,
       questionType: config.questionType || 'MCQ (একটি সঠিক উত্তর)',
       difficulty: config.difficulty || 'মাঝারি',
       status: 'published',
-      isArabic: isArab,
+      isArabic: dirInfo.isQuestionArabic,
+      questionDir: dirInfo.questionDir,
+      optionsDir: dirInfo.optionsDir,
+      explanationDir: dirInfo.explanationDir,
     });
   }
 

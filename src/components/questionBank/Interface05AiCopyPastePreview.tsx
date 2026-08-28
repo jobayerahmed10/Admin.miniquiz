@@ -19,7 +19,11 @@ import { StepIndicator } from './StepIndicator';
 import { DuplicateValidationCard } from './DuplicateValidationCard';
 import { EditQuestionModal } from './EditQuestionModal';
 import { SuccessPublishModal } from './SuccessPublishModal';
-import { validateAndCheckDuplicates, isArabicText } from '../../lib/questionBankEngine';
+import {
+  validateAndCheckDuplicates,
+  isArabicText,
+  getQuestionBankDirectionality,
+} from '../../lib/questionBankEngine';
 import { Question } from '../../types';
 
 interface Interface05AiCopyPastePreviewProps {
@@ -186,8 +190,24 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
       {/* 5. Question Cards List (Screenshot 5) */}
       <div className="space-y-4">
         {filteredQuestions.map((q, idx) => {
-          const isArabic = isArabicText(q.question) || q.language === 'العربية';
+          const dirInfo = getQuestionBankDirectionality({
+            question: q.question,
+            options: q.options,
+            explanation: q.explanation,
+            language: q.language,
+          });
+          const isArabic = dirInfo.isQuestionArabic;
+          const qDir = q.questionDir || dirInfo.questionDir;
+          const optDir = q.optionsDir || dirInfo.optionsDir;
+          const expDir = q.explanationDir || dirInfo.explanationDir;
+
           const isProblem = q.hasErrors || !q.correctAnswer;
+          const arabicOptionLabels: Record<string, string> = {
+            A: 'أ',
+            B: 'ب',
+            C: 'ج',
+            D: 'د',
+          };
 
           return (
             <div
@@ -221,6 +241,17 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                       </span>
                     )}
 
+                    {isArabic && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
+                        عربي (RTL)
+                      </span>
+                    )}
+                    {optDir === 'rtl' && !isArabic && (
+                      <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 text-[10px] font-bold">
+                        বিকল্প: RTL
+                      </span>
+                    )}
+
                     {q.subject && (
                       <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-bold">
                         {q.subject}
@@ -230,9 +261,9 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
 
                   <h3
                     className={`text-sm font-bold text-white leading-relaxed ${
-                      isArabic ? 'font-amiri text-base text-right' : ''
+                      qDir === 'rtl' ? 'font-amiri text-base text-right' : 'text-left'
                     }`}
-                    dir={isArabic ? 'rtl' : 'ltr'}
+                    dir={qDir}
                   >
                     {q.question}
                   </h3>
@@ -278,10 +309,11 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
               )}
 
               {/* Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" dir={optDir}>
                 {(['A', 'B', 'C', 'D'] as const).map((opt) => {
                   const isCorrect = q.correctAnswer === opt;
                   const optText = q.options[opt];
+                  const optLabel = optDir === 'rtl' ? arabicOptionLabels[opt] || opt : opt;
                   return (
                     <div
                       key={opt}
@@ -290,16 +322,15 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                           ? 'bg-emerald-950/30 border-emerald-500/60 text-emerald-300 font-bold'
                           : 'bg-[#050914] border-slate-800 text-slate-300'
                       }`}
-                      dir={isArabic ? 'rtl' : 'ltr'}
                     >
                       <span
                         className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
                           isCorrect ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
                         }`}
                       >
-                        {opt}
+                        {optLabel}
                       </span>
-                      <span className={`flex-1 ${isArabic ? 'font-amiri text-sm text-right' : ''}`}>
+                      <span className={`flex-1 ${optDir === 'rtl' ? 'font-amiri text-sm text-right' : 'text-left'}`}>
                         {optText || <span className="text-slate-500">বিকল্প নেই</span>}
                       </span>
                       {isCorrect && (
@@ -319,8 +350,8 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                     ব্যাখ্যা:
                   </span>
                   <p
-                    className={isArabic ? 'font-amiri text-sm text-right' : ''}
-                    dir={isArabic ? 'rtl' : 'ltr'}
+                    className={expDir === 'rtl' ? 'font-amiri text-sm text-right' : 'text-left'}
+                    dir={expDir}
                   >
                     {q.explanation}
                   </p>

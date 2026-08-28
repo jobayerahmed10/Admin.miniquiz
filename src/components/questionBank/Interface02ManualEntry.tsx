@@ -20,6 +20,7 @@ import { AddCategoryModal } from './AddCategoryModal';
 import {
   lookupSubjectPrefixAndSequence,
   isArabicText,
+  getQuestionBankDirectionality,
   PrefixLookupResult,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
@@ -183,17 +184,29 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
   };
 
   const handleNext = () => {
-    // Inject current metadata into working questions
-    const finalPrepared = questionsList.map((q) => ({
-      ...q,
-      subject,
-      topic,
-      post,
-      language,
-      questionType,
-      difficulty,
-      isArabic: isArabicText(q.question) || language === 'العربية',
-    }));
+    // Inject current metadata & computed directionality into working questions
+    const finalPrepared = questionsList.map((q) => {
+      const dirInfo = getQuestionBankDirectionality({
+        question: q.question,
+        options: q.options,
+        explanation: q.explanation,
+        language,
+      });
+
+      return {
+        ...q,
+        subject,
+        topic,
+        post,
+        language,
+        questionType,
+        difficulty,
+        isArabic: dirInfo.isQuestionArabic,
+        questionDir: dirInfo.questionDir,
+        optionsDir: dirInfo.optionsDir,
+        explanationDir: dirInfo.explanationDir,
+      };
+    });
 
     onProceedToPreview(finalPrepared, {
       subject,
@@ -374,10 +387,27 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
       {/* 5. Dynamic MCQ Question Input Cards */}
       <div className="space-y-4">
         {questionsList.map((q, qIndex) => {
-          const isArabic = isArabicText(q.question) || language === 'العربية';
+          const dirInfo = getQuestionBankDirectionality({
+            question: q.question,
+            options: q.options,
+            explanation: q.explanation,
+            language,
+          });
+          const isArabic = dirInfo.isQuestionArabic;
+          const qDir = dirInfo.questionDir;
+          const optDir = dirInfo.optionsDir;
+          const expDir = dirInfo.explanationDir;
+
           const qChars = (q.question || '').length;
           const expChars = (q.explanation || '').length;
           const refChars = (q.reference || '').length;
+
+          const arabicOptionLabels: Record<string, string> = {
+            A: 'أ',
+            B: 'ب',
+            C: 'ج',
+            D: 'د',
+          };
 
           return (
             <div
@@ -393,9 +423,18 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
                   <h3 className="text-sm font-black text-white">
                     প্রশ্ন {String(qIndex + 1).padStart(2, '0')}
                   </h3>
-                  {isArabic && (
+                  {isArabic ? (
                     <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
-                      Arabic RTL
+                      عربي (RTL)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-bold">
+                      LTR
+                    </span>
+                  )}
+                  {optDir === 'rtl' && !isArabic && (
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 text-[10px] font-bold">
+                      বিকল্প: RTL
                     </span>
                   )}
                 </div>
@@ -423,9 +462,9 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
                   onChange={(e) => handleQuestionChange(qIndex, 'question', e.target.value)}
                   placeholder="এখানে আপনার প্রশ্ন লিখুন..."
                   rows={2}
-                  dir={isArabic ? 'rtl' : 'ltr'}
+                  dir={qDir}
                   className={`w-full bg-[#050914] border border-slate-700/80 rounded-2xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors ${
-                    isArabic ? 'font-amiri text-sm leading-relaxed text-right' : ''
+                    qDir === 'rtl' ? 'font-amiri text-sm leading-relaxed text-right' : 'text-left'
                   }`}
                   required
                 />
@@ -433,11 +472,17 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
 
               {/* Options Section (A, B, C, D) */}
               <div className="space-y-2.5">
-                <label className="text-xs font-bold text-slate-300">বিকল্প (অপশন) *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">বিকল্প (অপশন) *</label>
+                  <span className="text-[10px] text-slate-500">
+                    {optDir === 'rtl' ? 'বিন্যাস: ডান দিক (RTL)' : 'বিন্যাস: বাম দিক (LTR)'}
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" dir={optDir}>
                   {(['A', 'B', 'C', 'D'] as const).map((optKey) => {
                     const isSelected = q.correctAnswer === optKey;
+                    const optLabel = optDir === 'rtl' ? arabicOptionLabels[optKey] || optKey : optKey;
                     return (
                       <div
                         key={optKey}
@@ -456,7 +501,7 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
                           }`}
                           title={`বিকল্প ${optKey} সঠিক উত্তর হিসেবে চিহ্নিত করুন`}
                         >
-                          {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : optKey}
+                          {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : optLabel}
                         </button>
 
                         {/* Input */}
@@ -464,10 +509,10 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
                           type="text"
                           value={q.options[optKey] || ''}
                           onChange={(e) => handleOptionChange(qIndex, optKey, e.target.value)}
-                          placeholder={`অপশন ${optKey}`}
-                          dir={isArabic ? 'rtl' : 'ltr'}
+                          placeholder={`অপশন ${optLabel}`}
+                          dir={optDir}
                           className={`flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none ${
-                            isArabic ? 'font-amiri text-right' : ''
+                            optDir === 'rtl' ? 'font-amiri text-right' : 'text-left'
                           }`}
                           required
                         />
@@ -480,23 +525,26 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
               {/* Correct Answer Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-300">সঠিক উত্তর *</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['A', 'B', 'C', 'D'] as const).map((opt) => (
-                    <button
-                      type="button"
-                      key={opt}
-                      onClick={() => handleQuestionChange(qIndex, 'correctAnswer', opt)}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        q.correctAnswer === opt
-                          ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
-                          : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                      }`}
-                    >
-                      <span>
-                        {opt}. {q.options[opt] ? q.options[opt].substring(0, 10) : `বিকল্প ${opt}`}
-                      </span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-4 gap-2" dir={optDir}>
+                  {(['A', 'B', 'C', 'D'] as const).map((opt) => {
+                    const optLabel = optDir === 'rtl' ? arabicOptionLabels[opt] || opt : opt;
+                    return (
+                      <button
+                        type="button"
+                        key={opt}
+                        onClick={() => handleQuestionChange(qIndex, 'correctAnswer', opt)}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          q.correctAnswer === opt
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
+                            : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                        }`}
+                      >
+                        <span dir={optDir} className={optDir === 'rtl' ? 'font-amiri' : ''}>
+                          {optLabel}. {q.options[opt] ? q.options[opt].substring(0, 10) : `বিকল্প ${optLabel}`}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -511,8 +559,10 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
                   onChange={(e) => handleQuestionChange(qIndex, 'explanation', e.target.value)}
                   placeholder="প্রশ্নের ব্যাখ্যা বা সমাধান লিখুন..."
                   rows={2}
-                  dir={isArabic ? 'rtl' : 'ltr'}
-                  className="w-full bg-[#050914] border border-slate-700/80 rounded-2xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  dir={expDir}
+                  className={`w-full bg-[#050914] border border-slate-700/80 rounded-2xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors ${
+                    expDir === 'rtl' ? 'font-amiri text-sm leading-relaxed text-right' : 'text-left'
+                  }`}
                 />
               </div>
 

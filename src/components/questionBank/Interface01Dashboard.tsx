@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Question } from '../../types';
 import { QuestionBankHeader } from './Header';
-import { isArabicText } from '../../lib/questionBankEngine';
+import { isArabicText, getQuestionBankDirectionality } from '../../lib/questionBankEngine';
 
 interface Interface01DashboardProps {
   questions: Question[];
@@ -381,7 +381,14 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               </div>
             ) : (
               filteredQuestions.slice(0, 10).map((q, idx) => {
-                const isArab = isArabicText(q.question);
+                const dirInfo = getQuestionBankDirectionality({
+                  question: q.question,
+                  options: [q.option_a, q.option_b, q.option_c, q.option_d],
+                  explanation: q.explanation,
+                  language: q.language,
+                });
+                const isArab = dirInfo.isQuestionArabic;
+                const qDir = dirInfo.questionDir;
                 return (
                   <div
                     key={String(q.id)}
@@ -411,9 +418,9 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
                       <p
                         className={`text-xs font-bold text-white leading-relaxed ${
-                          isArab ? 'font-amiri text-sm text-right' : ''
+                          qDir === 'rtl' ? 'font-amiri text-sm text-right' : 'text-left'
                         }`}
-                        dir={isArab ? 'rtl' : 'ltr'}
+                        dir={qDir}
                       >
                         {q.question}
                       </p>

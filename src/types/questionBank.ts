@@ -43,6 +43,9 @@ export interface WorkingQuestion {
   hasErrors?: boolean;
   errorMessage?: string;
   isArabic?: boolean;
+  questionDir?: 'rtl' | 'ltr';
+  optionsDir?: 'rtl' | 'ltr';
+  explanationDir?: 'rtl' | 'ltr';
   prefix?: string;
 }
 
