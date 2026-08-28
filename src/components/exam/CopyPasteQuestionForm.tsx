@@ -1,0 +1,445 @@
+import React, { useState } from 'react';
+import {
+  FileText,
+  RotateCcw,
+  Sparkles,
+  HelpCircle,
+  Check,
+  CheckCircle2,
+  Trash2,
+  Edit2,
+  Inbox,
+  AlertCircle,
+  Plus,
+} from 'lucide-react';
+import { Question } from '../../types';
+
+interface CopyPasteQuestionFormProps {
+  onAddBatchQuestions: (questions: Omit<Question, 'id'>[]) => void;
+  defaultSubject?: string;
+  defaultTopic?: string;
+  defaultPost?: string;
+}
+
+export const CopyPasteQuestionForm: React.FC<CopyPasteQuestionFormProps> = ({
+  onAddBatchQuestions,
+  defaultSubject = 'বাংলা',
+  defaultTopic = '',
+  defaultPost = '',
+}) => {
+  const [rawText, setRawText] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [processedQuestions, setProcessedQuestions] = useState<Omit<Question, 'id'>[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  // Offline regex fallback parser if AI is unavailable
+  const parseQuestionsFallback = (text: string): Omit<Question, 'id'>[] => {
+    const questions: Omit<Question, 'id'>[] = [];
+    // Split by question numbers like "1.", "১.", "(১)", "প্রশ্ন ১:"
+    const blocks = text.split(/(?=(?:^\s*(?:\d+|[\u09E6-\u09EF]+|[A-Z])[\.\)\:-]|^\s*প্রশ্ন\s*(?:\d+|[\u09E6-\u09EF]+)[\:\.]))/m);
+
+    for (const block of blocks) {
+      const cleanBlock = block.trim();
+      if (!cleanBlock || cleanBlock.length < 10) continue;
+
+      const lines = cleanBlock.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 3) continue;
+
+      // First line is usually question title
+      let qText = lines[0].replace(/^\s*(?:\d+|[\u09E6-\u09EF]+|[A-Z])[\.\)\:-]\s*/, '').replace(/^\s*প্রশ্ন\s*(?:\d+|[\u09E6-\u09EF]+)[\:\.]\s*/, '');
+
+      let optA = '';
+      let optB = '';
+      let optC = '';
+      let optD = '';
+      let answer = 'option_a';
+      let explanation = '';
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.match(/^(?:ক|a|১)[\.\)\:-]/i)) {
+          optA = line.replace(/^(?:ক|a|১)[\.\)\:-]\s*/i, '');
+        } else if (line.match(/^(?:খ|b|২)[\.\)\:-]/i)) {
+          optB = line.replace(/^(?:খ|b|২)[\.\)\:-]/i, '');
+        } else if (line.match(/^(?:গ|c|৩)[\.\)\:-]/i)) {
+          optC = line.replace(/^(?:গ|c|৩)[\.\)\:-]/i, '');
+        } else if (line.match(/^(?:ঘ|d|৪)[\.\)\:-]/i)) {
+          optD = line.replace(/^(?:ঘ|d|৪)[\.\)\:-]/i, '');
+        } else if (line.match(/^(?:উত্তর|Ans|Answer)[\:\.]/i)) {
+          const ansText = line.toLowerCase();
+          if (ansText.includes('খ') || ansText.includes('b') || ansText.includes('২')) answer = 'option_b';
+          else if (ansText.includes('গ') || ansText.includes('c') || ansText.includes('৩')) answer = 'option_c';
+          else if (ansText.includes('ঘ') || ansText.includes('d') || ansText.includes('৪')) answer = 'option_d';
+          else answer = 'option_a';
+        } else if (line.match(/^(?:ব্যাখ্যা|Explanation)[\:\.]/i)) {
+          explanation = line.replace(/^(?:ব্যাখ্যা|Explanation)[\:\.]\s*/i, '');
+        }
+      }
+
+      if (qText && (optA || optB)) {
+        questions.push({
+          question: qText,
+          option_a: optA || 'অপশন ১',
+          option_b: optB || 'অপশন ২',
+          option_c: optC || 'অপশন ৩',
+          option_d: optD || 'অপশন ৪',
+          correct_answer: answer,
+          explanation: explanation || null,
+          subject: defaultSubject || 'বাংলা',
+          topic: defaultTopic || null,
+          post: defaultPost || null,
+          status: 'published',
+        });
+      }
+    }
+    return questions;
+  };
+
+  const handleProcessText = async () => {
+    if (!rawText.trim()) {
+      setError('অনুগ্রহ করে প্রশ্নসমূহ কপি করে পেস্ট করুন');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      // 1. Try AI Extraction Endpoint
+      const response = await fetch('/api/gemini/extract-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: rawText,
+          defaultSubject: defaultSubject || 'বাংলা',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
+          const parsed: Omit<Question, 'id'>[] = data.questions.map((q: any) => ({
+            question: q.question || '',
+            option_a: q.option_a || '',
+            option_b: q.option_b || '',
+            option_c: q.option_c || '',
+            option_d: q.option_d || '',
+            correct_answer: q.correct_answer || 'option_a',
+            explanation: q.explanation || null,
+            subject: defaultSubject || q.subject || 'বাংলা',
+            topic: defaultTopic || null,
+            post: defaultPost || null,
+            status: 'published',
+          }));
+          setProcessedQuestions(parsed);
+          setSelectedIndices(new Set(parsed.map((_, idx) => idx)));
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // 2. Fallback to Local Offline Parser
+      const localParsed = parseQuestionsFallback(rawText);
+      if (localParsed.length > 0) {
+        setProcessedQuestions(localParsed);
+        setSelectedIndices(new Set(localParsed.map((_, idx) => idx)));
+      } else {
+        setError('প্রশ্ন ফরম্যাট শনাক্ত করা সম্ভব হয়নি। অনুগ্রহ করে উদাহরণ ফরম্যাট অনুযায়ী পেস্ট করুন।');
+      }
+    } catch (err: any) {
+      console.warn('AI Extraction failed, running local parser fallback:', err);
+      const localParsed = parseQuestionsFallback(rawText);
+      if (localParsed.length > 0) {
+        setProcessedQuestions(localParsed);
+        setSelectedIndices(new Set(localParsed.map((_, idx) => idx)));
+      } else {
+        setError(err.message || 'প্রশ্ন প্রসেস করতে ব্যর্থ হয়েছে।');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleClear = () => {
+    setRawText('');
+    setProcessedQuestions([]);
+    setSelectedIndices(new Set());
+    setError(null);
+  };
+
+  const toggleSelect = (idx: number) => {
+    const next = new Set(selectedIndices);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setSelectedIndices(next);
+  };
+
+  const handleAddSelectedToExam = () => {
+    const toAdd = processedQuestions.filter((_, idx) => selectedIndices.has(idx));
+    if (toAdd.length === 0) {
+      setError('কমপক্ষে একটি প্রশ্ন নির্বাচন করুন');
+      return;
+    }
+    onAddBatchQuestions(toAdd);
+    handleClear();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Top Card: AI বা অন্য উৎস থেকে কপি-পেস্ট করুন */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex items-start justify-between gap-2 pb-1 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+              AI বা অন্য উৎস থেকে কপি-পেস্ট করুন
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+              যে কোনো সোর্স থেকে প্রশ্ন কপি করে নিচের বক্সে পেস্ট করুন। সিস্টেম স্বয়ংক্রিয়ভাবে প্রশ্ন, অপশন ও সঠিক উত্তর আলাদা করবে।
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowHelpModal(!showHelpModal)}
+            className="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-[#5B36F5] dark:text-indigo-300 font-bold text-xs rounded-xl flex items-center gap-1 shrink-0 hover:bg-indigo-100 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>কিভাবে কাজ করে?</span>
+          </button>
+        </div>
+
+        {/* Help Format Banner (Collapsible / Modal) */}
+        {showHelpModal && (
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-indigo-200 dark:border-indigo-800/60 rounded-xl space-y-2 text-xs text-slate-700 dark:text-slate-300">
+            <h4 className="font-extrabold text-indigo-950 dark:text-indigo-200">
+              সঠিক কপি-পেস্ট ফরম্যাট উদাহরণ:
+            </h4>
+            <pre className="font-mono text-[11px] bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 leading-relaxed overflow-x-auto text-slate-800 dark:text-slate-200">
+{`১. বাংলাদেশের জাতীয় কবি কে?
+ক) রবীন্দ্রনাথ ঠাকুর
+খ) কাজী নজরুল ইসলাম
+গ) জসীমউদ্দীন
+ঘ) জীবনানন্দ দাশ
+উত্তর: খ
+ব্যাখ্যা: কাজী নজরুল ইসলাম বাংলাদেশের জাতীয় কবি।`}
+            </pre>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400">
+            {error}
+          </div>
+        )}
+
+        {/* Textarea */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              কপিকৃত প্রশ্ন পেস্ট করুন
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {rawText.length}/10000
+            </span>
+          </div>
+
+          <textarea
+            rows={8}
+            maxLength={10000}
+            value={rawText}
+            onChange={(e) => {
+              setRawText(e.target.value);
+              if (error) setError(null);
+            }}
+            placeholder={`এখানে কপি করা প্রশ্নসমূহ পেস্ট করুন...
+
+উদাহরণ:
+১. বাংলাদেশের জাতীয় কবি কে?
+ক) রবীন্দ্রনাথ ঠাকুর
+খ) কাজী নজরুল ইসলাম
+গ) জসীমউদ্দীন
+ঘ) জীবনানন্দ দাশ
+উত্তর: খ
+
+২. নিচের কোনটি বাংলা বর্ণমালার স্বরবর্ণ?
+ক) ক`}
+            className="w-full px-3.5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] leading-relaxed"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-2.5 pt-1">
+          <button
+            type="button"
+            onClick={handleClear}
+            className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>ক্লিয়ার করুন</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={isProcessing || !rawText.trim()}
+            onClick={handleProcessText}
+            className="px-5 py-2.5 bg-[#5B36F5] hover:bg-[#4E2DE3] disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-indigo-500/20 flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Sparkles className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} />
+            <span>{isProcessing ? 'প্রসেস হচ্ছে...' : 'প্রশ্ন প্রসেস করুন'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Processed Questions Section */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+              প্রসেসড প্রশ্নসমূহ
+            </h3>
+            <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-[#5B36F5] dark:text-indigo-300 text-xs font-bold">
+              মোট: {processedQuestions.length}টি
+            </span>
+          </div>
+
+          {processedQuestions.length > 0 && (
+            <button
+              type="button"
+              onClick={handleAddSelectedToExam}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>নির্বাচিত ({selectedIndices.size}) টি যুক্ত করুন</span>
+            </button>
+          )}
+        </div>
+
+        {/* Empty State */}
+        {processedQuestions.length === 0 ? (
+          <div className="py-12 px-4 text-center flex flex-col items-center justify-center space-y-3 bg-slate-50/50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-[#5B36F5] dark:text-indigo-400 flex items-center justify-center shadow-inner">
+              <Inbox className="w-8 h-8 stroke-[1.5]" />
+            </div>
+            <div className="space-y-1 max-w-sm">
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                এখনও কোনো প্রশ্ন প্রসেস করা হয়নি
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                উপরের বক্সে কপি করে পেস্ট করুন এবং "প্রশ্ন প্রসেস করুন" বাটনে ক্লিক করুন
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* List of Processed Questions */
+          <div className="space-y-3">
+            {processedQuestions.map((q, idx) => {
+              const isSelected = selectedIndices.has(idx);
+              const answerKeyMap: Record<string, string> = {
+                option_a: 'ক',
+                option_b: 'খ',
+                option_c: 'গ',
+                option_d: 'ঘ',
+              };
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => toggleSelect(idx)}
+                  className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'border-[#5B36F5] bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 opacity-70'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${
+                        isSelected
+                          ? 'bg-[#5B36F5] border-[#5B36F5] text-white'
+                          : 'border-slate-300 dark:border-slate-600'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white leading-snug">
+                          <span className="text-[#5B36F5] mr-1">{idx + 1}.</span>
+                          {q.question}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProcessedQuestions(processedQuestions.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          title="মুছুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Options Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                        <div
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] sm:text-xs ${
+                            q.correct_answer === 'option_a'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span className="font-bold mr-1">ক.</span> {q.option_a}
+                        </div>
+
+                        <div
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] sm:text-xs ${
+                            q.correct_answer === 'option_b'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span className="font-bold mr-1">খ.</span> {q.option_b}
+                        </div>
+
+                        <div
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] sm:text-xs ${
+                            q.correct_answer === 'option_c'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span className="font-bold mr-1">গ.</span> {q.option_c}
+                        </div>
+
+                        <div
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] sm:text-xs ${
+                            q.correct_answer === 'option_d'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span className="font-bold mr-1">ঘ.</span> {q.option_d}
+                        </div>
+                      </div>
+
+                      {q.explanation && (
+                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                          ব্যাখ্যা: {q.explanation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

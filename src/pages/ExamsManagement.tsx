@@ -46,7 +46,7 @@ import {
   QUICK_POST_SUGGESTIONS,
 } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { AddQuestionsToExamModal } from '../components/AddQuestionsToExamModal';
+import { CreateExamWizard } from '../components/exam/CreateExamWizard';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 
 export const ExamsManagement: React.FC = () => {
@@ -76,8 +76,9 @@ export const ExamsManagement: React.FC = () => {
   // Details Modal
   const [viewingExam, setViewingExam] = useState<Exam | null>(null);
 
-  // Add Questions Modal State (3-step wizard)
-  const [questionsModalExam, setQuestionsModalExam] = useState<Exam | null>(null);
+  // Add Questions / Create Wizard Modal State (3-step wizard)
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardExamToEdit, setWizardExamToEdit] = useState<Exam | null>(null);
 
   // Load Exams
   const loadExams = async () => {
@@ -100,39 +101,16 @@ export const ExamsManagement: React.FC = () => {
     loadExams();
   }, []);
 
-  // Open Create Modal -> Instantly creates a new draft exam and opens 3-step wizard at Step 1
-  const handleOpenCreateModal = async () => {
-    setFormSubmitting(true);
-    const defaultPayload = {
-      title: 'নতুন মডেল টেস্ট (শিরোনাম দিন)',
-      badge: 'দৈনিক মডেল টেস্ট',
-      badge_type: 'daily' as const,
-      subject: 'বাংলা',
-      topic: '',
-      post: '',
-      pass_mark: 0,
-      exam_type: 'free_exams',
-      category: 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
-      question_count: 25,
-      time_minutes: 20,
-      negative_marks: 0.25,
-      total_marks: 25,
-      description: 'প্রতিটি প্রশ্নের সঠিক উত্তরের জন্য ১ নম্বর। প্রতি ভুল উত্তরের জন্য ০.২৫ কাটা যাবে।',
-      status: 'active' as const,
-    };
-    const res = await insertExam(defaultPayload);
-    setFormSubmitting(false);
-    if (res.success && res.data) {
-      loadExams();
-      setQuestionsModalExam(res.data);
-    } else {
-      alert(res.error || 'নতুন পরীক্ষা তৈরি করতে সমস্যা হয়েছে।');
-    }
+  // Open Create Modal -> Opens 3-step wizard starting at Step 1 with fresh form
+  const handleOpenCreateModal = () => {
+    setWizardExamToEdit(null);
+    setIsWizardOpen(true);
   };
 
-  // Open Edit Modal -> Opens 3-step wizard directly
+  // Open Edit Modal -> Opens 3-step wizard directly with existing exam data
   const handleOpenEditModal = (exam: Exam) => {
-    setQuestionsModalExam(exam);
+    setWizardExamToEdit(exam);
+    setIsWizardOpen(true);
   };
 
   // Handle Delete Confirmation
@@ -571,18 +549,18 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
 
                 {/* Title & Clickable Area to Open Preview & Editor */}
                 <div
-                  onClick={() => setQuestionsModalExam(exam)}
+                  onClick={() => handleOpenEditModal(exam)}
                   className="cursor-pointer group/title"
                   title="ক্লিক করে পুরো মডেল টেস্ট প্রিভিউ দেখুন ও প্রশ্ন এডিট করুন"
                 >
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 leading-snug group-hover/title:text-emerald-600 dark:group-hover/title:text-emerald-400 transition-colors">
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 leading-snug group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
                     {exam.title}
                   </h3>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
                       বিষয়: <span className="text-slate-900 dark:text-slate-200">{exam.subject}</span>
                     </span>
-                    <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
                       <Eye className="w-3 h-3" /> ক্লিক করে প্রিভিউ ও এডিট
                     </span>
                   </div>
@@ -651,8 +629,8 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
               <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setQuestionsModalExam(exam)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all"
+                    onClick={() => handleOpenEditModal(exam)}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all"
                     title="পুরো মডেল টেস্ট প্রিভিউ দেখুন, প্রশ্ন ও অপশন এডিট করুন"
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -751,7 +729,7 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
                 onClick={() => {
                   const curr = viewingExam;
                   setViewingExam(null);
-                  setQuestionsModalExam(curr);
+                  handleOpenEditModal(curr);
                 }}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow"
               >
@@ -781,17 +759,18 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
         </div>
       )}
 
-      {/* ADD QUESTIONS MODAL */}
-      {questionsModalExam && (
-        <AddQuestionsToExamModal
-          isOpen={Boolean(questionsModalExam)}
-          onClose={() => setQuestionsModalExam(null)}
-          exam={questionsModalExam}
-          onQuestionsUpdated={() => {
-            loadExams();
-          }}
-        />
-      )}
+      {/* CREATE & EDIT EXAM WIZARD (3-STEP) */}
+      <CreateExamWizard
+        isOpen={isWizardOpen}
+        onClose={() => {
+          setIsWizardOpen(false);
+          setWizardExamToEdit(null);
+        }}
+        examToEdit={wizardExamToEdit}
+        onSuccess={() => {
+          loadExams();
+        }}
+      />
 
       {/* CONFIRM DELETE MODAL */}
       <ConfirmModal

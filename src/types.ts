@@ -32,11 +32,18 @@ export interface Exam {
   post?: string | null;
   pass_mark?: number;
   exam_type?: 'free' | 'course' | string;
+  exam_format?: string | null; // e.g. 'MCQ (বহুনির্বাচনি)'
   category?: string;
   question_count: number;
   time_minutes: number;
   negative_marks: number;
+  has_negative_marking?: boolean;
+  marks_per_question?: number;
   total_marks: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  max_attempts?: number | null;
+  instructions?: string | null;
   description?: string | null;
   id_pattern?: string | null; // e.g. 'Q-BANGLA-'
   status: ExamStatus;
