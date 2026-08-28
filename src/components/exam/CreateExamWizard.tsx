@@ -226,9 +226,9 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
 
       // 3. Batch Save / Link Questions
       if (updatedQuestions.length > 0) {
-        await insertBatchQuestions(
+        const qRes = await insertBatchQuestions(
           updatedQuestions.map((q) => ({
-            id: q.id,
+            id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
             question: q.question,
             option_a: q.option_a,
             option_b: q.option_b,
@@ -239,14 +239,17 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
             subject: q.subject || examInfo.subject,
             topic: q.topic || examInfo.topic,
             post: q.post || examInfo.post,
-            exam_id: examId,
+            exam_id: String(examId),
             status: 'published',
             slug: q.slug,
           }))
         );
+        if (!qRes.success) {
+          throw new Error(qRes.error || 'প্রশ্নগুলো সেভ করতে ব্যর্থ হয়েছে');
+        }
       }
 
-      setSaveSuccessMessage('পরীক্ষা সফলভাবে সংরক্ষিত হয়েছে!');
+      setSaveSuccessMessage('পরীক্ষা ও প্রশ্ন সফলভাবে সংরক্ষিত হয়েছে!');
 
       setTimeout(() => {
         if (savedExam) {
@@ -256,7 +259,9 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
       }, 1000);
     } catch (err: any) {
       console.error('Save exam failed:', err);
-      setSaveErrorMessage(err.message || 'সংরক্ষণে ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।');
+      const errMsg = err.message || 'সংরক্ষণে ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।';
+      setSaveErrorMessage(errMsg);
+      alert(`সুপাবেসে সংরক্ষণ করতে ব্যর্থ হয়েছে:\n${errMsg}`);
     } finally {
       setIsSaving(false);
     }

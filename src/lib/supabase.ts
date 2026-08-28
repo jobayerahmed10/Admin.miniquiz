@@ -758,7 +758,7 @@ export const insertBatchQuestions = async (
 
   try {
     const payload = localItems.map((q) => ({
-      id: q.id,
+      id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
       question: q.question,
       option_a: q.option_a,
       option_b: q.option_b,
@@ -771,8 +771,10 @@ export const insertBatchQuestions = async (
       subject: q.subject || 'সাধারণ',
       topic: q.topic || '',
       post: q.post || '',
-      ...(q.exam_id ? { exam_id: q.exam_id } : {}),
+      ...(q.exam_id ? { exam_id: String(q.exam_id) } : {}),
     }));
+
+    console.log('Payload: Questions batch insert', JSON.stringify(payload, null, 2));
 
     let { data, error } = await client
       .from('questions')
@@ -783,7 +785,7 @@ export const insertBatchQuestions = async (
       console.error('Supabase batch insert questions error:', error);
       const fallbackPayload = payload.map((p: any) => {
         const { subject, topic, post, ...rest } = p;
-        rest.exam_id = p.exam_id;
+        rest.exam_id = p.exam_id ? String(p.exam_id) : undefined;
         return rest;
       });
       const retryResult = await client
@@ -1185,7 +1187,7 @@ export const insertExam = async (
 
   try {
     const payload: any = {
-      ...(customId ? { id: customId } : {}),
+      id: String(customId || examId),
       title: newExam.title,
       badge: newExam.badge,
       badge_type: newExam.badge_type,
@@ -1204,6 +1206,8 @@ export const insertExam = async (
       status: newExam.status,
     };
 
+    console.log('Payload: Exam insert', JSON.stringify(payload, null, 2));
+
     let { data, error } = await client
       .from('exams')
       .upsert([payload], { onConflict: 'id' })
@@ -1213,7 +1217,7 @@ export const insertExam = async (
     if (error) {
       console.error('Supabase insertExam error:', error);
       const basicPayload = {
-        ...(customId ? { id: customId } : {}),
+        id: String(customId || examId),
         title: newExam.title,
         badge: newExam.badge,
         badge_type: newExam.badge_type,
@@ -1225,6 +1229,8 @@ export const insertExam = async (
         description: newExam.description || '',
         status: newExam.status,
       };
+
+      console.log('Payload: Exam retry basicPayload', JSON.stringify(basicPayload, null, 2));
 
       const retryResult = await client
         .from('exams')
