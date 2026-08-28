@@ -34,6 +34,7 @@ interface Interface01DashboardProps {
   onEditQuestion: (question: Question) => void;
   onDeleteQuestion: (id: string | number) => void;
   onRefresh: () => void;
+  onClearAll?: () => void;
 }
 
 export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
@@ -44,6 +45,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   onEditQuestion,
   onDeleteQuestion,
   onRefresh,
+  onClearAll,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -52,14 +54,14 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const [viewAllQuestionsModal, setViewAllQuestionsModal] = useState(false);
   const [viewQuestionDetail, setViewQuestionDetail] = useState<Question | null>(null);
 
-  // Dynamic calculations based on real questions
+  // Dynamic calculations based on real questions (no fake mock inflation)
   const stats = useMemo(() => {
-    const total = Math.max(questions.length, 12458);
-    const published = questions.filter((q) => q.status === 'published').length || 11820;
-    const draft = questions.filter((q) => q.status === 'draft').length || 438;
-    const pending = 125;
-    const duplicates = 75;
-    const addedToday = 248;
+    const total = questions.length;
+    const published = questions.filter((q) => q.status === 'published').length;
+    const draft = questions.filter((q) => q.status === 'draft').length;
+    const pending = 0;
+    const duplicates = 0;
+    const addedToday = questions.length;
 
     return {
       total,
@@ -71,17 +73,28 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
     };
   }, [questions]);
 
-  // Subject counts
+  // Subject counts based on real questions
   const subjectStats = useMemo(() => {
-    return [
-      { name: 'বাংলা', count: 2450, color: 'from-purple-500 to-indigo-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
-      { name: 'English', count: 1850, color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
-      { name: 'গণিত', count: 2100, color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
-      { name: 'সাধারণ জ্ঞান', count: 3200, color: 'from-blue-500 to-sky-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
-      { name: 'العربية', count: 850, color: 'from-rose-500 to-pink-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
-      { name: 'ফিকহ', count: 420, color: 'from-teal-500 to-cyan-600', text: 'text-teal-400', bg: 'bg-teal-950/40 border-teal-500/30' },
+    const counts: Record<string, number> = {};
+    questions.forEach((q) => {
+      const subj = q.subject || 'অন্যান্য';
+      counts[subj] = (counts[subj] || 0) + 1;
+    });
+
+    const defaultSubjects = [
+      { name: 'বাংলা', color: 'from-purple-500 to-indigo-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
+      { name: 'English', color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
+      { name: 'গণিত', color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
+      { name: 'সাধারণ জ্ঞান', color: 'from-blue-500 to-sky-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
+      { name: 'العربية', color: 'from-rose-500 to-pink-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
+      { name: 'ফিকহ', color: 'from-teal-500 to-cyan-600', text: 'text-teal-400', bg: 'bg-teal-950/40 border-teal-500/30' },
     ];
-  }, []);
+
+    return defaultSubjects.map((s) => ({
+      ...s,
+      count: counts[s.name] || 0,
+    }));
+  }, [questions]);
 
   // Filter questions for the list table
   const filteredQuestions = useMemo(() => {
@@ -322,13 +335,25 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               {filteredQuestions.length} টি
             </span>
           </div>
-          <button
-            onClick={onRefresh}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-emerald-400 transition-colors"
-            title="রিফ্রেশ করুন"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {questions.length > 0 && onClearAll && (
+              <button
+                onClick={onClearAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold transition-colors"
+                title="সব প্রশ্ন মুছে ফেলুন"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>সব প্রশ্ন মুছুন</span>
+              </button>
+            )}
+            <button
+              onClick={onRefresh}
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-emerald-400 transition-colors"
+              title="রিফ্রেশ করুন"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Filter Toolbar */}

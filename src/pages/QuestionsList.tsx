@@ -6,6 +6,7 @@ import {
   updateQuestion,
   insertBatchQuestions,
   getDefaultSubjectPrefix,
+  clearAllQuestions,
 } from '../lib/supabase';
 import { Question } from '../types';
 import { QuestionBankView, WorkingQuestion, AiAutoGenerateConfig } from '../types/questionBank';
@@ -173,6 +174,13 @@ export const QuestionsList: React.FC = () => {
     setEditingFromDashboard(null);
   };
 
+  const handleClearAllQuestions = async () => {
+    if (window.confirm('আপনি কি নিশ্চিতভাবে সব প্রশ্ন মুছে ফেলতে চান?')) {
+      await clearAllQuestions();
+      setQuestions([]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* 1. Interface 01: Master Question Bank Dashboard */}
@@ -185,6 +193,7 @@ export const QuestionsList: React.FC = () => {
           onEditQuestion={handleEditFromDashboard}
           onDeleteQuestion={(id) => setDeletingQuestionId(id)}
           onRefresh={loadQuestions}
+          onClearAll={handleClearAllQuestions}
         />
       )}
 
