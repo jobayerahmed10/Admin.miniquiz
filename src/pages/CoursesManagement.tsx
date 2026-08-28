@@ -715,21 +715,21 @@ NOTIFY pgrst, 'reload schema';
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16 animate-in fade-in duration-300">
       {/* Top Header & Action Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0a111e] border border-slate-800/80 p-6 sm:p-7 rounded-3xl shadow-xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/80 p-6 sm:p-7 rounded-3xl shadow-sm dark:shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-4 z-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-300 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-500/10">
             <GraduationCap className="w-7 h-7" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                 কোর্স ও বাটন কনফিগারেশন প্যানেল
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
                 লাইভ মোড
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
               কোর্সের প্রতিটি বাটন (বিস্তারিত টেক্সট, রুটিন PDF, সিলেবাস PDF, পরীক্ষা ও লেকচার শিট) আলাদাভাবে সাজান
             </p>
           </div>
@@ -738,34 +738,34 @@ NOTIFY pgrst, 'reload schema';
         <div className="flex items-center gap-2.5 flex-wrap z-10">
           <button
             onClick={() => setShowSqlModal(true)}
-            className="px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all flex items-center gap-2"
+            className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
           >
-            <Code className="w-4 h-4 text-emerald-400" />
+            <Code className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Supabase SQL স্কিমা</span>
           </button>
 
           <button
             onClick={handleSyncAllCourses}
             disabled={isSyncingAll}
-            className="px-4 py-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10"
+            className="px-4 py-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
             title="সব কোর্স সুপাবেজে আপলোড ও সিঙ্ক করুন"
           >
-            <Cloud className={`w-4 h-4 text-emerald-400 ${isSyncingAll ? 'animate-bounce' : ''}`} />
+            <Cloud className={`w-4 h-4 text-emerald-600 dark:text-emerald-400 ${isSyncingAll ? 'animate-bounce' : ''}`} />
             <span>{isSyncingAll ? 'সুপাবেজে সিঙ্ক হচ্ছে...' : 'সব কোর্স সুপাবেজে সিঙ্ক করুন'}</span>
           </button>
 
           <button
             onClick={loadCourses}
             disabled={loading}
-            className="p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all"
+            className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-sm"
             title="রিফ্রেশ করুন"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-500' : ''}`} />
           </button>
 
           <button
             onClick={handleOpenCreateModal}
-            className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all flex items-center gap-2 shadow-md shadow-emerald-500/20"
           >
             <Plus className="w-4 h-4" />
             <span>নতুন কোর্স তৈরি করুন</span>
@@ -774,30 +774,30 @@ NOTIFY pgrst, 'reload schema';
       </div>
 
       {/* Supabase Live App Sync Diagnostic Banner */}
-      <div className="bg-[#0b1322] border border-slate-800/80 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#0b1322] border border-slate-200 dark:border-slate-800/80 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
             <Smartphone className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-white">স্টুডেন্ট অ্যাপ ও সুপাবেজ ক্লাউড সংযোগ:</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">স্টুডেন্ট অ্যাপ ও সুপাবেজ ক্লাউড সংযোগ:</span>
               {isSupabaseConnected && !isTableMissing ? (
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 text-[10px] font-black flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
                   সুপাবেজ ক্লাউড সংযুক্ত
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-black flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[10px] font-black flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   সুপাবেজে টেবিল তৈরি বা কানেকশন প্রয়োজন
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              মোট কোর্স: <strong className="text-white">{courses.length}</strong> টি &bull;{' '}
-              সুপাবেজ ক্লাউডে সক্রিয়: <strong className="text-emerald-400">{courses.filter((c) => c.is_synced_to_supabase !== false).length}</strong> টি &bull;{' '}
-              লোকাল ব্রাউজারে: <strong className="text-amber-400">{courses.filter((c) => c.is_synced_to_supabase === false).length}</strong> টি
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              মোট কোর্স: <strong className="text-slate-800 dark:text-white">{courses.length}</strong> টি &bull;{' '}
+              সুপাবেজ ক্লাউডে সক্রিয়: <strong className="text-emerald-600 dark:text-emerald-400">{courses.filter((c) => c.is_synced_to_supabase !== false).length}</strong> টি &bull;{' '}
+              লোকাল ব্রাউজারে: <strong className="text-amber-600 dark:text-amber-400">{courses.filter((c) => c.is_synced_to_supabase === false).length}</strong> টি
             </p>
           </div>
         </div>
@@ -818,21 +818,21 @@ NOTIFY pgrst, 'reload schema';
 
       {/* Database Setup Notice if tables missing */}
       {isTableMissing && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 sm:p-6 text-amber-200 text-xs space-y-3">
-          <div className="flex items-center gap-3 font-bold text-amber-300 text-sm">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 sm:p-6 text-amber-900 dark:text-amber-200 text-xs space-y-3 shadow-sm">
+          <div className="flex items-center gap-3 font-bold text-amber-700 dark:text-amber-300 text-sm">
             <span>⚠️ Supabase-এ কোর্স টেবিল তৈরি করা প্রয়োজন (অ্যাপে ডাটা না যাওয়ার কারণ)</span>
           </div>
-          <p className="text-slate-300 leading-relaxed">
+          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
             এডমিন প্যানেলে তৈরি করা কোর্স মোবাইল অ্যাপে প্রদর্শিত হওয়ার জন্য আপনার Supabase ডাটাবেসে{' '}
-            <code className="text-amber-400 font-mono">public.courses</code>,{' '}
-            <code className="text-amber-400 font-mono">public.course_exams</code> এবং{' '}
-            <code className="text-amber-400 font-mono">public.course_sheets</code> টেবিল তৈরি থাকতে হবে।
+            <code className="text-amber-600 dark:text-amber-400 font-mono">public.courses</code>,{' '}
+            <code className="text-amber-600 dark:text-amber-400 font-mono">public.course_exams</code> এবং{' '}
+            <code className="text-amber-600 dark:text-amber-400 font-mono">public.course_sheets</code> টেবিল তৈরি থাকতে হবে।
             নিচের বাটনে ক্লিক করে প্রস্তুতকৃত SQL কোডটি কপি করে Supabase ড্যাশবোর্ডের <strong>SQL Editor</strong> এ গিয়ে <strong>Run</strong> বাটনে চাপ দিন।
           </p>
           <div className="flex items-center gap-2 flex-wrap pt-1">
             <button
               onClick={() => setShowSqlModal(true)}
-              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors flex items-center gap-2"
+              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Code className="w-4 h-4" />
               SQL কোড দেখুন ও কপি করুন
@@ -840,9 +840,9 @@ NOTIFY pgrst, 'reload schema';
             <button
               onClick={handleSyncAllCourses}
               disabled={isSyncingAll}
-              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-700"
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 shadow-sm"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin text-emerald-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin text-emerald-500' : ''}`} />
               SQL রান করার পর এখানে ক্লিক করুন
             </button>
           </div>
@@ -850,15 +850,15 @@ NOTIFY pgrst, 'reload schema';
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-[#0a111e] border border-slate-800/80 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/80 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             placeholder="কোর্স বা শিক্ষকের নাম দিয়ে খুঁজুন..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
@@ -870,7 +870,7 @@ NOTIFY pgrst, 'reload schema';
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                 selectedCategory === cat
                   ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                  : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
               }`}
             >
               {cat}
@@ -883,7 +883,7 @@ NOTIFY pgrst, 'reload schema';
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
               selectedCategory === 'আপকামিং'
                 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
-                : 'bg-amber-500/10 text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 border border-amber-500/30'
+                : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30'
             }`}
           >
             <Rocket className="w-3.5 h-3.5" />
@@ -893,7 +893,7 @@ NOTIFY pgrst, 'reload schema';
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
                   selectedCategory === 'আপকামিং'
                     ? 'bg-slate-950 text-amber-300'
-                    : 'bg-amber-500/30 text-amber-200'
+                    : 'bg-amber-500/30 text-amber-700 dark:text-amber-200'
                 }`}
               >
                 {upcomingCoursesCount}
@@ -905,15 +905,15 @@ NOTIFY pgrst, 'reload schema';
 
       {/* Course Grid */}
       {loading ? (
-        <div className="p-16 text-center text-sm text-slate-400 bg-slate-900/40 rounded-3xl border border-slate-800 flex flex-col items-center justify-center gap-3">
-          <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+        <div className="p-16 text-center text-sm text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-3 shadow-sm">
+          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
           <span>কোর্স লোড হচ্ছে...</span>
         </div>
       ) : filteredCourses.length === 0 ? (
-        <div className="p-16 text-center bg-[#0a111e] rounded-3xl border border-slate-800/80 space-y-3">
-          <GraduationCap className="w-12 h-12 text-slate-600 mx-auto" />
-          <h3 className="text-base font-bold text-white">কোনো কোর্স পাওয়া যায়নি</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
+        <div className="p-16 text-center bg-white dark:bg-[#0a111e] rounded-3xl border border-slate-200 dark:border-slate-800/80 space-y-3 shadow-sm">
+          <GraduationCap className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">কোনো কোর্স পাওয়া যায়নি</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             আপনার অ্যাকাউন্টে নতুন কোর্স তৈরি করতে উপরের "নতুন কোর্স তৈরি করুন" বাটনে ক্লিক করুন।
           </p>
           <button

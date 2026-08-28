@@ -148,74 +148,74 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
         </div>
       )}
 
-      {/* STATS CARDS GRID Matching Screenshot 1 */}
+      {/* STATS CARDS GRID */}
       <div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Card 1: Total Questions */}
-          <div className="bg-[#0b1322] p-5 rounded-3xl border border-slate-800/80 shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+          <div className="bg-white dark:bg-[#0b1322] p-5 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                 মোট প্রশ্ন সংখ্যা
               </span>
-              <div className="w-9 h-9 bg-slate-800/80 border border-slate-700/60 rounded-full flex items-center justify-center text-emerald-400">
+              <div className="w-9 h-9 bg-emerald-50 dark:bg-slate-800/80 border border-emerald-200 dark:border-slate-700/60 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
                 <HelpCircle className="w-5 h-5" />
               </div>
             </div>
 
             <div className="mt-4">
-              <span className="text-4xl font-black text-white tracking-tight">
+              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                 {loading ? '...' : stats.totalQuestions ?? 0}
               </span>
             </div>
 
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold">
               <TrendingUp className="w-3.5 h-3.5" />
               <span>+১২টি নতুন এই সপ্তাহে</span>
             </div>
           </div>
 
           {/* Card 2: Active Model Tests */}
-          <div className="bg-[#0b1322] p-5 rounded-3xl border border-slate-800/80 shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+          <div className="bg-white dark:bg-[#0b1322] p-5 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                 সক্রিয় মডেল টেস্ট
               </span>
-              <div className="w-9 h-9 bg-slate-800/80 border border-slate-700/60 rounded-full flex items-center justify-center text-emerald-400">
+              <div className="w-9 h-9 bg-emerald-50 dark:bg-slate-800/80 border border-emerald-200 dark:border-slate-700/60 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
                 <Award className="w-5 h-5" />
               </div>
             </div>
 
             <div className="mt-4">
-              <span className="text-4xl font-black text-white tracking-tight">
+              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                 {loading ? '...' : `${stats.activeExams || 2} / ${stats.totalExams || 2}`}
               </span>
             </div>
 
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold">
               <Zap className="w-3.5 h-3.5" />
               <span>পাবলিশড পরীক্ষা</span>
             </div>
           </div>
 
           {/* Card 3: Registered Students */}
-          <div className="bg-[#0b1322] p-5 rounded-3xl border border-slate-800/80 shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all sm:col-span-2 lg:col-span-1">
+          <div className="bg-white dark:bg-[#0b1322] p-5 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md relative overflow-hidden group hover:border-emerald-500/50 transition-all sm:col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                 নিবন্ধিত শিক্ষার্থী
               </span>
-              <div className="w-9 h-9 bg-slate-800/80 border border-slate-700/60 rounded-full flex items-center justify-center text-emerald-400">
+              <div className="w-9 h-9 bg-emerald-50 dark:bg-slate-800/80 border border-emerald-200 dark:border-slate-700/60 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
                 <Users className="w-5 h-5" />
               </div>
             </div>
 
             <div className="mt-4">
-              <span className="text-4xl font-black text-white tracking-tight">
+              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                 ১৫০+
               </span>
             </div>
 
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400 font-bold">
-              <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-bold">
+              <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>সক্রিয় শিক্ষার্থী</span>
             </div>
           </div>
@@ -223,14 +223,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
       </div>
 
       {/* QUESTION MANAGEMENT QUICK SUMMARY */}
-      <div className="bg-[#0b1322] rounded-3xl p-6 border border-slate-800/80 shadow-md">
+      <div className="bg-white dark:bg-[#0b1322] rounded-3xl p-6 border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h3 className="font-bold text-base text-white flex items-center gap-2">
-              <Database className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+              <Database className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
               প্রশ্ন ব্যাংক ওভারভিউ
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               প্রকাশিত এবং ড্রাফট প্রশ্নমালার সংক্ষিপ্ত অবস্থা
             </p>
           </div>
@@ -238,7 +238,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="self-start sm:self-auto px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-2xl border border-slate-700 transition-colors flex items-center gap-1.5"
+            className="self-start sm:self-auto px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-2xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             রিফ্রেশ
@@ -246,31 +246,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/20 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-between shadow-sm">
             <div>
-              <span className="text-xs font-bold text-emerald-300 block">প্রকাশিত প্রশ্ন (Published)</span>
-              <span className="text-2xl font-black text-white mt-1 block">
+              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 block">প্রকাশিত প্রশ্ন (Published)</span>
+              <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">
                 {stats.publishedQuestions}
               </span>
             </div>
             <Link
               to="/admin/questions"
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-black hover:bg-emerald-400 transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-black hover:bg-emerald-400 transition-colors shadow-sm"
             >
               তালিকায় যান &rarr;
             </Link>
           </div>
 
-          <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/20 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/20 flex items-center justify-between shadow-sm">
             <div>
-              <span className="text-xs font-bold text-amber-300 block">খসড়া প্রশ্ন (Draft)</span>
-              <span className="text-2xl font-black text-white mt-1 block">
+              <span className="text-xs font-bold text-amber-800 dark:text-amber-300 block">খসড়া প্রশ্ন (Draft)</span>
+              <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">
                 {stats.draftQuestions}
               </span>
             </div>
             <Link
               to="/admin/questions"
-              className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-black hover:bg-amber-400 transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-black hover:bg-amber-400 transition-colors shadow-sm"
             >
               সম্পাদনা &rarr;
             </Link>

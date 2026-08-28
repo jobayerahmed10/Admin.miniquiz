@@ -65,7 +65,7 @@ const AdminLayout: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-800 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 transition-colors duration-200">
       {/* Sidebar Navigation */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -87,7 +87,7 @@ const AdminLayout: React.FC<{
           <Outlet context={{ onOpenAiModal: handleOpenAiModal }} />
         </main>
 
-        <footer className="border-t border-slate-800/80 bg-[#060911] py-4 text-center text-xs text-slate-500 font-medium">
+        <footer className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#060911] py-4 text-center text-xs text-slate-500 dark:text-slate-400 font-medium transition-colors duration-200">
           তামরীন একাডেমি এডমিন সিএমএস v2.5 &bull; NTRCA Cadre Special Admin Panel &bull; Supabase Backend Connected
         </footer>
       </div>
