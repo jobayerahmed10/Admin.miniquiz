@@ -86,6 +86,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         end_date: examToEdit.end_date || '',
         max_attempts: examToEdit.max_attempts || 1,
         instructions: examToEdit.instructions || '',
+        custom_id: examToEdit.id || '',
         custom_id_pattern: examToEdit.id_pattern || '',
       });
 
@@ -158,7 +159,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
     setSaveSuccessMessage(null);
 
     try {
-      const examId = examToEdit ? examToEdit.id : `exam_${Date.now()}`;
+      const examId = examInfo.custom_id?.trim() || (examToEdit ? examToEdit.id : `exam_${Date.now()}`);
 
       // 1. Prepare Question IDs & update sequential IDs if pattern is given
       const pattern = examInfo.custom_id_pattern?.trim();

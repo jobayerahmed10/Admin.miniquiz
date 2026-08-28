@@ -272,6 +272,73 @@ export const generateSequentialQuestionId = (
   return `${cleanPrefix}${paddedNum}`;
 };
 
+/**
+ * Maps subject name and exam format to standard sequential ID prefix for exams (e.g. EXAM-FREE-0001, EXAM-BANGLA-0001)
+ */
+export const getDefaultExamPrefix = (subjectName?: string, examFormat?: string): string => {
+  if (examFormat) {
+    const fmt = examFormat.toLowerCase();
+    if (fmt.includes('free') || fmt.includes('ফ্রি')) return 'EXAM-FREE-';
+    if (fmt.includes('model') || fmt.includes('মডেল')) return 'EXAM-MODEL-';
+    if (fmt.includes('daily') || fmt.includes('দৈনিক')) return 'EXAM-DAILY-';
+    if (fmt.includes('weekly') || fmt.includes('সাপ্তাহিক')) return 'EXAM-WEEKLY-';
+    if (fmt.includes('live') || fmt.includes('লাইভ')) return 'EXAM-LIVE-';
+  }
+
+  if (!subjectName || !subjectName.trim()) return 'EXAM-BANGLA-';
+  const sub = subjectName.trim().toLowerCase();
+
+  if (sub.includes('বাংলা') || sub.includes('bangla')) return 'EXAM-BANGLA-';
+  if (sub.includes('ইংরেজি') || sub.includes('english')) return 'EXAM-ENGLISH-';
+  if (sub.includes('গণিত') || sub.includes('math')) return 'EXAM-MATH-';
+  if (sub.includes('সাধারণ জ্ঞান') || sub.includes('gk')) return 'EXAM-GK-';
+  if (sub.includes('ইসলাম') || sub.includes('islam')) return 'EXAM-ISLAM-';
+  if (sub.includes('আরবি') || sub.includes('arabic')) return 'EXAM-ARABIC-';
+
+  const ascii = sub.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (ascii.length >= 2) {
+    return `EXAM-${ascii.substring(0, 8)}-`;
+  }
+  return 'EXAM-TEST-';
+};
+
+/**
+ * Automatic Sequential ID Generator for Exams (e.g. EXAM-FREE-0001, EXAM-BANGLA-0001)
+ */
+export const generateSequentialExamId = (
+  prefixPattern: string,
+  existingExams: (Exam | string | number)[] = []
+): string => {
+  if (!prefixPattern || !prefixPattern.trim()) {
+    return `exam_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  }
+
+  let cleanPrefix = prefixPattern.trim().toUpperCase();
+  if (!/[-\_:\.]$/.test(cleanPrefix)) {
+    cleanPrefix += '-';
+  }
+
+  let maxNum = 0;
+  existingExams.forEach((item) => {
+    const idStr = typeof item === 'object' && item !== null ? String(item.id) : String(item);
+    if (idStr.toUpperCase().startsWith(cleanPrefix)) {
+      const suffix = idStr.substring(cleanPrefix.length);
+      const match = suffix.match(/^(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  });
+
+  const nextNum = maxNum + 1;
+  const paddedNum = String(nextNum).padStart(4, '0');
+  return `${cleanPrefix}${paddedNum}`;
+};
+
+
 // Helper function to map database row to Question interface cleanly
 function normalizeQuestionRow(row: any): Question {
   const qText = row.question || row.question_text || row.title || '';

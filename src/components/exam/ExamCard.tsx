@@ -219,6 +219,12 @@ export const ExamCard: React.FC<ExamCardProps> = ({
 
           {/* Metadata Chips Row */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1 font-mono text-[11px]">
+            {/* Exam ID */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 font-mono">
+              <FileText className="w-3.5 h-3.5 text-indigo-400" />
+              <span>ID: {exam.id}</span>
+            </div>
+
             {/* Question count */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300">
               <FileText className="w-3.5 h-3.5 text-slate-400" />
