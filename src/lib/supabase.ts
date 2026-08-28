@@ -645,8 +645,8 @@ export const updateQuestion = async (
     if (updatedFields.correct_answer !== undefined) payload.correct_answer = updatedFields.correct_answer;
     if (updatedFields.explanation !== undefined) payload.explanation = updatedFields.explanation;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
-    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
-    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
+    if ((updatedFields as any).questions !== undefined) payload.questions = (updatedFields as any).questions;
+    if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;
     if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
     if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
     if (updatedFields.post !== undefined) payload.post = updatedFields.post;
@@ -2013,8 +2013,8 @@ export const updateCourse = async (
     if (updatedFields.theme_color !== undefined) payload.theme_color = updatedFields.theme_color;
     if (updatedFields.features !== undefined) payload.features = updatedFields.features;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
-    if (updatedFields.questions !== undefined) payload.questions = updatedFields.questions;
-    if (updatedFields.question_ids !== undefined) payload.question_ids = updatedFields.question_ids;
+    if ((updatedFields as any).questions !== undefined) payload.questions = (updatedFields as any).questions;
+    if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;
     if (updatedFields.is_upcoming !== undefined) payload.is_upcoming = Boolean(updatedFields.is_upcoming);
     if (updatedFields.upcoming_date !== undefined) {
       const formattedDate = formatTimestampOrNull(updatedFields.upcoming_date);
