@@ -57,6 +57,7 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
   const [formData, setFormData] = useState<ExamInfoFormData>({
     title: initialData.title || '',
     subject: initialData.subject || '',
+    category: initialData.category || '',
     topic: initialData.topic || '',
     post: initialData.post || '',
     exam_format: initialData.exam_format || 'MCQ (বহুনির্বাচনি)',
@@ -78,23 +79,23 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
   });
 
   useEffect(() => {
-    if (!formData.subject) {
-      const defaultSubject = 'ফ্রি পরীক্ষা';
+    if (!formData.category) {
+      const defaultCategory = 'ফ্রি পরীক্ষা';
       fetchAllExams().then(({ exams }) => {
-        const prefix = CATEGORY_PREFIX_MAP[defaultSubject] || 'EXAM-FREE-';
+        const prefix = CATEGORY_PREFIX_MAP[defaultCategory] || 'EXAM-FREE-';
         const nextId = generateSequentialExamId(prefix, exams);
         setFormData(prev => ({
           ...prev,
-          subject: defaultSubject,
-          category: defaultSubject,
-          custom_id: nextId,
+          category: defaultCategory,
+          subject: prev.subject || '',
+          custom_id: prev.custom_id || nextId,
           badge_type: 'free',
           badge: 'ফ্রি পরীক্ষা',
         }));
       });
     } else if (!formData.custom_id) {
       fetchAllExams().then(({ exams }) => {
-        const prefix = getDefaultExamPrefix(formData.subject, formData.exam_format);
+        const prefix = CATEGORY_PREFIX_MAP[formData.category || ''] || 'EXAM-FREE-';
         const nextId = generateSequentialExamId(prefix, exams);
         setFormData(prev => ({ ...prev, custom_id: nextId }));
       });
@@ -108,6 +109,9 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
 
     if (!formData.title.trim()) {
       newErrors.title = 'পরীক্ষার নাম লিখা আবশ্যক';
+    }
+    if (!formData.category || !formData.category.trim()) {
+      newErrors.category = 'পরীক্ষার টাইপ নির্বাচন করা আবশ্যক';
     }
     if (!formData.subject.trim()) {
       newErrors.subject = 'বিষয় লিখা আবশ্যক';
@@ -175,62 +179,81 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
           {errors.title && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.title}</p>}
         </div>
 
+        {/* পরীক্ষার টাইপ */}
+        <div>
+          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+            পরীক্ষার টাইপ <span className="text-rose-500">*</span>
+          </label>
+          <select
+            value={formData.category || ''}
+            onChange={(e) => {
+              const selectedCat = e.target.value;
+              const prefix = CATEGORY_PREFIX_MAP[selectedCat] || 'EXAM-TEST-';
+              
+              // Determine appropriate badge settings
+              let updatedBadgeType = formData.badge_type || 'daily';
+              let updatedBadge = formData.badge || 'মডেল টেস্ট';
+              if (selectedCat === 'ফ্রি পরীক্ষা') {
+                updatedBadgeType = 'free';
+                updatedBadge = 'ফ্রি পরীক্ষা';
+              } else if (selectedCat === 'দৈনিক মডেল টেস্ট') {
+                updatedBadgeType = 'daily';
+                updatedBadge = 'দৈনিক মডেল টেস্ট';
+              } else if (selectedCat === 'সাপ্তাহিক মডেল টেস্ট') {
+                updatedBadgeType = 'weekly';
+                updatedBadge = 'সাপ্তাহিক মডেল টেস্ট';
+              } else if (selectedCat === 'মাসিক মডেল টেস্ট') {
+                updatedBadgeType = 'daily';
+                updatedBadge = 'মাসিক মডেল টেস্ট';
+              } else {
+                updatedBadgeType = 'daily';
+                updatedBadge = selectedCat;
+              }
+
+              fetchAllExams().then(({ exams }) => {
+                const nextId = generateSequentialExamId(prefix, exams);
+                setFormData(prev => ({ 
+                  ...prev, 
+                  category: selectedCat,
+                  custom_id: nextId,
+                  badge_type: updatedBadgeType as any,
+                  badge: updatedBadge
+                }));
+              });
+              if (errors.category) setErrors({ ...errors, category: '' });
+            }}
+            className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all cursor-pointer ${
+              errors.category ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <option value="" disabled>পরীক্ষার টাইপ নির্বাচন করুন</option>
+            {Object.keys(CATEGORY_PREFIX_MAP).map((catName) => (
+              <option key={catName} value={catName}>
+                {catName} ({CATEGORY_PREFIX_MAP[catName]})
+              </option>
+            ))}
+          </select>
+          {errors.category && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.category}</p>}
+        </div>
+
         {/* 2-col Grid: বিষয় & টপিক */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-              পরীক্ষার টাইপ / বিষয় <span className="text-rose-500">*</span>
+              বিষয় (ম্যানুয়ালি লিখুন) <span className="text-rose-500">*</span>
             </label>
-            <select
+            <input
+              type="text"
               value={formData.subject}
               onChange={(e) => {
-                const selectedCat = e.target.value;
-                const prefix = CATEGORY_PREFIX_MAP[selectedCat] || 'EXAM-TEST-';
-                
-                // Determine appropriate badge settings
-                let updatedBadgeType = formData.badge_type || 'daily';
-                let updatedBadge = formData.badge || 'মডেল টেস্ট';
-                if (selectedCat === 'ফ্রি পরীক্ষা') {
-                  updatedBadgeType = 'free';
-                  updatedBadge = 'ফ্রি পরীক্ষা';
-                } else if (selectedCat === 'দৈনিক মডেল টেস্ট') {
-                  updatedBadgeType = 'daily';
-                  updatedBadge = 'দৈনিক মডেল টেস্ট';
-                } else if (selectedCat === 'সাপ্তাহিক মডেল টেস্ট') {
-                  updatedBadgeType = 'weekly';
-                  updatedBadge = 'সাপ্তাহিক মডেল টেস্ট';
-                } else if (selectedCat === 'মাসিক মডেল টেস্ট') {
-                  updatedBadgeType = 'daily';
-                  updatedBadge = 'মাসিক মডেল টেস্ট';
-                } else {
-                  updatedBadgeType = 'daily';
-                  updatedBadge = selectedCat;
-                }
-
-                fetchAllExams().then(({ exams }) => {
-                  const nextId = generateSequentialExamId(prefix, exams);
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    subject: selectedCat, 
-                    category: selectedCat,
-                    custom_id: nextId,
-                    badge_type: updatedBadgeType as any,
-                    badge: updatedBadge
-                  }));
-                });
+                setFormData({ ...formData, subject: e.target.value });
                 if (errors.subject) setErrors({ ...errors, subject: '' });
               }}
-              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all cursor-pointer ${
+              placeholder="যেমন: ইংরেজি"
+              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all ${
                 errors.subject ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
               }`}
-            >
-              <option value="" disabled>পরীক্ষার টাইপ / বিষয় নির্বাচন করুন</option>
-              {Object.keys(CATEGORY_PREFIX_MAP).map((catName) => (
-                <option key={catName} value={catName}>
-                  {catName} ({CATEGORY_PREFIX_MAP[catName]})
-                </option>
-              ))}
-            </select>
+            />
             {errors.subject && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.subject}</p>}
           </div>
 
@@ -262,7 +285,7 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               type="button"
               onClick={() => {
                 fetchAllExams().then(({ exams }) => {
-                  const prefix = getDefaultExamPrefix(formData.subject, formData.exam_format);
+                  const prefix = CATEGORY_PREFIX_MAP[formData.category || ''] || 'EXAM-TEST-';
                   const nextId = generateSequentialExamId(prefix, exams);
                   setFormData({ ...formData, custom_id: nextId });
                 });
@@ -280,7 +303,7 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
             className="w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
           />
           <p className="text-[11px] text-slate-400 mt-1">
-            বিষয় ও টাইপের উপর ভিত্তি করে অটোমেটিক প্রেফিক্স ও সিকুয়েন্স নম্বরযুক্ত আইডি (ম্যানুয়ালি এডিটেবল)।
+            টাইপ ও বিষয়ের উপর ভিত্তি করে অটোমেটিক প্রেফিক্স ও সিকুয়েন্স নম্বরযুক্ত আইডি (ম্যানুয়ালি এডিটেবল)।
           </p>
         </div>
 
@@ -314,7 +337,7 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               onChange={(e) => {
                 const newFmt = e.target.value;
                 fetchAllExams().then(({ exams }) => {
-                  const prefix = getDefaultExamPrefix(formData.subject, newFmt);
+                  const prefix = CATEGORY_PREFIX_MAP[formData.category || ''] || 'EXAM-TEST-';
                   const nextId = generateSequentialExamId(prefix, exams);
                   setFormData(prev => ({ ...prev, exam_format: newFmt, custom_id: nextId }));
                 });
