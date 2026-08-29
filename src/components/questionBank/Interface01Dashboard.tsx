@@ -32,6 +32,12 @@ import { Question } from '../../types';
 import { QuestionBankHeader } from './Header';
 import { isArabicText, getQuestionBankDirectionality } from '../../lib/questionBankEngine';
 import { transferQuestionsSubjectTopic } from '../../lib/supabase';
+import {
+  sanitizeSubjectName,
+  isSameSubject,
+  groupItemsBySanitizedSubject,
+  getAllSubjects,
+} from '../../lib/subjectManager';
 
 interface Interface01DashboardProps {
   questions: Question[];
@@ -93,26 +99,29 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const allUniqueTopics = useMemo(() => {
     const set = new Set<string>();
     questions.forEach((q) => {
-      if (q.topic) set.add(q.topic);
+      const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
+      if (cleanTop) set.add(cleanTop);
     });
     return Array.from(set);
   }, [questions]);
 
-  // Unique subjects list from actual questions
+  // Unique subjects list from actual questions (Sanitized & Deduplicated)
   const availableSubjectsFromQuestions = useMemo(() => {
     const set = new Set<string>();
     questions.forEach((q) => {
-      if (q.subject) set.add(q.subject);
+      const cleanSub = sanitizeSubjectName(q.subject);
+      if (cleanSub) set.add(cleanSub);
     });
     return Array.from(set);
   }, [questions]);
 
-  // Subject counts based on real questions
+  // Subject counts based on real questions (Sanitized, Trimmed & Case-Insensitive Merged)
   const subjectStats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    questions.forEach((q) => {
-      const subj = q.subject || 'অন্যান্য';
-      counts[subj] = (counts[subj] || 0) + 1;
+    // 1. Group real questions by sanitized subject
+    const grouped = groupItemsBySanitizedSubject(questions);
+    const countsMap = new Map<string, number>();
+    grouped.forEach((g) => {
+      countsMap.set(g.name, g.count);
     });
 
     const colorPalettes = [
@@ -126,25 +135,29 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       { color: 'from-cyan-500 to-blue-600', text: 'text-cyan-400', bg: 'bg-cyan-950/40 border-cyan-500/30' },
     ];
 
-    const uniqueSubjects = Array.from(
-      new Set([...Object.keys(counts), 'উসূলুল ফিকহ', 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান', 'العربية', 'ফিকহ'])
+    // Priority default subjects to guarantee visual completeness
+    const defaultPrioritySubs = ['বাংলা', 'ইংরেজি', 'গণিত', 'সাধারণ জ্ঞান', 'বিজ্ঞান', 'কম্পিউটার ও তথ্যপ্রযুক্তি', 'আল কুরআন ও হাদিস', 'আরবি', 'ফিকহ', 'উসূলুল ফিকহ'];
+    
+    // Merge existing question subjects first, then standard priority subjects
+    const uniqueSubjectsList = Array.from(
+      new Set([...grouped.map((g) => g.name), ...defaultPrioritySubs])
     ).filter(Boolean);
 
-    return uniqueSubjects.map((name, idx) => {
+    return uniqueSubjectsList.map((name, idx) => {
       const palette = colorPalettes[idx % colorPalettes.length];
       return {
         name,
-        count: counts[name] || 0,
+        count: countsMap.get(name) || 0,
         ...palette,
       };
     });
   }, [questions]);
 
-  // Topic counts based on real questions
+  // Topic counts based on real questions (Trimmed and Sanitized)
   const topicStats = useMemo(() => {
     const counts: Record<string, number> = {};
     questions.forEach((q) => {
-      const top = q.topic || 'সাধারণ টপিক';
+      const top = (q.topic || '').replace(/\s+/g, ' ').trim() || 'সাধারণ টপিক';
       counts[top] = (counts[top] || 0) + 1;
     });
 
@@ -172,8 +185,12 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   // Filter questions for the list table
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      if (selectedSubject !== 'all' && q.subject !== selectedSubject) return false;
-      if (selectedTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== selectedTopic) return false;
+      if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return false;
+      if (selectedTopic !== 'all') {
+        const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = selectedTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qTop !== selTop) return false;
+      }
       if (selectedStatus !== 'all' && q.status !== selectedStatus) return false;
       if (selectedLanguage !== 'all') {
         const isArab = isArabicText(q.question);
@@ -181,7 +198,8 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         if (selectedLanguage === 'bangla' && (isArab || /^[a-zA-Z\s.,?]+$/.test(q.question))) return false;
       }
       if (searchQuery.trim()) {
-        const qStr = (q.question + ' ' + (q.subject || '') + ' ' + (q.topic || '') + ' ' + (q.id || '')).toLowerCase();
+        const qSub = sanitizeSubjectName(q.subject);
+        const qStr = (q.question + ' ' + (q.subject || '') + ' ' + qSub + ' ' + (q.topic || '') + ' ' + (q.id || '')).toLowerCase();
         if (!qStr.includes(searchQuery.toLowerCase())) return false;
       }
       return true;
@@ -192,8 +210,12 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const transferMatchingCount = useMemo(() => {
     if (selectedQuestionIds.length > 0) return selectedQuestionIds.length;
     return questions.filter((q) => {
-      if (transferSourceSubject !== 'all' && q.subject !== transferSourceSubject) return false;
-      if (transferSourceTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== transferSourceTopic) return false;
+      if (transferSourceSubject !== 'all' && !isSameSubject(q.subject, transferSourceSubject)) return false;
+      if (transferSourceTopic !== 'all') {
+        const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = transferSourceTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qTop !== selTop) return false;
+      }
       return true;
     }).length;
   }, [questions, selectedQuestionIds, transferSourceSubject, transferSourceTopic]);
@@ -217,7 +239,8 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
   // Perform transfer action
   const handlePerformTransfer = async () => {
-    if (!transferTargetSubject.trim()) {
+    const sanitizedTarget = sanitizeSubjectName(transferTargetSubject);
+    if (!sanitizedTarget.trim()) {
       alert('অনুগ্রহ করে একটি লক্ষ্য বিষয় (Target Subject) সিলেক্ট করুন বা লিখুন।');
       return;
     }
@@ -231,8 +254,12 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       } else {
         idsToTransfer = questions
           .filter((q) => {
-            if (transferSourceSubject !== 'all' && q.subject !== transferSourceSubject) return false;
-            if (transferSourceTopic !== 'all' && (q.topic || 'সাধারণ টপিক') !== transferSourceTopic) return false;
+            if (transferSourceSubject !== 'all' && !isSameSubject(q.subject, transferSourceSubject)) return false;
+            if (transferSourceTopic !== 'all') {
+              const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
+              const selTop = transferSourceTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+              if (qTop !== selTop) return false;
+            }
             return true;
           })
           .map((q) => q.id);
@@ -527,33 +554,36 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         {/* Breakdown Cards Grid */}
         {viewMode === 'subject' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {subjectStats.map((sub) => (
-              <div
-                key={sub.name}
-                onClick={() => setSelectedSubject(selectedSubject === sub.name ? 'all' : sub.name)}
-                className={`cursor-pointer rounded-3xl p-4 border transition-all ${
-                  selectedSubject === sub.name
-                    ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
-                    : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-black ${sub.text} truncate max-w-[100px]`} title={sub.name}>
-                    {sub.name}
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            {subjectStats.map((sub) => {
+              const isSelected = isSameSubject(selectedSubject, sub.name);
+              return (
+                <div
+                  key={sub.name}
+                  onClick={() => setSelectedSubject(isSelected ? 'all' : sub.name)}
+                  className={`cursor-pointer rounded-3xl p-4 border transition-all ${
+                    isSelected
+                      ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
+                      : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-black ${sub.text} truncate max-w-[100px]`} title={sub.name}>
+                      {sub.name}
+                    </span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  </div>
+                  <p className="text-base font-black text-white font-mono mb-2">
+                    {sub.count.toLocaleString()} টি
+                  </p>
+                  <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${sub.color}`}
+                      style={{ width: `${Math.min(100, (sub.count / Math.max(1, questions.length)) * 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <p className="text-base font-black text-white font-mono mb-2">
-                  {sub.count.toLocaleString()} টি
-                </p>
-                <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r ${sub.color}`}
-                    style={{ width: `${Math.min(100, (sub.count / Math.max(1, questions.length)) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

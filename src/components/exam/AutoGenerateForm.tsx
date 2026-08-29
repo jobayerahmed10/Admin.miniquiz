@@ -14,6 +14,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Question } from '../../types';
+import { getAllSubjects, sanitizeSubjectName, addCustomSubject } from '../../lib/subjectManager';
 
 interface AutoGenerateFormProps {
   onAddBatchQuestions: (questions: Omit<Question, 'id'>[]) => void;
@@ -30,7 +31,10 @@ export const AutoGenerateForm: React.FC<AutoGenerateFormProps> = ({
   defaultPost = 'সহকারী শিক্ষক',
   targetCount = 20,
 }) => {
-  const [subject, setSubject] = useState(defaultSubject || 'বাংলা');
+  const initialSub = sanitizeSubjectName(defaultSubject || 'বাংলা');
+  const [availableSubjectsList, setAvailableSubjectsList] = useState<string[]>(() => getAllSubjects([initialSub]));
+  const [subject, setSubject] = useState(initialSub);
+  const [customSubject, setCustomSubject] = useState('');
   const [topic, setTopic] = useState(defaultTopic || 'ব্যাকরণ ও সন্ধি');
   const [post, setPost] = useState(defaultPost || 'সহকারী শিক্ষক');
   const [difficulty, setDifficulty] = useState<'সহজ' | 'মাঝারি' | 'কঠিন'>('মাঝারি');
@@ -52,7 +56,18 @@ export const AutoGenerateForm: React.FC<AutoGenerateFormProps> = ({
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
   const handleGenerate = async () => {
-    if (!subject.trim() || !topic.trim()) {
+    let effectiveSubject = sanitizeSubjectName(subject);
+    if (subject === 'অন্যান্য' || subject === '__NEW_SUBJECT__') {
+      const cleanCustom = sanitizeSubjectName(customSubject);
+      if (cleanCustom) {
+        addCustomSubject(cleanCustom);
+        effectiveSubject = cleanCustom;
+      } else {
+        effectiveSubject = 'বাংলা';
+      }
+    }
+
+    if (!effectiveSubject || !topic.trim()) {
       setError('বিষয় এবং টপিক উল্লেখ করা বাধ্যতামূলক');
       return;
     }
@@ -65,7 +80,7 @@ export const AutoGenerateForm: React.FC<AutoGenerateFormProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subject: subject.trim(),
+          subject: effectiveSubject,
           topic: topic.trim(),
           post: post.trim(),
           difficulty,
@@ -91,7 +106,7 @@ export const AutoGenerateForm: React.FC<AutoGenerateFormProps> = ({
           option_d: q.option_d || '',
           correct_answer: q.correct_answer || 'option_a',
           explanation: q.explanation || null,
-          subject: subject.trim(),
+          subject: effectiveSubject,
           topic: topic.trim(),
           post: post.trim(),
           status: 'published',
@@ -184,13 +199,28 @@ export const AutoGenerateForm: React.FC<AutoGenerateFormProps> = ({
             <label className="block text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
               বিষয় <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
+            <select
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="যেমন: বাংলা"
-              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
-            />
+              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] cursor-pointer"
+            >
+              {availableSubjectsList.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
+              ))}
+              <option value="অন্যান্য">+ নতুন বিষয়...</option>
+            </select>
+            {subject === 'অন্যান্য' && (
+              <input
+                type="text"
+                required
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                placeholder="নতুন বিষয়ের নাম..."
+                className="w-full mt-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-[#5B36F5] rounded-xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+              />
+            )}
           </div>
 
           <div>

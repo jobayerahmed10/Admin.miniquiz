@@ -24,7 +24,7 @@ import {
   PrefixLookupResult,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
-import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject } from '../../lib/subjectManager';
+import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject, getAllSubjects, sanitizeSubjectName } from '../../lib/subjectManager';
 import { BASE_POSTS, getCustomPosts, addCustomPost } from '../../lib/postManager';
 
 interface Interface02ManualEntryProps {
@@ -105,9 +105,7 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
 
   // Load subjects & posts on mount
   useEffect(() => {
-    const customSubs = getCustomSubjects();
-    const mergedSubs = Array.from(new Set([...BASE_SUBJECTS, ...customSubs]));
-    setAllSubjects(mergedSubs);
+    setAllSubjects(getAllSubjects());
 
     const customPosts = getCustomPosts();
     const mergedPosts = Array.from(new Set([...BASE_POSTS, ...customPosts]));
@@ -171,19 +169,26 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
 
   const handleAddNewCategoryItem = (name: string) => {
     if (addModalType === 'subject') {
-      addCustomSubject(name);
-      setAllSubjects((prev) => Array.from(new Set([...prev, name])));
-      setSubject(name);
+      const clean = sanitizeSubjectName(name);
+      if (clean) {
+        addCustomSubject(clean);
+        setAllSubjects(getAllSubjects([clean]));
+        setSubject(clean);
+      }
     } else if (addModalType === 'topic') {
-      setTopic(name);
+      setTopic(name.replace(/\s+/g, ' ').trim());
     } else if (addModalType === 'post') {
-      addCustomPost(name);
-      setAllPosts((prev) => Array.from(new Set([...prev, name])));
-      setPost(name);
+      addCustomPost(name.replace(/\s+/g, ' ').trim());
+      setAllPosts((prev) => Array.from(new Set([...prev, name.replace(/\s+/g, ' ').trim()])));
+      setPost(name.replace(/\s+/g, ' ').trim());
     }
   };
 
   const handleNext = () => {
+    const cleanSub = sanitizeSubjectName(subject);
+    const cleanTopic = topic.replace(/\s+/g, ' ').trim();
+    const cleanPost = post.replace(/\s+/g, ' ').trim();
+
     // Inject current metadata & computed directionality into working questions
     const finalPrepared = questionsList.map((q) => {
       const dirInfo = getQuestionBankDirectionality({
@@ -195,9 +200,9 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
 
       return {
         ...q,
-        subject,
-        topic,
-        post,
+        subject: cleanSub,
+        topic: cleanTopic,
+        post: cleanPost,
         language,
         questionType,
         difficulty,
@@ -209,9 +214,9 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
     });
 
     onProceedToPreview(finalPrepared, {
-      subject,
-      topic,
-      post,
+      subject: cleanSub,
+      topic: cleanTopic,
+      post: cleanPost,
       language,
       questionType,
       difficulty,

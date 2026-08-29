@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { saveSubjectPrefixMapping } from './subjectPrefixManager';
+import { sanitizeSubjectName } from './subjectManager';
 import {
   Question,
   SupabaseConfig,
@@ -415,6 +416,11 @@ export const generateSequentialExamId = (
 // Helper function to map database row to Question interface cleanly
 function normalizeQuestionRow(row: any): Question {
   const qText = row.question || row.question_text || row.title || '';
+  const rawSub = row.subject || row.category || row.subject_name || 'বাংলা';
+  const cleanSubject = sanitizeSubjectName(rawSub);
+  const cleanTopic = (row.topic || row.topic_name || '').replace(/\s+/g, ' ').trim();
+  const cleanPost = (row.post || row.post_name || row.designation || row.position || '').replace(/\s+/g, ' ').trim();
+
   return {
     id: row.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
     question: qText,
@@ -426,9 +432,9 @@ function normalizeQuestionRow(row: any): Question {
     explanation: row.explanation || row.description || '',
     slug: row.slug || generateQuestionSlug(qText),
     status: row.status === 'published' ? 'published' : 'draft',
-    subject: row.subject || row.category || row.subject_name || 'ইংরেজি',
-    topic: row.topic || row.topic_name || '',
-    post: row.post || row.post_name || row.designation || row.position || '',
+    subject: cleanSubject,
+    topic: cleanTopic,
+    post: cleanPost,
     exam_id: row.exam_id || null,
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at,
@@ -624,6 +630,9 @@ export const insertQuestion = async (
   }
 
   const generatedSlug = newQuestion.slug || generateQuestionSlug(newQuestion.question);
+  const cleanSubject = sanitizeSubjectName(newQuestion.subject);
+  const cleanTopic = (newQuestion.topic || '').replace(/\s+/g, ' ').trim();
+  const cleanPost = (newQuestion.post || '').replace(/\s+/g, ' ').trim();
 
   const localItem: Question = {
     id: finalId,
@@ -636,9 +645,9 @@ export const insertQuestion = async (
     explanation: newQuestion.explanation || '',
     slug: generatedSlug,
     status: newQuestion.status || 'published',
-    subject: newQuestion.subject || 'সাধারণ',
-    topic: newQuestion.topic || '',
-    post: newQuestion.post || '',
+    subject: cleanSubject,
+    topic: cleanTopic,
+    post: cleanPost,
     exam_id: newQuestion.exam_id || null,
     created_at: new Date().toISOString(),
   };
@@ -665,9 +674,9 @@ export const insertQuestion = async (
       explanation: newQuestion.explanation || '',
       slug: generatedSlug,
       status: newQuestion.status || 'published',
-      subject: newQuestion.subject || 'সাধারণ',
-      topic: newQuestion.topic || '',
-      post: newQuestion.post || '',
+      subject: cleanSubject,
+      topic: cleanTopic,
+      post: cleanPost,
       ...(newQuestion.exam_id !== undefined && newQuestion.exam_id !== null ? { exam_id: String(newQuestion.exam_id) } : {}),
     };
 
@@ -804,6 +813,9 @@ export const insertBatchQuestions = async (
     }
 
     const generatedSlug = q.slug || generateQuestionSlug(q.question);
+    const cleanSub = sanitizeSubjectName(q.subject);
+    const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
+    const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
 
     return {
       id: finalId,
@@ -816,9 +828,9 @@ export const insertBatchQuestions = async (
       explanation: q.explanation || '',
       slug: generatedSlug,
       status: q.status || 'published',
-      subject: q.subject || 'সাধারণ',
-      topic: q.topic || '',
-      post: q.post || '',
+      subject: cleanSub,
+      topic: cleanTop,
+      post: cleanPost,
       exam_id: q.exam_id || null,
       created_at: new Date().toISOString(),
     };
@@ -856,9 +868,9 @@ export const insertBatchQuestions = async (
         explanation: q.explanation || '',
         slug: q.slug || generateQuestionSlug(qText),
         status: q.status || 'published',
-        subject: q.subject || 'সাধারণ',
-        topic: q.topic || '',
-        post: q.post || '',
+        subject: sanitizeSubjectName(q.subject),
+        topic: (q.topic || '').replace(/\s+/g, ' ').trim(),
+        post: (q.post || '').replace(/\s+/g, ' ').trim(),
       };
       if (q.exam_id) {
         item.exam_id = String(q.exam_id);
@@ -1006,9 +1018,16 @@ export const updateQuestion = async (
   // Update in local cache first
   const current = getLocalCachedQuestions();
   let updatedLocal: Question | null = null;
+  const sanitizedUpdatedSubject = updatedFields.subject !== undefined ? sanitizeSubjectName(updatedFields.subject) : undefined;
+
   const updatedCache = current.map((q) => {
     if (String(q.id) === String(id)) {
-      updatedLocal = { ...q, ...updatedFields, updated_at: new Date().toISOString() };
+      updatedLocal = {
+        ...q,
+        ...updatedFields,
+        ...(sanitizedUpdatedSubject !== undefined ? { subject: sanitizedUpdatedSubject } : {}),
+        updated_at: new Date().toISOString(),
+      };
       return updatedLocal;
     }
     return q;
@@ -1039,9 +1058,9 @@ export const updateQuestion = async (
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if ((updatedFields as any).questions !== undefined) payload.questions = (updatedFields as any).questions;
     if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;
-    if (updatedFields.subject !== undefined) payload.subject = updatedFields.subject;
-    if (updatedFields.topic !== undefined) payload.topic = updatedFields.topic;
-    if (updatedFields.post !== undefined) payload.post = updatedFields.post;
+    if (sanitizedUpdatedSubject !== undefined) payload.subject = sanitizedUpdatedSubject;
+    if (updatedFields.topic !== undefined) payload.topic = (updatedFields.topic || '').replace(/\s+/g, ' ').trim();
+    if (updatedFields.post !== undefined) payload.post = (updatedFields.post || '').replace(/\s+/g, ' ').trim();
     if (updatedFields.exam_id !== undefined) payload.exam_id = String(updatedFields.exam_id);
 
     console.log('Payload: Question update', JSON.stringify(payload, null, 2));
@@ -1131,6 +1150,9 @@ export const transferQuestionsSubjectTopic = async (
     return { success: true, count: 0, error: null };
   }
 
+  const cleanTargetSubject = sanitizeSubjectName(targetSubject);
+  const cleanTargetTopic = targetTopic !== undefined && targetTopic !== null ? targetTopic.replace(/\s+/g, ' ').trim() : undefined;
+
   // Update local cache
   const current = getLocalCachedQuestions();
   let transferredCount = 0;
@@ -1140,8 +1162,8 @@ export const transferQuestionsSubjectTopic = async (
       transferredCount++;
       return {
         ...q,
-        subject: targetSubject,
-        ...(targetTopic !== undefined && targetTopic !== null ? { topic: targetTopic } : {}),
+        subject: cleanTargetSubject,
+        ...(cleanTargetTopic !== undefined ? { topic: cleanTargetTopic } : {}),
         updated_at: new Date().toISOString(),
       };
     }
@@ -1157,12 +1179,12 @@ export const transferQuestionsSubjectTopic = async (
 
   try {
     const stringIds = questionIds.map((id) => String(id));
-    const payload: any = { subject: targetSubject };
-    if (targetTopic !== undefined && targetTopic !== null) {
-      payload.topic = targetTopic;
+    const payload: any = { subject: cleanTargetSubject };
+    if (cleanTargetTopic !== undefined) {
+      payload.topic = cleanTargetTopic;
     }
 
-    console.log(`Payload: Transfer ${stringIds.length} questions to subject=${targetSubject}, topic=${targetTopic}`, payload);
+    console.log(`Payload: Transfer ${stringIds.length} questions to subject=${cleanTargetSubject}, topic=${cleanTargetTopic}`, payload);
 
     let { error } = await client
       .from('questions')
@@ -1175,7 +1197,7 @@ export const transferQuestionsSubjectTopic = async (
       delete payload.topic;
       const fallbackRes = await client
         .from('questions')
-        .update({ subject: targetSubject })
+        .update({ subject: cleanTargetSubject })
         .in('id', stringIds);
 
       if (fallbackRes.error) {
@@ -1276,14 +1298,15 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
    ========================================================================== */
 
 export const normalizeExamRow = (row: any): Exam => {
+  const cleanSubject = sanitizeSubjectName(row.subject || 'বাংলা');
   return {
     id: String(row.id || `exam_${Date.now()}`),
     title: row.title || 'শিরোনাম ছাড়া পরীক্ষা',
     badge: row.badge || 'মডেল টেস্ট',
     badge_type: (row.badge_type || 'daily') as ExamBadgeType,
-    subject: row.subject || 'সকল বিষয়',
-    topic: row.topic || '',
-    post: row.post || '',
+    subject: cleanSubject,
+    topic: (row.topic || '').replace(/\s+/g, ' ').trim(),
+    post: (row.post || '').replace(/\s+/g, ' ').trim(),
     pass_mark: typeof row.pass_mark === 'number' ? row.pass_mark : Number(row.pass_mark || 0),
     exam_type: row.exam_type || 'free',
     category: row.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)',

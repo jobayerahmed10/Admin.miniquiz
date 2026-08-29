@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, X, Save, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
 import { isArabicText } from '../AddAiQuestionsModal';
+import { sanitizeSubjectName, getAllSubjects } from '../../lib/subjectManager';
 
 interface QuickAddQuestionInlineProps {
   examId: string;
@@ -36,7 +37,8 @@ export const QuickAddQuestionInline: React.FC<QuickAddQuestionInlineProps> = ({
   const [optionD, setOptionD] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState<'option_a' | 'option_b' | 'option_c' | 'option_d'>('option_a');
   const [explanation, setExplanation] = useState('');
-  const [subject, setSubject] = useState(defaultSubject || 'বাংলা');
+  const effectiveSubjectsList = subjectsList && subjectsList.length > 0 ? subjectsList : getAllSubjects();
+  const [subject, setSubject] = useState(() => sanitizeSubjectName(defaultSubject || 'বাংলা'));
   const [topic, setTopic] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -51,6 +53,9 @@ export const QuickAddQuestionInline: React.FC<QuickAddQuestionInlineProps> = ({
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    const cleanSub = sanitizeSubjectName(subject);
+    const cleanTopic = topic.replace(/\s+/g, ' ').trim();
+
     const res = await onAddQuestion({
       question: question.trim(),
       option_a: optionA.trim(),
@@ -59,8 +64,8 @@ export const QuickAddQuestionInline: React.FC<QuickAddQuestionInlineProps> = ({
       option_d: optionD.trim(),
       correct_answer: correctAnswer,
       explanation: explanation.trim() || null,
-      subject: subject.trim(),
-      topic: topic.trim() || undefined,
+      subject: cleanSub,
+      topic: cleanTopic || undefined,
       exam_id: examId,
       status: 'published',
     });
@@ -122,7 +127,7 @@ export const QuickAddQuestionInline: React.FC<QuickAddQuestionInlineProps> = ({
             onChange={(e) => setSubject(e.target.value)}
             className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
-            {subjectsList.map((sub) => (
+            {effectiveSubjectsList.map((sub) => (
               <option key={sub} value={sub}>
                 {sub}
               </option>

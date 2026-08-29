@@ -4,7 +4,7 @@ import { ArrowLeft, Save, AlertCircle, CheckCircle2, Edit, RefreshCw, BookOpen }
 import { fetchQuestionById, updateQuestion, generateQuestionSlug } from '../lib/supabase';
 import { QuestionStatus, DEFAULT_TOPICS, SubjectPost } from '../types';
 import { RlsErrorHelper } from '../components/RlsErrorHelper';
-import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
+import { getAllSubjects, addCustomSubject, sanitizeSubjectName, isSameSubject } from '../lib/subjectManager';
 import { MultiPostSelector } from '../components/MultiPostSelector';
 import { parsePosts, formatPosts } from '../lib/postManager';
 import { fetchSubjectPosts, getTopicsForPostName } from '../lib/subjectPostManager';
@@ -106,13 +106,14 @@ export const EditQuestion: React.FC = () => {
           setSelectedPosts(parsePosts(question.post));
         }
         if (question.subject) {
-          const allSubs = getAllSubjects([question.subject]);
+          const cleanSub = sanitizeSubjectName(question.subject);
+          const allSubs = getAllSubjects([cleanSub]);
           setAvailableSubjectsList(allSubs);
-          if (allSubs.includes(question.subject)) {
-            setSubject(question.subject);
+          const matched = allSubs.find((s) => isSameSubject(s, cleanSub));
+          if (matched) {
+            setSubject(matched);
           } else {
-            setSubject('অন্যান্য');
-            setCustomSubject(question.subject);
+            setSubject(cleanSub);
           }
         }
       }
@@ -139,9 +140,9 @@ export const EditQuestion: React.FC = () => {
 
     setSaving(true);
 
-    let finalSubject = subject;
+    let finalSubject = sanitizeSubjectName(subject);
     if (subject === 'অন্যান্য' || subject === '__NEW_SUBJECT__') {
-      const cleanCustom = customSubject.trim();
+      const cleanCustom = sanitizeSubjectName(customSubject);
       if (cleanCustom) {
         addCustomSubject(cleanCustom);
         finalSubject = cleanCustom;

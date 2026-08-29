@@ -26,7 +26,7 @@ import {
   PrefixLookupResult,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
-import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject } from '../../lib/subjectManager';
+import { BASE_SUBJECTS, getCustomSubjects, addCustomSubject, getAllSubjects, sanitizeSubjectName } from '../../lib/subjectManager';
 import { BASE_POSTS, getCustomPosts, addCustomPost } from '../../lib/postManager';
 
 interface Interface06AiAutoGenerateProps {
@@ -85,8 +85,7 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
   const [exampleIndex, setExampleIndex] = useState(0);
 
   useEffect(() => {
-    const customSubs = getCustomSubjects();
-    setAllSubjects(Array.from(new Set([...BASE_SUBJECTS, ...customSubs])));
+    setAllSubjects(getAllSubjects());
     const customPosts = getCustomPosts();
     setAllPosts(Array.from(new Set([...BASE_POSTS, ...customPosts])));
   }, []);
@@ -99,25 +98,32 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
 
   const handleAddNewCategoryItem = (name: string) => {
     if (addModalType === 'subject') {
-      addCustomSubject(name);
-      setAllSubjects((prev) => Array.from(new Set([...prev, name])));
-      setSubject(name);
+      const clean = sanitizeSubjectName(name);
+      if (clean) {
+        addCustomSubject(clean);
+        setAllSubjects(getAllSubjects([clean]));
+        setSubject(clean);
+      }
     } else if (addModalType === 'topic') {
-      setTopic(name);
+      setTopic(name.replace(/\s+/g, ' ').trim());
     } else if (addModalType === 'post') {
-      addCustomPost(name);
-      setAllPosts((prev) => Array.from(new Set([...prev, name])));
-      setPost(name);
+      addCustomPost(name.replace(/\s+/g, ' ').trim());
+      setAllPosts((prev) => Array.from(new Set([...prev, name.replace(/\s+/g, ' ').trim()])));
+      setPost(name.replace(/\s+/g, ' ').trim());
     }
   };
 
   const handleGenerate = () => {
     setIsGenerating(true);
 
+    const cleanSub = sanitizeSubjectName(subject);
+    const cleanTopic = topic.replace(/\s+/g, ' ').trim();
+    const cleanPost = post.replace(/\s+/g, ' ').trim();
+
     const config: AiAutoGenerateConfig = {
-      subject,
-      topic,
-      post,
+      subject: cleanSub,
+      topic: cleanTopic,
+      post: cleanPost,
       language,
       questionType,
       difficulty,
