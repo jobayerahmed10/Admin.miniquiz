@@ -263,7 +263,14 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
             </label>
             <select
               value={formData.exam_format}
-              onChange={(e) => setFormData({ ...formData, exam_format: e.target.value })}
+              onChange={(e) => {
+                const newFmt = e.target.value;
+                fetchAllExams().then(({ exams }) => {
+                  const prefix = getDefaultExamPrefix(formData.subject, newFmt);
+                  const nextId = generateSequentialExamId(prefix, exams);
+                  setFormData(prev => ({ ...prev, exam_format: newFmt, custom_id: nextId }));
+                });
+              }}
               className="w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] cursor-pointer"
             >
               <option value="MCQ (বহুনির্বাচনি)">MCQ (বহুনির্বাচনি)</option>
