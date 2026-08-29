@@ -136,6 +136,7 @@ export const setLocalCachedExams = (exams: Exam[]) => {
 
 export const clearAllExams = async (): Promise<{ success: boolean; error: string | null }> => {
   setLocalCachedExams([]);
+  setLocalCachedQuestions([]);
 
   const client = getSupabaseClient();
   if (!client) {
@@ -143,13 +144,24 @@ export const clearAllExams = async (): Promise<{ success: boolean; error: string
   }
 
   try {
-    const { error } = await client
+    // 1. First delete all questions from Supabase questions table
+    const { error: questionsError } = await client
+      .from('questions')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (questionsError) {
+      console.warn('Supabase clearAllQuestions warning:', questionsError);
+    }
+
+    // 2. Then delete all exams
+    const { error: examsError } = await client
       .from('exams')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000');
 
-    if (error) {
-      console.warn('Supabase clearAllExams warning:', error);
+    if (examsError) {
+      console.warn('Supabase clearAllExams warning:', examsError);
     }
     return { success: true, error: null };
   } catch (err: any) {
@@ -1443,6 +1455,25 @@ export const insertExam = async (
   const customId = (newExam.custom_id || newExam.id || '').trim();
   const examId = customId || `exam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+  // ID Duplication Protection in Local Cache
+  const localExams = getLocalCachedExams();
+  if (localExams.some((e) => String(e.id) === String(examId))) {
+    return {
+      success: false,
+      error: `পরীক্ষা আইডি "${examId}" ইতোমধ্যে লোকাল ক্যাশে বিদ্যমান আছে! অনুগ্রহ করে অন্য আইডি ব্যবহার করুন বা নতুন আইডি জেনারেট করুন।`,
+      syncedToSupabase: false,
+    };
+  }
+
+  const localQuestions = getLocalCachedQuestions();
+  if (localQuestions.some((q) => String(q.exam_id) === String(examId))) {
+    return {
+      success: false,
+      error: `পরীক্ষা আইডি "${examId}" দিয়ে ইতোমধ্যে লোকাল ক্যাশে প্রশ্ন সংরক্ষিত আছে! অনুগ্রহ করে অন্য আইডি ব্যবহার করুন বা নতুন আইডি জেনারেট করুন।`,
+      syncedToSupabase: false,
+    };
+  }
+
   const localItem: Exam = {
     id: examId,
     title: newExam.title,
@@ -1475,6 +1506,35 @@ export const insertExam = async (
   }
 
   try {
+    // ID Duplication Protection in Supabase Database
+    const { data: existingExam, error: examCheckErr } = await client
+      .from('exams')
+      .select('id')
+      .eq('id', String(examId))
+      .maybeSingle();
+
+    if (existingExam) {
+      return {
+        success: false,
+        error: `পরীক্ষা আইডি "${examId}" ইতোমধ্যে 'exams' টেবিলে বিদ্যমান আছে! অনুগ্রহ করে অন্য আইডি ব্যবহার করুন বা নতুন আইডি জেনারেট করুন।`,
+        syncedToSupabase: false,
+      };
+    }
+
+    const { data: existingQuestions, error: questionCheckErr } = await client
+      .from('questions')
+      .select('id')
+      .eq('exam_id', String(examId))
+      .limit(1);
+
+    if (existingQuestions && existingQuestions.length > 0) {
+      return {
+        success: false,
+        error: `পরীক্ষা আইডি "${examId}" দিয়ে ইতোমধ্যে 'questions' টেবিলে প্রশ্ন সংরক্ষিত আছে! অনুগ্রহ করে অন্য আইডি ব্যবহার করুন বা নতুন আইডি জেনারেট করুন।`,
+        syncedToSupabase: false,
+      };
+    }
+
     const payload: any = {
       id: String(customId || examId),
       title: newExam.title,
