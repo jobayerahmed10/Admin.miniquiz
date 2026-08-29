@@ -272,28 +272,89 @@ export const generateSequentialQuestionId = (
   return `${cleanPrefix}${paddedNum}`;
 };
 
+export const CATEGORY_PREFIX_MAP: Record<string, string> = {
+  'ফ্রি পরীক্ষা': 'EXAM-FREE-',
+  'দৈনিক মডেল টেস্ট': 'MODEL-DAILY-',
+  'সাপ্তাহিক মডেল টেস্ট': 'MODEL-WEEKLY-',
+  'মাসিক মডেল টেস্ট': 'MODEL-MONTHLY-',
+  'ফিকহ': 'EXAM-FIQH-',
+  'উসূলুল ফিকহ': 'EXAM-U-FIQH-',
+  'হাদিস': 'EXAM-HADITH-',
+  'উসূলুল হাদিস': 'EXAM-U-HADITH-',
+  'কুরআন': 'EXAM-QURAN-',
+  'উসূলুল কুরআন': 'EXAM-U-QURAN-',
+  'আরবি': 'EXAM-ARABIC-',
+  'আরবি ব্যাকরণ': 'EXAM-ARABIC-GRM-',
+  'আরবি সাহিত্য': 'EXAM-ARABIC-LIT-',
+  'বাংলা ব্যাকরণ': 'EXAM-BANGLA-GRM-',
+  'বাংলা সাহিত্য': 'EXAM-BANGLA-LIT-',
+  'ইংরেজি Grammar': 'EXAM-ENG-GRM-',
+  'ইংরেজি Literature': 'EXAM-ENG-LIT-',
+  'সাধারণ জ্ঞান (বাংলাদেশ)': 'EXAM-GK-BN-',
+  'সাধারণ জ্ঞান (আন্তর্জাতিক)': 'EXAM-GK-INT-',
+};
+
 /**
  * Maps subject name and exam format to standard sequential ID prefix for exams (e.g. EXAM-FREE-0001, EXAM-BANGLA-0001)
  */
 export const getDefaultExamPrefix = (subjectName?: string, examFormat?: string): string => {
+  const sub = (subjectName || '').trim().toLowerCase();
+  const fmt = (examFormat || '').trim().toLowerCase();
+
+  // Try direct matches from CATEGORY_PREFIX_MAP
+  for (const [key, prefix] of Object.entries(CATEGORY_PREFIX_MAP)) {
+    const lowerKey = key.toLowerCase();
+    if (sub === lowerKey || sub.includes(lowerKey) || fmt === lowerKey || fmt.includes(lowerKey)) {
+      return prefix;
+    }
+  }
+
   if (examFormat) {
-    const fmt = examFormat.toLowerCase();
-    if (fmt.includes('free') || fmt.includes('ফ্রি')) return 'EXAM-FREE-';
-    if (fmt.includes('model') || fmt.includes('মডেল')) return 'EXAM-MODEL-';
-    if (fmt.includes('daily') || fmt.includes('দৈনিক')) return 'EXAM-DAILY-';
-    if (fmt.includes('weekly') || fmt.includes('সাপ্তাহিক')) return 'EXAM-WEEKLY-';
-    if (fmt.includes('live') || fmt.includes('লাইভ')) return 'EXAM-LIVE-';
+    const f = examFormat.toLowerCase();
+    if (f.includes('free') || f.includes('ফ্রি')) return 'EXAM-FREE-';
+    if (f.includes('daily') || f.includes('দৈনিক')) return 'MODEL-DAILY-';
+    if (f.includes('weekly') || f.includes('সাপ্তাহিক')) return 'MODEL-WEEKLY-';
+    if (f.includes('monthly') || f.includes('মাসিক')) return 'MODEL-MONTHLY-';
+    if (f.includes('model') || f.includes('মডেল')) return 'EXAM-MODEL-';
+    if (f.includes('live') || f.includes('লাইভ')) return 'EXAM-LIVE-';
   }
 
   if (!subjectName || !subjectName.trim()) return 'EXAM-BANGLA-';
-  const sub = subjectName.trim().toLowerCase();
 
-  if (sub.includes('বাংলা') || sub.includes('bangla')) return 'EXAM-BANGLA-';
-  if (sub.includes('ইংরেজি') || sub.includes('english')) return 'EXAM-ENGLISH-';
+  if (sub.includes('ফিকহ') || sub.includes('fiqh')) {
+    if (sub.includes('উসূল') || sub.includes('usul') || sub.includes('u-fiqh')) return 'EXAM-U-FIQH-';
+    return 'EXAM-FIQH-';
+  }
+  if (sub.includes('হাদিস') || sub.includes('hadith')) {
+    if (sub.includes('উসূল') || sub.includes('usul') || sub.includes('u-hadith')) return 'EXAM-U-HADITH-';
+    return 'EXAM-HADITH-';
+  }
+  if (sub.includes('কুরআন') || sub.includes('quran')) {
+    if (sub.includes('উসূল') || sub.includes('usul') || sub.includes('u-quran')) return 'EXAM-U-QURAN-';
+    return 'EXAM-QURAN-';
+  }
+  if (sub.includes('আরবি') || sub.includes('arabic')) {
+    if (sub.includes('ব্যাকরণ') || sub.includes('grammar') || sub.includes('grm')) return 'EXAM-ARABIC-GRM-';
+    if (sub.includes('সাহিত্য') || sub.includes('literature') || sub.includes('lit')) return 'EXAM-ARABIC-LIT-';
+    return 'EXAM-ARABIC-';
+  }
+  if (sub.includes('বাংলা') || sub.includes('bangla')) {
+    if (sub.includes('ব্যাকরণ') || sub.includes('grammar') || sub.includes('grm')) return 'EXAM-BANGLA-GRM-';
+    if (sub.includes('সাহিত্য') || sub.includes('literature') || sub.includes('lit')) return 'EXAM-BANGLA-LIT-';
+    return 'EXAM-BANGLA-';
+  }
+  if (sub.includes('ইংরেজি') || sub.includes('english') || sub.includes('eng')) {
+    if (sub.includes('ব্যাকরণ') || sub.includes('grammar') || sub.includes('grm')) return 'EXAM-ENG-GRM-';
+    if (sub.includes('সাহিত্য') || sub.includes('literature') || sub.includes('lit')) return 'EXAM-ENG-LIT-';
+    return 'EXAM-ENG-';
+  }
+  if (sub.includes('সাধারণ জ্ঞান') || sub.includes('gk') || sub.includes('general knowledge')) {
+    if (sub.includes('বাংলাদেশ') || sub.includes('bangladesh') || sub.includes('bn')) return 'EXAM-GK-BN-';
+    if (sub.includes('আন্তর্জাতিক') || sub.includes('international') || sub.includes('int')) return 'EXAM-GK-INT-';
+    return 'EXAM-GK-';
+  }
   if (sub.includes('গণিত') || sub.includes('math')) return 'EXAM-MATH-';
-  if (sub.includes('সাধারণ জ্ঞান') || sub.includes('gk')) return 'EXAM-GK-';
   if (sub.includes('ইসলাম') || sub.includes('islam')) return 'EXAM-ISLAM-';
-  if (sub.includes('আরবি') || sub.includes('arabic')) return 'EXAM-ARABIC-';
 
   const ascii = sub.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
   if (ascii.length >= 2) {

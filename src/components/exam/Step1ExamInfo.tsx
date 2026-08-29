@@ -18,6 +18,7 @@ import {
   fetchAllExams,
   getDefaultExamPrefix,
   generateSequentialExamId,
+  CATEGORY_PREFIX_MAP,
 } from '../../lib/supabase';
 
 export interface ExamInfoFormData {
@@ -77,7 +78,21 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
   });
 
   useEffect(() => {
-    if (!formData.custom_id) {
+    if (!formData.subject) {
+      const defaultSubject = 'ফ্রি পরীক্ষা';
+      fetchAllExams().then(({ exams }) => {
+        const prefix = CATEGORY_PREFIX_MAP[defaultSubject] || 'EXAM-FREE-';
+        const nextId = generateSequentialExamId(prefix, exams);
+        setFormData(prev => ({
+          ...prev,
+          subject: defaultSubject,
+          category: defaultSubject,
+          custom_id: nextId,
+          badge_type: 'free',
+          badge: 'ফ্রি পরীক্ষা',
+        }));
+      });
+    } else if (!formData.custom_id) {
       fetchAllExams().then(({ exams }) => {
         const prefix = getDefaultExamPrefix(formData.subject, formData.exam_format);
         const nextId = generateSequentialExamId(prefix, exams);
@@ -164,25 +179,58 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-              বিষয় (ম্যানুয়ালি লিখুন) <span className="text-rose-500">*</span>
+              পরীক্ষার টাইপ / বিষয় <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
+            <select
               value={formData.subject}
               onChange={(e) => {
-                const newSubj = e.target.value;
+                const selectedCat = e.target.value;
+                const prefix = CATEGORY_PREFIX_MAP[selectedCat] || 'EXAM-TEST-';
+                
+                // Determine appropriate badge settings
+                let updatedBadgeType = formData.badge_type || 'daily';
+                let updatedBadge = formData.badge || 'মডেল টেস্ট';
+                if (selectedCat === 'ফ্রি পরীক্ষা') {
+                  updatedBadgeType = 'free';
+                  updatedBadge = 'ফ্রি পরীক্ষা';
+                } else if (selectedCat === 'দৈনিক মডেল টেস্ট') {
+                  updatedBadgeType = 'daily';
+                  updatedBadge = 'দৈনিক মডেল টেস্ট';
+                } else if (selectedCat === 'সাপ্তাহিক মডেল টেস্ট') {
+                  updatedBadgeType = 'weekly';
+                  updatedBadge = 'সাপ্তাহিক মডেল টেস্ট';
+                } else if (selectedCat === 'মাসিক মডেল টেস্ট') {
+                  updatedBadgeType = 'daily';
+                  updatedBadge = 'মাসিক মডেল টেস্ট';
+                } else {
+                  updatedBadgeType = 'daily';
+                  updatedBadge = selectedCat;
+                }
+
                 fetchAllExams().then(({ exams }) => {
-                  const prefix = getDefaultExamPrefix(newSubj, formData.exam_format);
                   const nextId = generateSequentialExamId(prefix, exams);
-                  setFormData(prev => ({ ...prev, subject: newSubj, custom_id: nextId }));
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    subject: selectedCat, 
+                    category: selectedCat,
+                    custom_id: nextId,
+                    badge_type: updatedBadgeType as any,
+                    badge: updatedBadge
+                  }));
                 });
                 if (errors.subject) setErrors({ ...errors, subject: '' });
               }}
-              placeholder="যেমন: বাংলা"
-              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all ${
+              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all cursor-pointer ${
                 errors.subject ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
               }`}
-            />
+            >
+              <option value="" disabled>পরীক্ষার টাইপ / বিষয় নির্বাচন করুন</option>
+              {Object.keys(CATEGORY_PREFIX_MAP).map((catName) => (
+                <option key={catName} value={catName}>
+                  {catName} ({CATEGORY_PREFIX_MAP[catName]})
+                </option>
+              ))}
+            </select>
             {errors.subject && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.subject}</p>}
           </div>
 
