@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Clock,
@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Exam, Question } from '../../types';
+import { fetchQuestionsByExamId, fetchAllQuestions } from '../../lib/supabase';
 
 interface LiveExamStudentPreviewModalProps {
   isOpen: boolean;
@@ -28,12 +29,57 @@ export const LiveExamStudentPreviewModal: React.FC<LiveExamStudentPreviewModalPr
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [fetchedQuestions, setFetchedQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && exam) {
+      setCurrentIndex(0);
+      setSelectedAnswers({});
+      setIsSubmitted(false);
+      setShowExplanation(false);
+
+      if (exam.questions && exam.questions.length > 0) {
+        setFetchedQuestions(exam.questions as Question[]);
+      } else {
+        setLoading(true);
+        fetchQuestionsByExamId(exam.id).then(async (res) => {
+          if (res.questions && res.questions.length > 0) {
+            setFetchedQuestions(res.questions as Question[]);
+          } else {
+            const allQ = await fetchAllQuestions();
+            const matched = allQ.questions.filter(
+              (q) => String(q.exam_id) === String(exam.id) || q.subject === exam.subject
+            );
+            if (matched.length > 0) {
+              setFetchedQuestions(matched);
+            } else {
+              setFetchedQuestions([
+                {
+                  id: '1',
+                  question: 'নমুনা প্রশ্ন ১: এই পরীক্ষার সঠিক উত্তর কোনটি?',
+                  option_a: 'অপশন ক (নমুনা)',
+                  option_b: 'অপশন খ (সঠিক উত্তর)',
+                  option_c: 'অপশন গ (নমুনা)',
+                  option_d: 'অপশন ঘ (নমুনা)',
+                  correct_answer: 'option_b',
+                  explanation: 'ব্যাখ্যা: এটি একটি সঠিক বিকল্প।',
+                  status: 'published',
+                },
+              ]);
+            }
+          }
+          setLoading(false);
+        });
+      }
+    }
+  }, [isOpen, exam]);
 
   if (!isOpen || !exam) return null;
 
-  const questions: Question[] = exam.questions && exam.questions.length > 0
-    ? exam.questions
-    : [
+  const questions: Question[] = fetchedQuestions.length > 0 
+    ? fetchedQuestions 
+    : (exam.questions && exam.questions.length > 0 ? (exam.questions as Question[]) : [
         {
           id: '1',
           question: 'নমুনা প্রশ্ন ১: এই পরীক্ষার সঠিক উত্তর কোনটি?',
@@ -45,7 +91,7 @@ export const LiveExamStudentPreviewModal: React.FC<LiveExamStudentPreviewModalPr
           explanation: 'ব্যাখ্যা: এটি একটি সঠিক বিকল্প।',
           status: 'published',
         },
-      ];
+      ]);
 
   const currentQ = questions[currentIndex] || questions[0];
 
