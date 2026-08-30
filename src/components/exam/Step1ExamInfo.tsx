@@ -16,10 +16,12 @@ import {
 import { Exam } from '../../types';
 import {
   fetchAllExams,
+  fetchAllQuestions,
   getDefaultExamPrefix,
   generateSequentialExamId,
   CATEGORY_PREFIX_MAP,
 } from '../../lib/supabase';
+import { getAllSubjects } from '../../lib/subjectManager';
 
 export interface ExamInfoFormData {
   title: string;
@@ -77,6 +79,29 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
     custom_id: initialData.custom_id || initialData.id || '',
     custom_id_pattern: initialData.custom_id_pattern || '',
   });
+
+  const [subjectsList] = useState<string[]>(() => getAllSubjects([initialData.subject]));
+  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [isCustomTopicInput, setIsCustomTopicInput] = useState(false);
+
+  useEffect(() => {
+    fetchAllQuestions().then(({ questions }) => {
+      const currentSub = formData.subject || subjectsList[0] || 'বাংলা ব্যাকরণ';
+      const topics = Array.from(
+        new Set(
+          questions
+            .filter((q) => (q.subject || '').trim() === currentSub.trim() && q.topic)
+            .map((q) => q.topic!)
+        )
+      );
+      setAvailableTopics(topics);
+      if (topics.length > 0 && !formData.topic) {
+        setFormData(prev => ({ ...prev, subject: currentSub, topic: topics[0] }));
+      } else if (!formData.subject) {
+        setFormData(prev => ({ ...prev, subject: currentSub }));
+      }
+    });
+  }, [formData.subject]);
 
   useEffect(() => {
     if (!formData.category) {
@@ -240,39 +265,84 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-              বিষয় (ম্যানুয়ালি লিখুন) <span className="text-rose-500">*</span>
+              বিষয় নির্বাচন করুন <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
+            <select
               value={formData.subject}
               onChange={(e) => {
-                setFormData({ ...formData, subject: e.target.value });
+                const sub = e.target.value;
+                setFormData({ ...formData, subject: sub, topic: '' });
                 if (errors.subject) setErrors({ ...errors, subject: '' });
+                // Fetch topics for this subject
+                fetchAllQuestions().then(({ questions }) => {
+                  const topics = Array.from(
+                    new Set(
+                      questions
+                        .filter((q) => (q.subject || '').trim() === sub.trim() && q.topic)
+                        .map((q) => q.topic!)
+                    )
+                  );
+                  setAvailableTopics(topics);
+                  if (topics.length > 0) {
+                    setFormData(prev => ({ ...prev, subject: sub, topic: topics[0] }));
+                  }
+                });
               }}
-              placeholder="যেমন: ইংরেজি"
-              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all ${
+              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all cursor-pointer ${
                 errors.subject ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
               }`}
-            />
+            >
+              <option value="" disabled>বিষয় সিলেক্ট করুন</option>
+              {subjectsList.map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
             {errors.subject && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.subject}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-              টপিক (ম্যানুয়ালি লিখুন) <span className="text-rose-500">*</span>
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
+              <span>টপিক নির্বাচন করুন <span className="text-rose-500">*</span></span>
+              {availableTopics.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomTopicInput(!isCustomTopicInput)}
+                  className="text-[10px] text-[#5B36F5] dark:text-indigo-400 hover:underline font-semibold"
+                >
+                  {isCustomTopicInput ? 'তালিকা থেকে বেছে নিন' : '+ নিজে লিখুন'}
+                </button>
+              )}
             </label>
-            <input
-              type="text"
-              value={formData.topic}
-              onChange={(e) => {
-                setFormData({ ...formData, topic: e.target.value });
-                if (errors.topic) setErrors({ ...errors, topic: '' });
-              }}
-              placeholder="যেমন: ব্যাকরণ"
-              className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all ${
-                errors.topic ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
-              }`}
-            />
+            {availableTopics.length > 0 && !isCustomTopicInput ? (
+              <select
+                value={formData.topic}
+                onChange={(e) => {
+                  setFormData({ ...formData, topic: e.target.value });
+                  if (errors.topic) setErrors({ ...errors, topic: '' });
+                }}
+                className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all cursor-pointer ${
+                  errors.topic ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <option value="" disabled>টপিক সিলেক্ট করুন</option>
+                {availableTopics.map((top) => (
+                  <option key={top} value={top}>{top}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={formData.topic}
+                onChange={(e) => {
+                  setFormData({ ...formData, topic: e.target.value });
+                  if (errors.topic) setErrors({ ...errors, topic: '' });
+                }}
+                placeholder="যেমন: ব্যাকরণ বা নতুন টপিক লিখুন"
+                className={`w-full px-3.5 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] transition-all ${
+                  errors.topic ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                }`}
+              />
+            )}
             {errors.topic && <p className="text-[11px] text-rose-500 font-bold mt-1">{errors.topic}</p>}
           </div>
         </div>

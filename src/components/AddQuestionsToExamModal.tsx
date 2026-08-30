@@ -96,6 +96,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
   const [loadingBank, setLoadingBank] = useState(false);
   const [bankSearch, setBankSearch] = useState('');
   const [bankSubjectFilter, setBankSubjectFilter] = useState('all');
+  const [bankTopicFilter, setBankTopicFilter] = useState('all');
   const [selectedBankIds, setSelectedBankIds] = useState<Set<string | number>>(new Set());
   const [attachingFromBank, setAttachingFromBank] = useState(false);
 
@@ -812,14 +813,22 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
     const matchesSearch =
       q.question.toLowerCase().includes(bankSearch.toLowerCase()) ||
       q.option_a.toLowerCase().includes(bankSearch.toLowerCase()) ||
-      (q.subject && q.subject.toLowerCase().includes(bankSearch.toLowerCase()));
+      (q.subject && q.subject.toLowerCase().includes(bankSearch.toLowerCase())) ||
+      (q.topic && q.topic.toLowerCase().includes(bankSearch.toLowerCase()));
     const matchesSub = bankSubjectFilter === 'all' ? true : (q.subject || 'বাংলা') === bankSubjectFilter;
-    return matchesSearch && matchesSub;
+    const matchesTopic = bankTopicFilter === 'all' ? true : (q.topic || '') === bankTopicFilter;
+    return matchesSearch && matchesSub && matchesTopic;
   });
 
-  const availableSubjects = Array.from(
-    new Set([...bankQuestions.map((q) => q.subject).filter(Boolean), 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান', 'العربية', 'ফিকহ'])
-  );
+  const availableSubjects = getAllSubjects(bankQuestions.map((q) => q.subject || ''));
+  const availableBankTopics = Array.from(
+    new Set(
+      bankQuestions
+        .filter((q) => bankSubjectFilter === 'all' || (q.subject || '').trim() === bankSubjectFilter.trim())
+        .map((q) => q.topic)
+        .filter(Boolean)
+    )
+  ) as string[];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
@@ -1225,10 +1234,13 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                       />
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={bankSubjectFilter}
-                        onChange={(e) => setBankSubjectFilter(e.target.value)}
+                        onChange={(e) => {
+                          setBankSubjectFilter(e.target.value);
+                          setBankTopicFilter('all');
+                        }}
                         className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
                       >
                         <option value="all">সকল বিষয় ({bankQuestions.length})</option>
@@ -1236,6 +1248,17 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
                           <option key={sub} value={sub}>
                             {sub} ({bankQuestions.filter((q) => (q.subject || 'বাংলা') === sub).length})
                           </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={bankTopicFilter}
+                        onChange={(e) => setBankTopicFilter(e.target.value)}
+                        className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
+                      >
+                        <option value="all">সকল টপিক</option>
+                        {availableBankTopics.map((top) => (
+                          <option key={top} value={top}>{top}</option>
                         ))}
                       </select>
 

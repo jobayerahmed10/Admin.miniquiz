@@ -240,7 +240,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
             id: customQuestionId,
             question_code: q.question_code || customQuestionId,
             exam_id: targetExamId,
-            subject: examInfo.subject || q.subject || 'সাধারণ',
+            subject: q.subject || examInfo.subject || 'সাধারণ',
             question_text: q.question,
             question: q.question,
             option_a: q.option_a,
