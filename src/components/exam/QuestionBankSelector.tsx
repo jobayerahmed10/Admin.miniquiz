@@ -10,6 +10,9 @@ import {
   CheckSquare,
   Square,
   BookOpen,
+  RotateCcw,
+  PlusCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { Question } from '../../types';
 import { QuestionDetailModal } from './QuestionDetailModal';
@@ -26,6 +29,18 @@ interface QuestionBankSelectorProps {
   initialPost?: string;
 }
 
+const isAllPosts = (p?: string | null): boolean => {
+  if (!p) return true;
+  const clean = p.replace(/\s+/g, ' ').trim().toLowerCase();
+  return clean === '' || clean === 'সকল পদ' || clean === 'সকল' || clean === 'all' || clean === 'all posts';
+};
+
+const isAllTopics = (t?: string | null): boolean => {
+  if (!t) return true;
+  const clean = t.replace(/\s+/g, ' ').trim().toLowerCase();
+  return clean === '' || clean === 'সকল টপিক' || clean === 'সকল' || clean === 'all' || clean === 'all topics';
+};
+
 export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
   currentSelectedQuestions,
   onToggleQuestion,
@@ -38,8 +53,8 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
   const [subjectFilter, setSubjectFilter] = useState(initialSubject || '');
-  const [topicFilter, setTopicFilter] = useState(initialTopic || '');
-  const [postFilter, setPostFilter] = useState(initialPost || '');
+  const [topicFilter, setTopicFilter] = useState(isAllTopics(initialTopic) ? '' : (initialTopic || ''));
+  const [postFilter, setPostFilter] = useState(isAllPosts(initialPost) ? '' : (initialPost || ''));
   const [difficultyFilter, setDifficultyFilter] = useState('সকল স্তর');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null);
@@ -52,7 +67,24 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
       setLoading(true);
       try {
         const res = await fetchAllQuestions();
-        setAllQuestions(res.questions || []);
+        const loaded = res.questions || [];
+        setAllQuestions(loaded);
+
+        // Smart topic selection: if initialTopic was specified but has 0 questions in DB,
+        // we can check whether to keep it or reset to all topics
+        if (initialTopic && !isAllTopics(initialTopic)) {
+          const normInitialTopic = initialTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+          const hasMatchingTopic = loaded.some(
+            (q) =>
+              (!initialSubject || isSameSubject(q.subject, initialSubject)) &&
+              (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase() === normInitialTopic
+          );
+
+          if (!hasMatchingTopic) {
+            // Keep topicFilter as is so user knows what was selected, but UI will show the zero-state guidance
+            console.log(`Initial topic "${initialTopic}" has 0 questions in Question Bank for subject "${initialSubject}".`);
+          }
+        }
       } catch (e) {
         console.error('Failed to fetch questions:', e);
       } finally {
@@ -60,57 +92,105 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
       }
     };
     loadData();
-  }, []);
+  }, [initialSubject, initialTopic]);
 
-  // Compute unique subject, topic, post list for dropdowns
+  // Compute unique subject with question count
   const availableSubjects = useMemo(() => {
     const rawSubs = allQuestions.map((q) => q.subject).filter((s): s is string => Boolean(s));
     if (initialSubject) rawSubs.push(initialSubject);
-    return getAllSubjects(rawSubs);
+    const uniqueSubs = getAllSubjects(rawSubs);
+
+    return uniqueSubs.map((subj) => {
+      const count = allQuestions.filter((q) => isSameSubject(q.subject, subj)).length;
+      return { name: subj, count };
+    });
   }, [allQuestions, initialSubject]);
 
+  // Compute unique topic list with question count (scoped to currently selected subject)
   const availableTopics = useMemo(() => {
-    const set = new Set<string>();
+    const topicMap = new Map<string, number>();
+
     allQuestions.forEach((q) => {
-      if ((!subjectFilter || isSameSubject(q.subject, subjectFilter)) && q.topic) {
-        set.add(q.topic.replace(/\s+/g, ' ').trim());
+      if (!subjectFilter || isSameSubject(q.subject, subjectFilter)) {
+        if (q.topic && q.topic.trim()) {
+          const clean = q.topic.replace(/\s+/g, ' ').trim();
+          topicMap.set(clean, (topicMap.get(clean) || 0) + 1);
+        }
       }
     });
-    if (initialTopic) set.add(initialTopic.replace(/\s+/g, ' ').trim());
-    return Array.from(set);
+
+    if (initialTopic && !isAllTopics(initialTopic)) {
+      const cleanInitial = initialTopic.replace(/\s+/g, ' ').trim();
+      if (!topicMap.has(cleanInitial)) {
+        topicMap.set(cleanInitial, 0);
+      }
+    }
+
+    return Array.from(topicMap.entries()).map(([topic, count]) => ({
+      name: topic,
+      count,
+    }));
   }, [allQuestions, subjectFilter, initialTopic]);
 
+  // Compute available posts with question count
   const availablePosts = useMemo(() => {
-    const set = new Set<string>();
+    const postMap = new Map<string, number>();
+
     allQuestions.forEach((q) => {
-      if (q.post) set.add(q.post.replace(/\s+/g, ' ').trim());
+      if (q.post && q.post.trim() && !isAllPosts(q.post)) {
+        const clean = q.post.replace(/\s+/g, ' ').trim();
+        postMap.set(clean, (postMap.get(clean) || 0) + 1);
+      }
     });
-    if (initialPost) set.add(initialPost.replace(/\s+/g, ' ').trim());
-    return Array.from(set);
+
+    if (initialPost && !isAllPosts(initialPost)) {
+      const cleanInitial = initialPost.replace(/\s+/g, ' ').trim();
+      if (!postMap.has(cleanInitial)) {
+        postMap.set(cleanInitial, 0);
+      }
+    }
+
+    return Array.from(postMap.entries()).map(([post, count]) => ({
+      name: post,
+      count,
+    }));
   }, [allQuestions, initialPost]);
 
   const selectedIdsSet = useMemo(() => {
     return new Set(currentSelectedQuestions.map((q) => String(q.id)));
   }, [currentSelectedQuestions]);
 
+  // Count questions for current subject regardless of topic/post
+  const subjectTotalQuestionsCount = useMemo(() => {
+    if (!subjectFilter) return allQuestions.length;
+    return allQuestions.filter((q) => isSameSubject(q.subject, subjectFilter)).length;
+  }, [allQuestions, subjectFilter]);
+
   // Filter questions
   const filteredQuestions = useMemo(() => {
     return allQuestions.filter((q) => {
       if (onlyShowSelected && !selectedIdsSet.has(String(q.id))) return false;
 
-      if (subjectFilter && !isSameSubject(q.subject, subjectFilter)) {
+      // Subject Filter
+      if (subjectFilter && subjectFilter !== 'সকল বিষয়' && !isSameSubject(q.subject, subjectFilter)) {
         return false;
       }
-      if (topicFilter) {
+
+      // Topic Filter
+      if (topicFilter && !isAllTopics(topicFilter)) {
         const qTop = (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const fTop = topicFilter.replace(/\s+/g, ' ').trim().toLowerCase();
         if (qTop !== fTop) return false;
       }
-      if (postFilter) {
+
+      // Post Filter
+      if (postFilter && !isAllPosts(postFilter)) {
         const qPost = (q.post || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const fPost = postFilter.replace(/\s+/g, ' ').trim().toLowerCase();
         if (qPost !== fPost) return false;
       }
+
+      // Search Query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesQ = q.question.toLowerCase().includes(query);
@@ -119,9 +199,11 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
           q.option_b?.toLowerCase().includes(query) ||
           q.option_c?.toLowerCase().includes(query) ||
           q.option_d?.toLowerCase().includes(query);
-        const matchesId = String(q.id).toLowerCase().includes(query);
-        if (!matchesQ && !matchesOpts && !matchesId) return false;
+        const matchesId = String(q.id).toLowerCase().includes(query) || (q.question_code && String(q.question_code).toLowerCase().includes(query));
+        const matchesTopic = (q.topic || '').toLowerCase().includes(query);
+        if (!matchesQ && !matchesOpts && !matchesId && !matchesTopic) return false;
       }
+
       return true;
     });
   }, [allQuestions, onlyShowSelected, selectedIdsSet, subjectFilter, topicFilter, postFilter, searchQuery]);
@@ -151,20 +233,41 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
     onBatchSelect([...currentSelectedQuestions, ...toSelect]);
   };
 
+  const handleResetFilters = () => {
+    setSubjectFilter('');
+    setTopicFilter('');
+    setPostFilter('');
+    setDifficultyFilter('সকল স্তর');
+    setSearchQuery('');
+    setOnlyShowSelected(false);
+  };
+
   return (
     <div className="space-y-4">
       {/* Top Filter Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-        <div className="pb-1 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
-            প্রশ্ন ব্যাংক থেকে যুক্ত করুন
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            বিষয়, টপিক ও পদ সিলেক্ট করে প্রশ্ন নির্বাচন করুন
-          </p>
+        <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+              প্রশ্ন ব্যাংক থেকে যুক্ত করুন
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              বিষয়, টপিক ও পদ সিলেক্ট করে প্রশ্ন নির্বাচন করুন (মোট ডাটাবেসে {allQuestions.length} টি প্রশ্ন আছে)
+            </p>
+          </div>
+          {(subjectFilter || topicFilter || postFilter || searchQuery) && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="px-2.5 py-1 text-[11px] font-bold text-[#5B36F5] dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>ফিল্টার রিসেট</span>
+            </button>
+          )}
         </div>
 
-        {/* 3-col / 2-col Filter Grid */}
+        {/* 3-col Filter Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* বিষয় */}
           <div>
@@ -179,10 +282,10 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
               }}
               className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] cursor-pointer"
             >
-              <option value="">সকল বিষয়</option>
+              <option value="">সকল বিষয় ({allQuestions.length} টি)</option>
               {availableSubjects.map((subj) => (
-                <option key={subj} value={subj}>
-                  {subj}
+                <option key={subj.name} value={subj.name}>
+                  {subj.name} ({subj.count} টি)
                 </option>
               ))}
             </select>
@@ -198,10 +301,10 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
               onChange={(e) => setTopicFilter(e.target.value)}
               className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] cursor-pointer"
             >
-              <option value="">সকল টপিক</option>
+              <option value="">সকল টপিক ({subjectTotalQuestionsCount} টি)</option>
               {availableTopics.map((top) => (
-                <option key={top} value={top}>
-                  {top}
+                <option key={top.name} value={top.name}>
+                  {top.name} ({top.count} টি)
                 </option>
               ))}
             </select>
@@ -217,10 +320,10 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
               onChange={(e) => setPostFilter(e.target.value)}
               className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5] cursor-pointer"
             >
-              <option value="">সকল পদ</option>
+              <option value="">সকল পদ ({subjectTotalQuestionsCount} টি)</option>
               {availablePosts.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+                <option key={p.name} value={p.name}>
+                  {p.name} ({p.count} টি)
                 </option>
               ))}
             </select>
@@ -305,7 +408,7 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
           <button
             type="button"
             onClick={handleSelectAllFiltered}
-            disabled={currentSelectedQuestions.length >= targetCount}
+            disabled={filteredQuestions.length === 0 || currentSelectedQuestions.length >= targetCount}
             className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             সব নির্বাচন করুন
@@ -332,8 +435,52 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
             প্রশ্নসমূহ লোড হচ্ছে...
           </div>
         ) : filteredQuestions.length === 0 ? (
-          <div className="py-12 text-center text-xs font-medium text-slate-500">
-            কোনো প্রশ্ন পাওয়া যায়নি। ফিল্টার পরিবর্তন করে দেখুন।
+          <div className="py-8 px-4 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
+              <HelpCircle className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1 max-w-md mx-auto">
+              <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                কোনো প্রশ্ন পাওয়া যায়নি
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {topicFilter ? (
+                  <>
+                    <strong className="text-slate-700 dark:text-slate-300">"{subjectFilter || 'নির্বাচিত বিষয়'}"</strong> বিষয়ের{' '}
+                    <strong className="text-amber-600 dark:text-amber-400">"{topicFilter}"</strong> টপিকের অধীনে বর্তমানে কোনো প্রশ্ন প্রশ্ন ব্যাংকে সংরক্ষিত নেই।
+                  </>
+                ) : subjectFilter ? (
+                  <>
+                    <strong className="text-slate-700 dark:text-slate-300">"{subjectFilter}"</strong> বিষয়ের অধীনে বর্তমানে প্রশ্ন ব্যাংকে কোনো প্রশ্ন পাওয়া যায়নি।
+                  </>
+                ) : (
+                  'আপনার নির্বাচিত ফিল্টারের সাথে মিলে এমন কোনো প্রশ্ন ডাটাবেসে নেই।'
+                )}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+              {topicFilter && (
+                <button
+                  type="button"
+                  onClick={() => setTopicFilter('')}
+                  className="px-4 py-2 bg-[#5B36F5] text-white text-xs font-bold rounded-xl shadow-sm hover:bg-[#4a2cd0] transition-colors flex items-center gap-1.5"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>{subjectFilter || 'এই বিষয়'}-এর সকল টপিকের প্রশ্ন দেখুন ({subjectTotalQuestionsCount} টি)</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>সকল ফিল্টার রিসেট করুন ({allQuestions.length} টি)</span>
+              </button>
+            </div>
           </div>
         ) : (
           filteredQuestions.map((q, idx) => {
@@ -398,11 +545,16 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
                           {q.subject}
                         </span>
                       )}
+                      {q.topic && (
+                        <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-[10px] rounded-md">
+                          {q.topic}
+                        </span>
+                      )}
                       <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] rounded-md">
                         সহজ
                       </span>
                       <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono text-[10px] rounded-md">
-                        ID: {q.id}
+                        ID: {q.question_code || q.id}
                       </span>
                     </div>
                   </div>
@@ -436,3 +588,4 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
     </div>
   );
 };
+
