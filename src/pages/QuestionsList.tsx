@@ -7,6 +7,7 @@ import {
   insertBatchQuestions,
   getDefaultSubjectPrefix,
   clearAllQuestions,
+  autoAssignAndRepairQuestionTopics,
 } from '../lib/supabase';
 import { Question } from '../types';
 import { QuestionBankView, WorkingQuestion, AiAutoGenerateConfig } from '../types/questionBank';
@@ -60,6 +61,7 @@ export const QuestionsList: React.FC = () => {
   const loadQuestions = useCallback(async () => {
     setLoading(true);
     try {
+      await autoAssignAndRepairQuestionTopics();
       const { questions: data } = await fetchAllQuestions();
       setQuestions(data || []);
     } catch (err) {

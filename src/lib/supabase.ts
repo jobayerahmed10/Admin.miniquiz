@@ -691,16 +691,17 @@ export const insertQuestion = async (
       .select()
       .single();
 
-    // If optional columns (slug, topic, post, exam_id, subject, id) fail or don't exist in DB, retry gracefully
+    // If optional columns fail or don't exist in DB, retry gracefully
     if (error) {
       console.warn('Supabase insertQuestion error (attempting safe fallback):', error);
       const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
       const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
+      const isSlugError = errStr.includes('slug');
 
       const sanitizedPayload = { ...payload };
-      delete sanitizedPayload.slug;
-      delete sanitizedPayload.topic;
-      delete sanitizedPayload.post;
+      if (isSlugError) {
+        delete sanitizedPayload.slug;
+      }
       if (isExamIdError) {
         delete sanitizedPayload.exam_id;
       }
@@ -712,8 +713,12 @@ export const insertQuestion = async (
         .single();
 
       if (retryResult.error) {
-        delete sanitizedPayload.subject;
-        delete sanitizedPayload.exam_id;
+        const retryErrStr = ((retryResult.error.message || '') + ' ' + (retryResult.error.details || '')).toLowerCase();
+        if (retryErrStr.includes('topic')) delete sanitizedPayload.topic;
+        if (retryErrStr.includes('post')) delete sanitizedPayload.post;
+        if (retryErrStr.includes('slug')) delete sanitizedPayload.slug;
+        if (retryErrStr.includes('exam_id')) delete sanitizedPayload.exam_id;
+
         retryResult = await client
           .from('questions')
           .upsert([sanitizedPayload], { onConflict: 'id' })
@@ -852,29 +857,28 @@ export const insertBatchQuestions = async (
   try {
     const payload = localItems.map((q) => {
       const qText = q.question || (q as any).question_text || '';
-      const optA = q.option_a || (Array.isArray((q as any).options) ? (q as any).options[0] : '') || '';
-      const optB = q.option_b || (Array.isArray((q as any).options) ? (q as any).options[1] : '') || '';
-      const optC = q.option_c || (Array.isArray((q as any).options) ? (q as any).options[2] : '') || '';
-      const optD = q.option_d || (Array.isArray((q as any).options) ? (q as any).options[3] : '') || '';
-      const optsArray = (q as any).options && Array.isArray((q as any).options) ? (q as any).options : [optA, optB, optC, optD];
+      const optA = q.option_a || '';
+      const optB = q.option_b || '';
+      const optC = q.option_c || '';
+      const optD = q.option_d || '';
 
       const item: any = {
         id: String(q.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
         question: qText,
-        question_text: qText,
         option_a: optA,
         option_b: optB,
         option_c: optC,
         option_d: optD,
-        options: optsArray,
         correct_answer: q.correct_answer || (q as any).correctAnswer || 'option_a',
         explanation: q.explanation || '',
-        slug: q.slug || generateQuestionSlug(qText),
         status: q.status || 'published',
         subject: sanitizeSubjectName(q.subject),
         topic: (q.topic || '').replace(/\s+/g, ' ').trim(),
         post: (q.post || '').replace(/\s+/g, ' ').trim(),
       };
+      if (q.slug) {
+        item.slug = q.slug;
+      }
       if (q.exam_id) {
         item.exam_id = String(q.exam_id);
       }
@@ -892,14 +896,14 @@ export const insertBatchQuestions = async (
       console.error('Questions Insert Error (initial attempt failed):', error);
       const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
       const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
+      const isSlugError = errStr.includes('slug');
 
-      // Fallback 1: Standard columns without options array / question_text if those caused schema issues
+      // Fallback 1: Keep topic and post, remove slug or exam_id if problematic
       const fallbackPayload = payload.map((p: any) => {
-        const { topic, post, slug, options, question_text, ...rest } = p;
-        if (isExamIdError) {
-          delete rest.exam_id;
-        }
-        return rest;
+        const copy = { ...p };
+        if (isExamIdError) delete copy.exam_id;
+        if (isSlugError) delete copy.slug;
+        return copy;
       });
 
       console.log('Payload: Retry batch insert fallback 1', JSON.stringify(fallbackPayload, null, 2));
@@ -911,7 +915,9 @@ export const insertBatchQuestions = async (
 
       if (retryResult.error) {
         console.error('Questions Insert Error (retry 1 failed):', retryResult.error);
-        // Fallback 2: Minimal columns
+        const retryErrStr = ((retryResult.error.message || '') + ' ' + (retryResult.error.details || '')).toLowerCase();
+        
+        // Fallback 2: Remove only missing schema fields
         const minimalPayload = payload.map((p: any) => {
           const minItem: any = {
             id: p.id,
@@ -922,10 +928,11 @@ export const insertBatchQuestions = async (
             option_d: p.option_d,
             correct_answer: p.correct_answer,
             explanation: p.explanation || '',
+            subject: p.subject || 'সাধারণ',
+            status: p.status || 'published',
           };
-          if (!isExamIdError && p.exam_id) {
-            minItem.exam_id = p.exam_id;
-          }
+          if (!retryErrStr.includes('topic')) minItem.topic = p.topic || '';
+          if (!retryErrStr.includes('post')) minItem.post = p.post || '';
           return minItem;
         });
 
@@ -1213,6 +1220,76 @@ export const transferQuestionsSubjectTopic = async (
     console.error('transferQuestionsSubjectTopic exception:', err);
     return { success: true, count: transferredCount, error: null };
   }
+};
+
+// Auto-repair and assign proper topics based on question content and subject
+export const autoAssignAndRepairQuestionTopics = async (
+  customRules?: { subjectMatch: string; targetTopic: string }[]
+): Promise<{ success: boolean; updatedCount: number; error: string | null }> => {
+  const current = getLocalCachedQuestions();
+  let updatedCount = 0;
+
+  const updatedCache = current.map((q) => {
+    const cleanSub = (q.subject || '').trim();
+    const cleanTop = (q.topic || '').trim();
+    const qText = (q.question || '').toLowerCase();
+    let newTopic = cleanTop;
+
+    const isTopicGeneric = !cleanTop || cleanTop === 'সাধারণ টপিক' || cleanTop === 'সাধারণ' || cleanTop === 'সাধারণ জ্ঞান ও সাহিত্য' || cleanTop === 'عام' || cleanTop === 'সাহিত্য';
+
+    if (isTopicGeneric) {
+      if (cleanSub === 'বাংলা' || qText.includes('বিপরীত') || qText.includes('বিপরীতার্থক')) {
+        newTopic = 'বিপরীত শব্দ';
+      } else if (cleanSub === 'ইংরেজি' || cleanSub.toLowerCase() === 'english' || qText.includes('preposition') || qText.includes('appropriate')) {
+        newTopic = 'Appropriate Preposition';
+      } else if (cleanSub.includes('উসূলুল') || cleanSub.includes('ফিকহ') || cleanSub.includes('আরবি') || cleanSub.includes('ইসলাম') || qText.includes('কিতাব') || cleanSub === 'ফিকহ') {
+        newTopic = 'কিতাবুল্লাহ';
+      } else if (cleanSub === 'গণিত') {
+        newTopic = 'পাটিগণিত ও বীজগণিত';
+      } else if (cleanSub === 'বিজ্ঞান') {
+        newTopic = 'দৈনন্দিন বিজ্ঞান';
+      } else {
+        newTopic = cleanTop || 'সাধারণ জ্ঞান';
+      }
+    }
+
+    if (newTopic !== cleanTop) {
+      updatedCount++;
+      return {
+        ...q,
+        topic: newTopic,
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return q;
+  });
+
+  setLocalCachedQuestions(updatedCache);
+
+  const client = getSupabaseClient();
+  if (client && updatedCount > 0) {
+    try {
+      const topicGroups: Record<string, string[]> = {};
+      updatedCache.forEach((q) => {
+        const top = q.topic || '';
+        if (top) {
+          if (!topicGroups[top]) topicGroups[top] = [];
+          topicGroups[top].push(String(q.id));
+        }
+      });
+
+      for (const [topName, qIds] of Object.entries(topicGroups)) {
+        await client
+          .from('questions')
+          .update({ topic: topName })
+          .in('id', qIds);
+      }
+    } catch (err) {
+      console.warn('autoAssignAndRepairQuestionTopics background update error:', err);
+    }
+  }
+
+  return { success: true, updatedCount, error: null };
 };
 
 // Delete Question from public.questions + local cache
