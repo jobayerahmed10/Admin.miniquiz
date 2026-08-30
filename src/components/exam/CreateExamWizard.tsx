@@ -168,9 +168,11 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         if (pattern && (!String(qId).startsWith(pattern) || typeof qId === 'number')) {
           qId = generateSequentialQuestionId(pattern, attachedQuestions, idx);
         }
+        const qCode = q.question_code || (typeof qId === 'string' ? qId : `q_${qId}`);
         return {
           ...q,
           id: qId,
+          question_code: qCode,
           exam_id: examId,
           subject: q.subject || examInfo.subject,
           topic: q.topic || examInfo.topic,
@@ -180,7 +182,10 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         };
       });
 
-      const questionIds = updatedQuestions.map((q) => q.id);
+      // Strict Selected Question Codes / IDs
+      const selectedCodes = Array.from(
+        new Set(updatedQuestions.map((q) => String(q.question_code || q.id)).filter(Boolean))
+      );
 
       const examPayload: Omit<Exam, 'created_at' | 'updated_at'> = {
         id: examId,
@@ -204,7 +209,8 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         instructions: examInfo.instructions || null,
         id_pattern: examInfo.custom_id_pattern || null,
         status: finalStatus,
-        question_ids: questionIds,
+        selected_question_codes: selectedCodes,
+        question_ids: selectedCodes,
         questions: updatedQuestions,
       };
 
@@ -226,12 +232,13 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
 
       const targetExamId = String(savedExam?.id || examId);
 
-      // 3. Batch Save Questions linked to the Exam ID
+      // 3. Batch Save / Sync Questions linked to the Exam ID
       if (updatedQuestions.length > 0) {
         const questionsPayload = updatedQuestions.map((q, idx) => {
           const customQuestionId = String(q.id || `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`);
           return {
             id: customQuestionId,
+            question_code: q.question_code || customQuestionId,
             exam_id: targetExamId,
             subject: examInfo.subject || q.subject || 'সাধারণ',
             question_text: q.question,

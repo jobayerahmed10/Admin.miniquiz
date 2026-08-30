@@ -2,6 +2,7 @@ export type QuestionStatus = 'published' | 'draft';
 
 export interface Question {
   id: string | number;
+  question_code?: string; // নির্দিষ্ট Question Code / ইউনিক প্রিফিক্স কোড
   question: string;
   option_a: string;
   option_b: string;
@@ -47,6 +48,7 @@ export interface Exam {
   description?: string | null;
   id_pattern?: string | null; // e.g. 'Q-BANGLA-'
   status: ExamStatus;
+  selected_question_codes?: (string | number)[]; // সিলেক্টেড প্রশ্নের কোড / আইডির তালিকা
   question_ids?: (string | number)[];
   questions?: Question[];
   created_at?: string;

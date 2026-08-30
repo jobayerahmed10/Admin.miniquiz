@@ -706,6 +706,18 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
           })
         )
       );
+      const newlyAdded = bankQuestions.filter((q) => selectedBankIds.has(q.id));
+      const nextAttached = [...attachedQuestions, ...newlyAdded];
+      const nextCodes: (string | number)[] = Array.from(
+        new Set(nextAttached.map((q) => q.question_code || q.id))
+      );
+
+      await updateExam(exam.id, {
+        selected_question_codes: nextCodes,
+        question_ids: nextCodes,
+        question_count: nextCodes.length,
+      });
+
       const count = ids.length;
       setActionSuccessMsg(`🎉 ${count} টি প্রশ্ন এই মডেল টেস্টে সফলভাবে যুক্ত হয়েছে!`);
       setSelectedBankIds(new Set());
@@ -726,7 +738,16 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
     if (isAttached) {
       const res = await updateQuestion(q.id, { exam_id: null });
       if (res.success) {
-        setAttachedQuestions((prev) => prev.filter((item) => String(item.id) !== String(q.id)));
+        const nextAttached = attachedQuestions.filter((item) => String(item.id) !== String(q.id));
+        setAttachedQuestions(nextAttached);
+        const nextCodes: (string | number)[] = Array.from(
+          new Set(nextAttached.map((item) => item.question_code || item.id))
+        );
+        await updateExam(exam.id, {
+          selected_question_codes: nextCodes,
+          question_ids: nextCodes,
+          question_count: nextCodes.length,
+        });
         setActionSuccessMsg('প্রশ্নটি পরীক্ষা থেকে বাদ দেওয়া হয়েছে!');
         setTimeout(() => setActionSuccessMsg(null), 2000);
         onQuestionsUpdated(-1);
@@ -735,7 +756,16 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       const res = await updateQuestion(q.id, { exam_id: exam.id });
       if (res.success) {
         const updatedQ = { ...q, exam_id: exam.id };
-        setAttachedQuestions((prev) => [...prev, updatedQ]);
+        const nextAttached = [...attachedQuestions, updatedQ];
+        setAttachedQuestions(nextAttached);
+        const nextCodes: (string | number)[] = Array.from(
+          new Set(nextAttached.map((item) => item.question_code || item.id))
+        );
+        await updateExam(exam.id, {
+          selected_question_codes: nextCodes,
+          question_ids: nextCodes,
+          question_count: nextCodes.length,
+        });
         setActionSuccessMsg('✓ প্রশ্ন যুক্ত হয়েছে!');
         setTimeout(() => setActionSuccessMsg(null), 2000);
         onQuestionsUpdated(1);
@@ -751,6 +781,11 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       await updateQuestion(q.id, { exam_id: null });
     }
     setAttachedQuestions([]);
+    await updateExam(exam.id, {
+      selected_question_codes: [],
+      question_ids: [],
+      question_count: 0,
+    });
     onQuestionsUpdated(-currentList.length);
     setActionSuccessMsg('সব প্রশ্ন পরীক্ষা থেকে বাদ দেওয়া হয়েছে।');
     setTimeout(() => setActionSuccessMsg(null), 2500);

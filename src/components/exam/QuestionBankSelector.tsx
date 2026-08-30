@@ -14,6 +14,7 @@ import {
 import { Question } from '../../types';
 import { QuestionDetailModal } from './QuestionDetailModal';
 import { fetchAllQuestions } from '../../lib/supabase';
+import { sanitizeSubjectName, isSameSubject, getAllSubjects } from '../../lib/subjectManager';
 
 interface QuestionBankSelectorProps {
   currentSelectedQuestions: Question[];
@@ -63,31 +64,28 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
 
   // Compute unique subject, topic, post list for dropdowns
   const availableSubjects = useMemo(() => {
-    const set = new Set<string>();
-    allQuestions.forEach((q) => {
-      if (q.subject) set.add(q.subject);
-    });
-    if (initialSubject) set.add(initialSubject);
-    return Array.from(set);
+    const rawSubs = allQuestions.map((q) => q.subject).filter((s): s is string => Boolean(s));
+    if (initialSubject) rawSubs.push(initialSubject);
+    return getAllSubjects(rawSubs);
   }, [allQuestions, initialSubject]);
 
   const availableTopics = useMemo(() => {
     const set = new Set<string>();
     allQuestions.forEach((q) => {
-      if ((!subjectFilter || q.subject === subjectFilter) && q.topic) {
-        set.add(q.topic);
+      if ((!subjectFilter || isSameSubject(q.subject, subjectFilter)) && q.topic) {
+        set.add(q.topic.replace(/\s+/g, ' ').trim());
       }
     });
-    if (initialTopic) set.add(initialTopic);
+    if (initialTopic) set.add(initialTopic.replace(/\s+/g, ' ').trim());
     return Array.from(set);
   }, [allQuestions, subjectFilter, initialTopic]);
 
   const availablePosts = useMemo(() => {
     const set = new Set<string>();
     allQuestions.forEach((q) => {
-      if (q.post) set.add(q.post);
+      if (q.post) set.add(q.post.replace(/\s+/g, ' ').trim());
     });
-    if (initialPost) set.add(initialPost);
+    if (initialPost) set.add(initialPost.replace(/\s+/g, ' ').trim());
     return Array.from(set);
   }, [allQuestions, initialPost]);
 
@@ -100,14 +98,18 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
     return allQuestions.filter((q) => {
       if (onlyShowSelected && !selectedIdsSet.has(String(q.id))) return false;
 
-      if (subjectFilter && q.subject && !q.subject.toLowerCase().includes(subjectFilter.toLowerCase())) {
+      if (subjectFilter && !isSameSubject(q.subject, subjectFilter)) {
         return false;
       }
-      if (topicFilter && q.topic && !q.topic.toLowerCase().includes(topicFilter.toLowerCase())) {
-        return false;
+      if (topicFilter) {
+        const qTop = (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const fTop = topicFilter.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qTop !== fTop) return false;
       }
-      if (postFilter && q.post && !q.post.toLowerCase().includes(postFilter.toLowerCase())) {
-        return false;
+      if (postFilter) {
+        const qPost = (q.post || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const fPost = postFilter.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qPost !== fPost) return false;
       }
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();

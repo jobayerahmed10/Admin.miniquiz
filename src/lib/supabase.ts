@@ -420,9 +420,12 @@ function normalizeQuestionRow(row: any): Question {
   const cleanSubject = sanitizeSubjectName(rawSub);
   const cleanTopic = (row.topic || row.topic_name || '').replace(/\s+/g, ' ').trim();
   const cleanPost = (row.post || row.post_name || row.designation || row.position || '').replace(/\s+/g, ' ').trim();
+  const qId = row.id || row.question_code || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const qCode = row.question_code || (typeof qId === 'string' ? qId : undefined);
 
   return {
-    id: row.id || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    id: qId,
+    question_code: qCode,
     question: qText,
     option_a: row.option_a || (Array.isArray(row.options) ? row.options[0] : '') || '',
     option_b: row.option_b || (Array.isArray(row.options) ? row.options[1] : '') || '',
@@ -1299,6 +1302,23 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
 
 export const normalizeExamRow = (row: any): Exam => {
   const cleanSubject = sanitizeSubjectName(row.subject || 'বাংলা');
+  let questionCodes: (string | number)[] = [];
+  if (Array.isArray(row.selected_question_codes)) {
+    questionCodes = row.selected_question_codes;
+  } else if (Array.isArray(row.question_ids)) {
+    questionCodes = row.question_ids;
+  } else if (typeof row.selected_question_codes === 'string') {
+    try {
+      const parsed = JSON.parse(row.selected_question_codes);
+      if (Array.isArray(parsed)) questionCodes = parsed;
+    } catch (_) {}
+  } else if (typeof row.question_ids === 'string') {
+    try {
+      const parsed = JSON.parse(row.question_ids);
+      if (Array.isArray(parsed)) questionCodes = parsed;
+    } catch (_) {}
+  }
+
   return {
     id: String(row.id || `exam_${Date.now()}`),
     title: row.title || 'শিরোনাম ছাড়া পরীক্ষা',
@@ -1315,8 +1335,10 @@ export const normalizeExamRow = (row: any): Exam => {
     negative_marks: typeof row.negative_marks === 'number' ? row.negative_marks : Number(row.negative_marks || 0),
     total_marks: typeof row.total_marks === 'number' ? row.total_marks : Number(row.total_marks || 0),
     description: row.description || '',
+    id_pattern: row.id_pattern || null,
     status: (row.status === 'active' ? 'active' : 'draft') as ExamStatus,
-    question_ids: Array.isArray(row.question_ids) ? row.question_ids : [],
+    selected_question_codes: questionCodes,
+    question_ids: questionCodes,
     questions: Array.isArray(row.questions) ? row.questions : [],
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at,
@@ -1497,6 +1519,14 @@ export const insertExam = async (
     };
   }
 
+  const selectedQuestionCodes = Array.from(
+    new Set(
+      (newExam.selected_question_codes || newExam.question_ids || [])
+        .map((code) => String(code).trim())
+        .filter(Boolean)
+    )
+  );
+
   const localItem: Exam = {
     id: examId,
     title: newExam.title,
@@ -1508,13 +1538,16 @@ export const insertExam = async (
     pass_mark: newExam.pass_mark || 0,
     exam_type: newExam.exam_type || 'free',
     category: newExam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
-    question_count: newExam.question_count,
+    question_count: newExam.question_count || selectedQuestionCodes.length,
     time_minutes: newExam.time_minutes,
     negative_marks: newExam.negative_marks,
     total_marks: newExam.total_marks,
     description: newExam.description || '',
     id_pattern: newExam.id_pattern || null,
     status: newExam.status,
+    selected_question_codes: selectedQuestionCodes,
+    question_ids: selectedQuestionCodes,
+    questions: newExam.questions || [],
     created_at: new Date().toISOString(),
   };
 
@@ -1569,13 +1602,15 @@ export const insertExam = async (
       pass_mark: newExam.pass_mark || 0,
       exam_type: newExam.exam_type || 'free',
       category: newExam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
-      question_count: newExam.question_count,
+      question_count: newExam.question_count || selectedQuestionCodes.length,
       time_minutes: newExam.time_minutes,
       negative_marks: newExam.negative_marks,
       total_marks: newExam.total_marks,
       description: newExam.description || '',
       ...(newExam.id_pattern ? { id_pattern: newExam.id_pattern } : {}),
       status: newExam.status,
+      selected_question_codes: selectedQuestionCodes,
+      question_ids: selectedQuestionCodes,
     };
 
     console.log('Payload: Exam insert', JSON.stringify(payload, null, 2));
@@ -1594,7 +1629,7 @@ export const insertExam = async (
         badge: newExam.badge,
         badge_type: newExam.badge_type,
         subject: newExam.subject,
-        question_count: newExam.question_count,
+        question_count: newExam.question_count || selectedQuestionCodes.length,
         time_minutes: newExam.time_minutes,
         negative_marks: newExam.negative_marks,
         total_marks: newExam.total_marks,
@@ -1624,6 +1659,20 @@ export const insertExam = async (
       };
     }
 
+    const finalExamId = String(customId || examId);
+
+    // Sync question linkages in Supabase questions table
+    if (selectedQuestionCodes.length > 0) {
+      try {
+        await client
+          .from('questions')
+          .update({ exam_id: finalExamId })
+          .in('id', selectedQuestionCodes);
+      } catch (syncErr) {
+        console.warn('Could not update questions exam_id on insertExam:', syncErr);
+      }
+    }
+
     const normalized = normalizeExamRow({
       ...data,
       topic: data.topic || newExam.topic,
@@ -1632,8 +1681,9 @@ export const insertExam = async (
       category: data.category || newExam.category,
       exam_type: data.exam_type || newExam.exam_type,
       questions: newExam.questions || [],
-      question_ids: newExam.question_ids || [],
-      question_count: newExam.question_count || (newExam.questions ? newExam.questions.length : 0),
+      selected_question_codes: selectedQuestionCodes,
+      question_ids: selectedQuestionCodes,
+      question_count: newExam.question_count || (newExam.questions ? newExam.questions.length : selectedQuestionCodes.length),
     });
 
     const current = getLocalCachedExams();
@@ -1700,7 +1750,25 @@ export const updateExam = async (
     if (updatedFields.negative_marks !== undefined) payload.negative_marks = updatedFields.negative_marks;
     if (updatedFields.total_marks !== undefined) payload.total_marks = updatedFields.total_marks;
     if (updatedFields.description !== undefined) payload.description = updatedFields.description;
+    if (updatedFields.id_pattern !== undefined) payload.id_pattern = updatedFields.id_pattern;
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
+
+    const hasQuestionCodes =
+      updatedFields.selected_question_codes !== undefined ||
+      updatedFields.question_ids !== undefined;
+
+    let selectedCodes: string[] = [];
+    if (hasQuestionCodes) {
+      selectedCodes = Array.from(
+        new Set(
+          (updatedFields.selected_question_codes || updatedFields.question_ids || [])
+            .map((code) => String(code).trim())
+            .filter(Boolean)
+        )
+      );
+      payload.selected_question_codes = selectedCodes;
+      payload.question_ids = selectedCodes;
+    }
 
     console.log('Payload: Exam update', JSON.stringify(payload, null, 2));
 
@@ -1717,6 +1785,8 @@ export const updateExam = async (
       error.message?.includes('pass_mark') ||
       error.message?.includes('category') ||
       error.message?.includes('exam_type') ||
+      error.message?.includes('selected_question_codes') ||
+      error.message?.includes('question_ids') ||
       error.code === 'PGRST204' ||
       error.code === '42703'
     )) {
@@ -1726,6 +1796,8 @@ export const updateExam = async (
       delete basicPayload.pass_mark;
       delete basicPayload.category;
       delete basicPayload.exam_type;
+      delete basicPayload.selected_question_codes;
+      delete basicPayload.question_ids;
 
       let retryResult = await client
         .from('exams')
@@ -1747,12 +1819,48 @@ export const updateExam = async (
       };
     }
 
+    // Sync question linkages in Supabase questions table
+    if (hasQuestionCodes) {
+      try {
+        // 1. Link selected questions to this exam
+        if (selectedCodes.length > 0) {
+          await client
+            .from('questions')
+            .update({ exam_id: String(id) })
+            .in('id', selectedCodes);
+        }
+
+        // 2. Selection Integrity: Detach questions previously attached to this exam that are no longer selected
+        const { data: previousAttached } = await client
+          .from('questions')
+          .select('id')
+          .eq('exam_id', String(id));
+
+        if (previousAttached && previousAttached.length > 0) {
+          const selectedSet = new Set(selectedCodes);
+          const toDetach = previousAttached
+            .map((q) => String(q.id))
+            .filter((qId) => !selectedSet.has(qId));
+
+          if (toDetach.length > 0) {
+            await client
+              .from('questions')
+              .update({ exam_id: null })
+              .in('id', toDetach);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Could not sync question linkages on updateExam:', syncErr);
+      }
+    }
+
     const normalized = normalizeExamRow({
       ...data,
       ...updatedFields,
       questions: updatedFields.questions || (updatedLocal ? updatedLocal.questions : []),
-      question_ids: updatedFields.question_ids || (updatedLocal ? updatedLocal.question_ids : []),
-      question_count: updatedFields.question_count ?? (updatedFields.questions ? updatedFields.questions.length : (updatedLocal ? updatedLocal.question_count : 0)),
+      selected_question_codes: hasQuestionCodes ? selectedCodes : (updatedFields.selected_question_codes || (updatedLocal ? updatedLocal.selected_question_codes : [])),
+      question_ids: hasQuestionCodes ? selectedCodes : (updatedFields.question_ids || (updatedLocal ? updatedLocal.question_ids : [])),
+      question_count: updatedFields.question_count ?? (updatedFields.questions ? updatedFields.questions.length : (updatedLocal ? updatedLocal.question_count : selectedCodes.length)),
     });
 
     return {
