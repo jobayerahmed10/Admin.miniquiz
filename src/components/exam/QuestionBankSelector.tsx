@@ -27,18 +27,80 @@ interface QuestionBankSelectorProps {
   initialSubject?: string;
   initialTopic?: string;
   initialPost?: string;
+  onSwitchMethod?: (method: 'manual' | 'copy_paste' | 'bank' | 'auto_generate') => void;
 }
 
 const isAllPosts = (p?: string | null): boolean => {
   if (!p) return true;
   const clean = p.replace(/\s+/g, ' ').trim().toLowerCase();
-  return clean === '' || clean === 'সকল পদ' || clean === 'সকল' || clean === 'all' || clean === 'all posts';
+  return clean === '' || clean === 'সকল পদ' || clean === 'সকল' || clean === 'all' || clean === 'all posts' || clean === 'সাধারণ';
 };
 
 const isAllTopics = (t?: string | null): boolean => {
   if (!t) return true;
   const clean = t.replace(/\s+/g, ' ').trim().toLowerCase();
   return clean === '' || clean === 'সকল টপিক' || clean === 'সকল' || clean === 'all' || clean === 'all topics';
+};
+
+const SUBJECT_DEFAULT_TOPICS_MAP: Record<string, string[]> = {
+  'বাংলা': [
+    'বিপরীত শব্দ',
+    'সমার্থক শব্দ',
+    'কারক ও বিভক্তি',
+    'সমাস ও সন্ধি',
+    'শব্দ ও বাক্য',
+    'বাগধারা ও প্রবাদ-প্রবচন',
+    'এক কথায় প্রকাশ',
+    'বানান ও বাক্য শুদ্ধি',
+    'ধ্বনি ও বর্ণ',
+    'ণ-ত্ব ও ষ-ত্ব বিধান',
+    'বাংলা ভাষা ও ব্যাকরণ',
+    'প্রাচীন ও মধ্যযুগীয় বাংলা সাহিত্য',
+    'আধুনিক বাংলা সাহিত্য',
+  ],
+  'ইংরেজি': [
+    'Vocabulary & Synonyms',
+    'Antonyms',
+    'Parts of Speech',
+    'Tense & Right Forms of Verbs',
+    'Preposition & Idioms',
+    'Voice & Narration',
+    'Sentence Correction',
+    'English Literature',
+  ],
+  'গণিত': [
+    'পাটিগণিত (শতকরা, লাভ-ক্ষতি)',
+    'অনুপাত ও সমানুপাত',
+    'বীজগণিত (মান নির্ণয় ও সূত্রাবলী)',
+    'উৎপাদকে বিশ্লেষণ ও লসাগু-গসাগু',
+    'জ্যামিতি ও পরিমিতি',
+    'ত্রিকোণমিতি',
+    'সেট ও ফাংশন',
+  ],
+  'সাধারণ জ্ঞান': [
+    'মুক্তিযুদ্ধ ও বাংলাদেশের ইতিহাস',
+    'সংবিধান ও প্রশাসনিক ব্যবস্থা',
+    'বাংলাদেশের ভূগোল ও অর্থনীতি',
+    'আন্তর্জাতিক সংস্থা ও কূটনীতি',
+    'চলতি বিশ্ব ও আন্তর্জাতিক বিষয়াবলী',
+    'বিজ্ঞান ও তথ্যপ্রযুক্তি',
+  ],
+  'আরবি': [
+    'আল কুরআন ও উলুমুল কুরআন',
+    'হাদিস ও উসুলুল হাদিস',
+    'ফিকহ ও উসুলুল ফিকহ',
+    'আরবি ব্যাকরণ (নাহু ও সরফ)',
+    'আরবি সাহিত্য ও ইতিহাস (আদবুল আরাবি)',
+    'বালাঘাত ও মানতিক',
+  ],
+  'সহকারী মৌলভী': [
+    'কুরআন মাজিদ ও তাজবিদ',
+    'হাদিস শরিফ ও মাসায়িল',
+    'ফিকহ (ইবাদাত ও মুয়ামালাত)',
+    'আকাইদ ও কালাম',
+    'আরবি ব্যাকরণ ও সাহিত্য',
+    'ইসলামিক ঐতিহ্য ও সভ্যতা',
+  ],
 };
 
 export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
@@ -49,6 +111,7 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
   initialSubject = '',
   initialTopic = '',
   initialPost = '',
+  onSwitchMethod,
 }) => {
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,6 +124,13 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
   const [onlyShowSelected, setOnlyShowSelected] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
+  // Sync state if incoming props from Step 1 change
+  useEffect(() => {
+    if (initialSubject) setSubjectFilter(initialSubject);
+    if (initialTopic) setTopicFilter(isAllTopics(initialTopic) ? '' : initialTopic);
+    if (initialPost) setPostFilter(isAllPosts(initialPost) ? '' : initialPost);
+  }, [initialSubject, initialTopic, initialPost]);
+
   // Load questions on mount
   useEffect(() => {
     const loadData = async () => {
@@ -69,22 +139,6 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
         const res = await fetchAllQuestions();
         const loaded = res.questions || [];
         setAllQuestions(loaded);
-
-        // Smart topic selection: if initialTopic was specified but has 0 questions in DB,
-        // we can check whether to keep it or reset to all topics
-        if (initialTopic && !isAllTopics(initialTopic)) {
-          const normInitialTopic = initialTopic.replace(/\s+/g, ' ').trim().toLowerCase();
-          const hasMatchingTopic = loaded.some(
-            (q) =>
-              (!initialSubject || isSameSubject(q.subject, initialSubject)) &&
-              (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase() === normInitialTopic
-          );
-
-          if (!hasMatchingTopic) {
-            // Keep topicFilter as is so user knows what was selected, but UI will show the zero-state guidance
-            console.log(`Initial topic "${initialTopic}" has 0 questions in Question Bank for subject "${initialSubject}".`);
-          }
-        }
       } catch (e) {
         console.error('Failed to fetch questions:', e);
       } finally {
@@ -92,7 +146,7 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
       }
     };
     loadData();
-  }, [initialSubject, initialTopic]);
+  }, []);
 
   // Compute unique subject with question count
   const availableSubjects = useMemo(() => {
@@ -106,31 +160,67 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
     });
   }, [allQuestions, initialSubject]);
 
-  // Compute unique topic list with question count (scoped to currently selected subject)
+  // Compute unique topic list with question count (dynamically scoped to currently selected subject)
   const availableTopics = useMemo(() => {
-    const topicMap = new Map<string, number>();
+    const topicCountMap = new Map<string, number>();
 
+    // 1. Gather all topics that actually have questions in the database under current subject
     allQuestions.forEach((q) => {
       if (!subjectFilter || isSameSubject(q.subject, subjectFilter)) {
         if (q.topic && q.topic.trim()) {
           const clean = q.topic.replace(/\s+/g, ' ').trim();
-          topicMap.set(clean, (topicMap.get(clean) || 0) + 1);
+          topicCountMap.set(clean, (topicCountMap.get(clean) || 0) + 1);
         }
       }
     });
 
+    // 2. Ensure initialTopic (from Step 1) is included in the list
     if (initialTopic && !isAllTopics(initialTopic)) {
       const cleanInitial = initialTopic.replace(/\s+/g, ' ').trim();
-      if (!topicMap.has(cleanInitial)) {
-        topicMap.set(cleanInitial, 0);
+      const existingKey = Array.from(topicCountMap.keys()).find(
+        (k) => k.toLowerCase() === cleanInitial.toLowerCase()
+      );
+      if (!existingKey) {
+        topicCountMap.set(cleanInitial, 0);
       }
     }
 
-    return Array.from(topicMap.entries()).map(([topic, count]) => ({
-      name: topic,
-      count,
-    }));
-  }, [allQuestions, subjectFilter, initialTopic]);
+    // 3. Ensure currently selected topicFilter is in the list
+    if (topicFilter && !isAllTopics(topicFilter)) {
+      const cleanSelected = topicFilter.replace(/\s+/g, ' ').trim();
+      const existingKey = Array.from(topicCountMap.keys()).find(
+        (k) => k.toLowerCase() === cleanSelected.toLowerCase()
+      );
+      if (!existingKey) {
+        topicCountMap.set(cleanSelected, 0);
+      }
+    }
+
+    // 4. Also add standard known topics for the selected subject
+    const cleanSubj = sanitizeSubjectName(subjectFilter);
+    const defaultTopics = SUBJECT_DEFAULT_TOPICS_MAP[cleanSubj] || [];
+    defaultTopics.forEach((defTop) => {
+      const cleanDef = defTop.replace(/\s+/g, ' ').trim();
+      const existingKey = Array.from(topicCountMap.keys()).find(
+        (k) => k.toLowerCase() === cleanDef.toLowerCase()
+      );
+      if (!existingKey) {
+        topicCountMap.set(cleanDef, 0);
+      }
+    });
+
+    // Sort: topics with existing questions (>0) first, then zero-count topics
+    return Array.from(topicCountMap.entries())
+      .map(([topic, count]) => ({
+        name: topic,
+        count,
+      }))
+      .sort((a, b) => {
+        if (a.count > 0 && b.count === 0) return -1;
+        if (a.count === 0 && b.count > 0) return 1;
+        return a.name.localeCompare(b.name, 'bn');
+      });
+  }, [allQuestions, subjectFilter, initialTopic, topicFilter]);
 
   // Compute available posts with question count
   const availablePosts = useMemo(() => {
@@ -160,7 +250,7 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
     return new Set(currentSelectedQuestions.map((q) => String(q.id)));
   }, [currentSelectedQuestions]);
 
-  // Count questions for current subject regardless of topic/post
+  // Count total questions for current subject regardless of topic/post
   const subjectTotalQuestionsCount = useMemo(() => {
     if (!subjectFilter) return allQuestions.length;
     return allQuestions.filter((q) => isSameSubject(q.subject, subjectFilter)).length;
@@ -180,26 +270,33 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
       if (topicFilter && !isAllTopics(topicFilter)) {
         const qTop = (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const fTop = topicFilter.replace(/\s+/g, ' ').trim().toLowerCase();
-        if (qTop !== fTop) return false;
+        const matchesTopic =
+          qTop === fTop ||
+          (qTop.length > 3 && fTop.length > 3 && (qTop.includes(fTop) || fTop.includes(qTop)));
+        if (!matchesTopic) return false;
       }
 
       // Post Filter
       if (postFilter && !isAllPosts(postFilter)) {
         const qPost = (q.post || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const fPost = postFilter.replace(/\s+/g, ' ').trim().toLowerCase();
-        if (qPost !== fPost) return false;
+        const isUniversal = isAllPosts(qPost);
+        const matchesPost = isUniversal || qPost === fPost || qPost.includes(fPost) || fPost.includes(qPost);
+        if (!matchesPost) return false;
       }
 
       // Search Query
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesQ = q.question.toLowerCase().includes(query);
+        const query = searchQuery.toLowerCase().trim();
+        const matchesQ = (q.question || '').toLowerCase().includes(query);
         const matchesOpts =
           q.option_a?.toLowerCase().includes(query) ||
           q.option_b?.toLowerCase().includes(query) ||
           q.option_c?.toLowerCase().includes(query) ||
           q.option_d?.toLowerCase().includes(query);
-        const matchesId = String(q.id).toLowerCase().includes(query) || (q.question_code && String(q.question_code).toLowerCase().includes(query));
+        const matchesId =
+          String(q.id).toLowerCase().includes(query) ||
+          (q.question_code && String(q.question_code).toLowerCase().includes(query));
         const matchesTopic = (q.topic || '').toLowerCase().includes(query);
         if (!matchesQ && !matchesOpts && !matchesId && !matchesTopic) return false;
       }
@@ -234,12 +331,18 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
   };
 
   const handleResetFilters = () => {
-    setSubjectFilter('');
+    setSubjectFilter(initialSubject || '');
     setTopicFilter('');
     setPostFilter('');
     setDifficultyFilter('সকল স্তর');
     setSearchQuery('');
     setOnlyShowSelected(false);
+  };
+
+  const handleSubjectChange = (newSubject: string) => {
+    setSubjectFilter(newSubject);
+    // When changing subject, reset topic to all topics under the new subject
+    setTopicFilter('');
   };
 
   return (
@@ -469,6 +572,17 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   <span>{subjectFilter || 'এই বিষয়'}-এর সকল টপিকের প্রশ্ন দেখুন ({subjectTotalQuestionsCount} টি)</span>
+                </button>
+              )}
+
+              {onSwitchMethod && topicFilter && (
+                <button
+                  type="button"
+                  onClick={() => onSwitchMethod('auto_generate')}
+                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold rounded-xl shadow-sm hover:opacity-90 transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI দিয়ে '{topicFilter}' টপিকের প্রশ্ন তৈরি করুন</span>
                 </button>
               )}
 

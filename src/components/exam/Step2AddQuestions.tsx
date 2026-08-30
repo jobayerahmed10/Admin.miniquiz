@@ -315,6 +315,7 @@ export const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
             initialPost={examInfo.post}
             onToggleQuestion={handleToggleBankQuestion}
             onBatchSelect={onUpdateQuestions}
+            onSwitchMethod={(method) => setActiveMethod(method)}
           />
         )}
 
