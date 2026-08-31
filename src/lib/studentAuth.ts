@@ -256,6 +256,28 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
   const client = getSupabaseClient();
   if (client) {
     try {
+      // 1. First attempt to fetch from 'profiles' table
+      const { data: profilesData, error: profilesError } = await client
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!profilesError && profilesData && profilesData.length > 0) {
+        return profilesData.map((row: any) => ({
+          id: row.id,
+          student_id_code: row.student_id_code || row.student_id || `AT-2026-${row.id.toString().slice(-4)}`,
+          name: row.name || row.full_name || row.username || 'নাম নেই',
+          phone: row.phone || row.mobile || row.phone_number || '–',
+          email: row.email || '–',
+          created_at: row.created_at || new Date().toISOString(),
+          target_exam: row.target_exam || 'NTRCA শিক্ষক নিবন্ধন',
+          total_exams_taken: row.total_exams_taken || 0,
+          avg_score: row.avg_score || 0,
+          study_streak_days: row.study_streak_days || 1,
+        }));
+      }
+
+      // 2. Fallback to 'students' table if profiles is empty or error
       const { data, error } = await client
         .from('students')
         .select('*')
@@ -276,7 +298,7 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
         }));
       }
     } catch (e) {
-      console.warn(e);
+      console.warn('Error fetching students from Supabase:', e);
     }
   }
 
@@ -453,15 +475,24 @@ export const deleteStudentAdmin = async (id: string): Promise<{ success: boolean
   const client = getSupabaseClient();
   if (client) {
     try {
-      const { error } = await client
+      // 1. Delete from Supabase 'profiles' table
+      const { error: profilesError } = await client
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+
+      // 2. Also delete from 'students' table if record exists there
+      const { error: studentsError } = await client
         .from('students')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        return { success: false, error: error.message };
+      if (profilesError && studentsError) {
+        console.error('Error deleting student from profiles and students:', profilesError, studentsError);
+        return { success: false, error: profilesError.message || studentsError.message };
       }
     } catch (e: any) {
+      console.error('Exception deleting student:', e);
       return { success: false, error: e.message };
     }
   }
