@@ -448,3 +448,32 @@ export const getStudentDashboardGrowthData = (student: StudentUser): StudentDash
     weaknesses: weaknesses.length > 0 ? weaknesses : ['গণিত (পাটিগণিত)', 'ইংরেজি সিনোনিম'],
   };
 };
+
+export const deleteStudentAdmin = async (id: string): Promise<{ success: boolean; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { error } = await client
+        .from('students')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  // Also remove from local storage if present
+  let localList = getLocalRegisteredStudents();
+  const initialLength = localList.length;
+  localList = localList.filter((s) => s.id !== id);
+  
+  if (localList.length !== initialLength) {
+    saveLocalRegisteredStudents(localList);
+  }
+
+  return { success: true, error: null };
+};

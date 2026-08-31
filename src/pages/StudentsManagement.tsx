@@ -14,15 +14,22 @@ import {
   Copy,
   Check,
   Filter,
+  Trash2,
 } from 'lucide-react';
 import { StudentUser } from '../types';
-import { fetchAllRegisteredStudentsForAdmin } from '../lib/studentAuth';
+import { fetchAllRegisteredStudentsForAdmin, deleteStudentAdmin } from '../lib/studentAuth';
 
 export const StudentsManagement: React.FC = () => {
   const [students, setStudents] = useState<StudentUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const loadStudents = async () => {
     setLoading(true);
@@ -39,6 +46,18 @@ export const StudentsManagement: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedId(text);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (window.confirm(`আপনি কি নিশ্চিত যে "${name}"-কে রিমোভ করতে চান?`)) {
+      const { success, error } = await deleteStudentAdmin(id);
+      if (success) {
+        showToast(`"${name}"-কে সফলভাবে রিমোভ করা হয়েছে`, 'success');
+        setStudents(students.filter(s => s.id !== id));
+      } else {
+        showToast(`শিক্ষার্থী রিমোভ করতে সমস্যা হয়েছে: ${error}`, 'error');
+      }
+    }
   };
 
   const filteredStudents = students.filter((s) => {
@@ -114,7 +133,7 @@ export const StudentsManagement: React.FC = () => {
                 <th className="p-4">টার্গেট পরীক্ষা</th>
                 <th className="p-4">অংশগ্রহণ</th>
                 <th className="p-4">যোগদান</th>
-                <th className="p-4 text-right">স্ট্যাটাস</th>
+                <th className="p-4 text-right">স্ট্যাটাস ও অ্যাকশন</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -189,11 +208,20 @@ export const StudentsManagement: React.FC = () => {
                       {new Date(s.created_at).toLocaleDateString('bn-BD')}
                     </td>
 
-                    {/* Status */}
+                    {/* Status & Actions */}
                     <td className="p-4 whitespace-nowrap text-right">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        <UserCheck className="w-3 h-3" /> সক্রিয় শিক্ষার্থী
-                      </span>
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <UserCheck className="w-3 h-3" /> সক্রিয়
+                        </span>
+                        <button
+                          onClick={() => handleDelete(s.id, s.name)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"
+                          title="শিক্ষার্থী রিমোভ করুন"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -208,6 +236,18 @@ export const StudentsManagement: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 z-50 animate-fade-in-up">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border ${
+            toastMessage.type === 'success' 
+              ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+              : 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20 text-rose-800 dark:text-rose-300'
+          }`}>
+            <span className="text-sm font-semibold">{toastMessage.text}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
