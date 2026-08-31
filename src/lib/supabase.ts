@@ -4882,3 +4882,69 @@ export const subscribeToCourseApplications = (
   }
 };
 
+
+// --- Question Reports ---
+
+export const fetchQuestionReports = async (): Promise<{ reports: any[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { reports: [], error: 'Supabase client not initialized' };
+  }
+  
+  try {
+    const { data, error } = await client
+      .from('question_reports')
+      .select(`
+        *,
+        questions (
+          id,
+          question,
+          question_text
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching question reports:', error);
+      return { reports: [], error: error.message };
+    }
+    
+    // Normalize question field
+    const normalizedData = (data || []).map((report: any) => ({
+      ...report,
+      question: report.questions ? {
+        id: report.questions.id,
+        question: report.questions.question || report.questions.question_text || 'Unknown'
+      } : undefined
+    }));
+
+    return { reports: normalizedData, error: null };
+  } catch (err: any) {
+    console.error('Exception fetching question reports:', err);
+    return { reports: [], error: err.message };
+  }
+};
+
+export const updateQuestionReportStatus = async (id: string, status: 'resolved'): Promise<{ success: boolean; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await client
+      .from('question_reports')
+      .update({ status, resolved_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating report status:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error('Exception updating report status:', err);
+    return { success: false, error: err.message };
+  }
+};

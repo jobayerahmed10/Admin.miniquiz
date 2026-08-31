@@ -13,6 +13,7 @@ import { CreateQuestion } from './pages/CreateQuestion';
 import { EditQuestion } from './pages/EditQuestion';
 import { StudentsManagement } from './pages/StudentsManagement';
 import { SubjectPostsManagement } from './pages/SubjectPostsManagement';
+import { QuestionReportsManagement } from './pages/QuestionReportsManagement';
 import { StudentApp } from './pages/StudentApp';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
@@ -260,6 +261,7 @@ export default function App() {
           <Route path="/admin/enrollments" element={<EnrollmentsManagement />} />
           <Route path="/admin/students" element={<StudentsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
+          <Route path="/admin/reports" element={<QuestionReportsManagement />} />
           <Route path="/admin/questions/create" element={<CreateQuestion />} />
           <Route path="/admin/questions/edit/:id" element={<EditQuestion />} />
         </Route>

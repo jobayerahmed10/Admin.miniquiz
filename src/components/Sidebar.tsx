@@ -13,6 +13,7 @@ import {
   X,
   ChevronLeft,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -86,6 +87,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Database,
       badge: questionsCount,
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'reports',
+      path: '/admin/reports',
+      title: 'প্রশ্ন রিপোর্ট ম্যানেজমেন্ট',
+      subTitle: 'QUESTION REPORTS',
+      icon: AlertCircle,
+      badge: 'রিপোর্ট',
+      badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold',
     },
     {
       id: 'ai-hub',

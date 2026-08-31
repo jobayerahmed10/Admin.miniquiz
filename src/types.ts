@@ -287,6 +287,23 @@ export interface CourseApplication {
   updated_at?: string;
 }
 
+export interface QuestionReport {
+  id: string;
+  question_id: string;
+  reporter_name?: string;
+  user_id?: string;
+  issue_description?: string;
+  reason?: string;
+  issue?: string;
+  status?: 'pending' | 'resolved' | string;
+  created_at: string;
+  resolved_at?: string;
+  question?: {
+    id: string;
+    question: string;
+  };
+}
+
 export interface DashboardStats {
   totalQuestions: number;
   publishedQuestions: number;
