@@ -17,7 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { StudentUser } from '../types';
-import { fetchAllRegisteredStudentsForAdmin, deleteStudentAdmin } from '../lib/studentAuth';
+import { fetchAllRegisteredStudentsForAdmin, deleteStudentAdmin, deleteAllStudentsAdmin } from '../lib/studentAuth';
 
 export const StudentsManagement: React.FC = () => {
   const [students, setStudents] = useState<StudentUser[]>([]);
@@ -60,6 +60,19 @@ export const StudentsManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (students.length === 0) return;
+    if (window.confirm(`আপনি কি নিশ্চিত যে সকল (${students.length} জন) শিক্ষার্থীকে রিমোভ করতে চান?`)) {
+      const { success, error } = await deleteAllStudentsAdmin();
+      if (success) {
+        showToast('সকল নিবন্ধিত শিক্ষার্থী সফলভাবে রিমোভ করা হয়েছে', 'success');
+        setStudents([]);
+      } else {
+        showToast(`শিক্ষার্থী ডিলিট করতে সমস্যা হয়েছে: ${error}`, 'error');
+      }
+    }
+  };
+
   const filteredStudents = students.filter((s) => {
     const q = searchTerm.toLowerCase();
     return (
@@ -89,6 +102,16 @@ export const StudentsManagement: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {students.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={loading}
+              className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-bold rounded-xl flex items-center gap-2 transition-all border border-rose-500/30 shadow"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>সকলকে রিমোভ করুন ({students.length})</span>
+            </button>
+          )}
           <button
             onClick={loadStudents}
             disabled={loading}

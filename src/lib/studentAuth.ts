@@ -19,37 +19,7 @@ export const getLocalRegisteredStudents = (): StudentUser[] => {
   } catch (e) {
     console.error(e);
   }
-  // Default seeded students for demonstration
-  return [
-    {
-      id: 'stu-demo-001',
-      student_id_code: 'AT-2026-1082',
-      name: 'মো: জোবায়ের আহমেদ',
-      phone: '01645244715',
-      email: 'jobayer@example.com',
-      created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
-      target_exam: '১৮তম NTRCA ক্যাডার আরবি প্রভাষক',
-      enrolled_courses: ['১৮তম NTRCA ক্যাডার আরবি প্রভাষক বিশেষ স্পেশাল মডেল টেস্ট ব্যাচ'],
-      total_exams_taken: 14,
-      avg_score: 84.5,
-      study_streak_days: 5,
-      total_study_minutes: 420,
-    },
-    {
-      id: 'stu-demo-002',
-      student_id_code: 'AT-2026-2491',
-      name: 'মাওলানা কামরুল হাসান',
-      phone: '01712345678',
-      email: 'kamrul@gmail.com',
-      created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
-      target_exam: 'সহকারী মৌলভী বিশেষ ব্যাচ',
-      enrolled_courses: ['সহকারী মৌলভী ও ইবতেদায়ী প্রস্তুতি ব্যাচ'],
-      total_exams_taken: 22,
-      avg_score: 91.0,
-      study_streak_days: 12,
-      total_study_minutes: 780,
-    },
-  ];
+  return [];
 };
 
 export const saveLocalRegisteredStudents = (students: StudentUser[]) => {
@@ -506,5 +476,34 @@ export const deleteStudentAdmin = async (id: string): Promise<{ success: boolean
     saveLocalRegisteredStudents(localList);
   }
 
+  return { success: true, error: null };
+};
+
+export const deleteAllStudentsAdmin = async (): Promise<{ success: boolean; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      // Delete all records from profiles table
+      const { error: pErr } = await client
+        .from('profiles')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // match all rows
+
+      // Delete all records from students table
+      const { error: sErr } = await client
+        .from('students')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (pErr && sErr) {
+        console.error('Error deleting all students:', pErr, sErr);
+      }
+    } catch (e: any) {
+      console.error('Exception deleting all students:', e);
+    }
+  }
+
+  // Clear local storage
+  saveLocalRegisteredStudents([]);
   return { success: true, error: null };
 };
