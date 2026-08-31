@@ -40,7 +40,8 @@ import {
 import { uploadBlogThumbnail } from '../../lib/supabase';
 
 interface RichTextEditorProps {
-  content: string;
+  value?: string;
+  content?: string;
   onChange: (html: string) => void;
   placeholder?: string;
 }
@@ -74,13 +75,15 @@ const HIGHLIGHT_PALETTE = [
 ];
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
+  value,
   content,
   onChange,
   placeholder = 'এখানে আপনার ব্লগের সম্পূর্ণ লেখা, ছবি, টেবিল এবং লিংক সাজিয়ে লিখুন...',
 }) => {
+  const actualContent = value !== undefined ? value : content !== undefined ? content : '';
   const editorRef = useRef<HTMLDivElement>(null);
   const [isSourceMode, setIsSourceMode] = useState(false);
-  const [htmlSource, setHtmlSource] = useState(content);
+  const [htmlSource, setHtmlSource] = useState(actualContent);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Modals state
@@ -103,13 +106,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Sync incoming content with editor div if not focused
   useEffect(() => {
+    const nextContent = value !== undefined ? value : content !== undefined ? content : '';
     if (editorRef.current && !isSourceMode) {
-      if (editorRef.current.innerHTML !== content) {
-        editorRef.current.innerHTML = content;
+      if (editorRef.current.innerHTML !== nextContent) {
+        editorRef.current.innerHTML = nextContent;
       }
     }
-    setHtmlSource(content);
-  }, [content, isSourceMode]);
+    setHtmlSource(nextContent);
+  }, [value, content, isSourceMode]);
 
   // Execute standard editor commands
   const execCmd = (command: string, value: string | undefined = undefined) => {
@@ -260,7 +264,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Word & Character count calculation
   const getStats = () => {
-    const text = htmlSource.replace(/<[^>]*>?/gm, '').trim();
+    const text = (htmlSource || '').replace(/<[^>]*>?/gm, '').trim();
     const chars = text.length;
     const words = text ? text.split(/\s+/).length : 0;
     const readMinutes = Math.max(1, Math.ceil(words / 150));

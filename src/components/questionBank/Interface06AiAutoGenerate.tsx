@@ -105,11 +105,13 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
         setSubject(clean);
       }
     } else if (addModalType === 'topic') {
-      setTopic(name.replace(/\s+/g, ' ').trim());
+      const cleanName = (name || '').replace(/\s+/g, ' ').trim();
+      setTopic(cleanName);
     } else if (addModalType === 'post') {
-      addCustomPost(name.replace(/\s+/g, ' ').trim());
-      setAllPosts((prev) => Array.from(new Set([...prev, name.replace(/\s+/g, ' ').trim()])));
-      setPost(name.replace(/\s+/g, ' ').trim());
+      const cleanName = (name || '').replace(/\s+/g, ' ').trim();
+      addCustomPost(cleanName);
+      setAllPosts((prev) => Array.from(new Set([...prev, cleanName])));
+      setPost(cleanName);
     }
   };
 
@@ -117,8 +119,8 @@ export const Interface06AiAutoGenerate: React.FC<Interface06AiAutoGenerateProps>
     setIsGenerating(true);
 
     const cleanSub = sanitizeSubjectName(subject);
-    const cleanTopic = topic.replace(/\s+/g, ' ').trim();
-    const cleanPost = post.replace(/\s+/g, ' ').trim();
+    const cleanTopic = (topic || '').replace(/\s+/g, ' ').trim();
+    const cleanPost = (post || '').replace(/\s+/g, ' ').trim();
 
     const config: AiAutoGenerateConfig = {
       subject: cleanSub,

@@ -188,7 +188,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return false;
       if (selectedTopic !== 'all') {
         const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
-        const selTop = selectedTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = (selectedTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
         if (qTop !== selTop) return false;
       }
       if (selectedStatus !== 'all' && q.status !== selectedStatus) return false;
@@ -213,7 +213,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       if (transferSourceSubject !== 'all' && !isSameSubject(q.subject, transferSourceSubject)) return false;
       if (transferSourceTopic !== 'all') {
         const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
-        const selTop = transferSourceTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = (transferSourceTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
         if (qTop !== selTop) return false;
       }
       return true;
@@ -257,7 +257,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             if (transferSourceSubject !== 'all' && !isSameSubject(q.subject, transferSourceSubject)) return false;
             if (transferSourceTopic !== 'all') {
               const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
-              const selTop = transferSourceTopic.replace(/\s+/g, ' ').trim().toLowerCase();
+              const selTop = (transferSourceTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
               if (qTop !== selTop) return false;
             }
             return true;

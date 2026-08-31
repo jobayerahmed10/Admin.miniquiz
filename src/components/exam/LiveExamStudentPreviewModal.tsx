@@ -108,10 +108,12 @@ export const LiveExamStudentPreviewModal: React.FC<LiveExamStudentPreviewModalPr
     let wrong = 0;
     questions.forEach((q, idx) => {
       const ans = selectedAnswers[idx];
-      if (ans) {
+      if (ans && typeof ans === 'string') {
+        const cleanAns = ans.replace('option_', '').toLowerCase();
+        const correctAns = (q.correct_answer || '').toLowerCase();
         const isCorrect =
           q.correct_answer === ans ||
-          q.correct_answer?.toLowerCase() === ans.replace('option_', '').toLowerCase();
+          correctAns === cleanAns;
         if (isCorrect) {
           correct += 1;
         } else {

@@ -140,7 +140,7 @@ const KNOWN_SUBJECT_MAP: Record<string, string> = {
  */
 export const normalizePrefixString = (rawPrefix: string): string => {
   if (!rawPrefix) return 'Q-GEN-';
-  let clean = rawPrefix.trim().toUpperCase();
+  let clean = String(rawPrefix).trim().toUpperCase();
   clean = clean.replace(/[^A-Z0-9_-]/g, '');
   if (!clean.startsWith('Q-') && !clean.startsWith('q-')) {
     clean = `Q-${clean.replace(/^[-_]+/, '')}`;

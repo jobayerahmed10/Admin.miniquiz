@@ -176,18 +176,20 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
         setSubject(clean);
       }
     } else if (addModalType === 'topic') {
-      setTopic(name.replace(/\s+/g, ' ').trim());
+      const cleanName = (name || '').replace(/\s+/g, ' ').trim();
+      setTopic(cleanName);
     } else if (addModalType === 'post') {
-      addCustomPost(name.replace(/\s+/g, ' ').trim());
-      setAllPosts((prev) => Array.from(new Set([...prev, name.replace(/\s+/g, ' ').trim()])));
-      setPost(name.replace(/\s+/g, ' ').trim());
+      const cleanName = (name || '').replace(/\s+/g, ' ').trim();
+      addCustomPost(cleanName);
+      setAllPosts((prev) => Array.from(new Set([...prev, cleanName])));
+      setPost(cleanName);
     }
   };
 
   const handleNext = () => {
     const cleanSub = sanitizeSubjectName(subject);
-    const cleanTopic = topic.replace(/\s+/g, ' ').trim();
-    const cleanPost = post.replace(/\s+/g, ' ').trim();
+    const cleanTopic = (topic || '').replace(/\s+/g, ' ').trim();
+    const cleanPost = (post || '').replace(/\s+/g, ' ').trim();
 
     // Inject current metadata & computed directionality into working questions
     const finalPrepared = questionsList.map((q) => {

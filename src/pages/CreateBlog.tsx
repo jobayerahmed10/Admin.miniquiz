@@ -268,8 +268,9 @@ export const CreateBlog: React.FC = () => {
 
   // Auto calculate reading time based on content
   const handleContentChange = (newHtml: string) => {
-    setContent(newHtml);
-    const text = newHtml.replace(/<[^>]*>?/gm, '').trim();
+    const htmlVal = newHtml || '';
+    setContent(htmlVal);
+    const text = htmlVal.replace(/<[^>]*>?/gm, '').trim();
     const words = text ? text.split(/\s+/).length : 0;
     const minutes = Math.max(1, Math.ceil(words / 150));
     setReadTime(`${minutes} মিনিট`);
@@ -300,7 +301,7 @@ export const CreateBlog: React.FC = () => {
 
   // Tags management
   const handleAddTag = () => {
-    const trimmed = tagInput.trim().replace(/^#/, '');
+    const trimmed = (tagInput || '').trim().replace(/^#/, '');
     if (trimmed && !tags.includes(trimmed)) {
       setTags([...tags, trimmed]);
       setTagInput('');

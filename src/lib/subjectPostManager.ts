@@ -337,9 +337,9 @@ export const fetchSubjectPosts = async (): Promise<{
  */
 export const generateSlugId = (name: string, customId?: string): string => {
   if (customId && customId.trim()) {
-    return customId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return (customId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
   }
-  const clean = name
+  const clean = (name || '')
     .trim()
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
