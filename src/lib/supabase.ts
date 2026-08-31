@@ -5212,6 +5212,7 @@ export const insertBlog = async (
   const client = getSupabaseClient();
   const slug = blogData.slug?.trim() || generateBlogSlug(blogData.title);
   const now = new Date().toISOString();
+  const cleanThumb = blogData.thumbnail_url?.trim() || (blogData as any).thumbnail?.trim() || '';
 
   const newBlog: Blog = {
     id: blogData.id || `blog-${Date.now()}`,
@@ -5225,7 +5226,7 @@ export const insertBlog = async (
     sub_category_id: blogData.sub_category_id,
     topic: blogData.topic,
     topic_id: blogData.topic_id,
-    thumbnail_url: blogData.thumbnail_url || '',
+    thumbnail_url: cleanThumb,
     external_link: blogData.external_link?.trim() || '',
     author_name: blogData.author_name?.trim() || 'আত-তামরীন টিম',
     read_time: blogData.read_time?.trim() || '৫ মিনিট',
@@ -5249,10 +5250,13 @@ export const insertBlog = async (
         excerpt: newBlog.excerpt,
         content: newBlog.content,
         category: newBlog.category,
+        thumbnail: newBlog.thumbnail_url,
         thumbnail_url: newBlog.thumbnail_url,
         external_link: newBlog.external_link,
         author_name: newBlog.author_name,
+        author: newBlog.author_name,
         read_time: newBlog.read_time,
+        reading_time: newBlog.read_time,
         status: newBlog.status,
       };
 
@@ -5266,19 +5270,34 @@ export const insertBlog = async (
         payload.tags = newBlog.tags;
       }
 
-      const { data, error } = await client
+      // Try insert with comprehensive payload
+      let insertRes = await client
         .from('blogs')
         .insert([payload])
         .select()
         .single();
 
-      if (error) {
-        console.warn('Supabase blogs insert issue (local fallback active):', error.message);
-        return { blog: newBlog, error: null };
+      // If failed due to extra column names, retry with core standardized payload
+      if (insertRes.error) {
+        console.warn('Supabase blogs insert retry with standard payload:', insertRes.error.message);
+        const standardPayload: any = {
+          title: newBlog.title,
+          slug: newBlog.slug,
+          excerpt: newBlog.excerpt,
+          content: newBlog.content,
+          category: newBlog.category,
+          thumbnail: newBlog.thumbnail_url,
+          status: newBlog.status,
+        };
+        insertRes = await client
+          .from('blogs')
+          .insert([standardPayload])
+          .select()
+          .single();
       }
 
-      if (data) {
-        newBlog.id = String(data.id);
+      if (insertRes.data) {
+        newBlog.id = String(insertRes.data.id);
         const refreshed = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
         saveLocalBlogs(refreshed);
       }
@@ -5300,9 +5319,15 @@ export const updateBlog = async (
 ): Promise<{ success: boolean; error: string | null }> => {
   const currentBlogs = getLocalBlogs();
   const existingIdx = currentBlogs.findIndex((b) => b.id === id);
+  const cleanThumb = blogData.thumbnail_url?.trim() || (blogData as any).thumbnail?.trim();
 
   const updated: Blog = existingIdx >= 0
-    ? { ...currentBlogs[existingIdx], ...blogData, updated_at: new Date().toISOString() }
+    ? {
+        ...currentBlogs[existingIdx],
+        ...blogData,
+        thumbnail_url: cleanThumb !== undefined ? cleanThumb : currentBlogs[existingIdx].thumbnail_url,
+        updated_at: new Date().toISOString(),
+      }
     : {
         id,
         title: blogData.title || '',
@@ -5314,6 +5339,7 @@ export const updateBlog = async (
         author_name: blogData.author_name || 'আত-তামরীন টিম',
         read_time: blogData.read_time || '৫ মিনিট',
         status: blogData.status || 'published',
+        thumbnail_url: cleanThumb || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...blogData,
@@ -5329,7 +5355,12 @@ export const updateBlog = async (
   const client = getSupabaseClient();
   if (client) {
     try {
-      const payload: any = { ...blogData, updated_at: new Date().toISOString() };
+      const payload: any = {
+        ...blogData,
+        thumbnail: updated.thumbnail_url,
+        thumbnail_url: updated.thumbnail_url,
+        updated_at: new Date().toISOString(),
+      };
       delete payload.id;
       delete payload.created_at;
 
@@ -5393,8 +5424,12 @@ export const uploadBlogThumbnail = async (
   }
 
   try {
-    const fileExt = file.name.split('.').pop() || 'png';
-    const fileName = `thumb-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const cleanBaseName = file.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 30);
+    const fileName = `${cleanBaseName}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
     const filePath = `thumbnails/${fileName}`;
 
     // Upload to 'blog-thumbnails' bucket
@@ -5403,6 +5438,7 @@ export const uploadBlogThumbnail = async (
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: true,
+        contentType: file.type || 'image/jpeg',
       });
 
     if (uploadError) {
