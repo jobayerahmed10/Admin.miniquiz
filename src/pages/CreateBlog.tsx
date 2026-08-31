@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   FileText,
@@ -21,6 +21,10 @@ import {
   Copy,
   Layers,
   Check,
+  FolderTree,
+  ChevronRight,
+  BookOpen,
+  FolderPlus,
 } from 'lucide-react';
 import { RichTextEditor } from '../components/blog/RichTextEditor';
 import { AddBlogCategoryModal } from '../components/blog/AddBlogCategoryModal';
@@ -46,7 +50,6 @@ export const CreateBlog: React.FC = () => {
   const [isCustomSlug, setIsCustomSlug] = useState(false);
   const [excerpt, setExcerpt] = useState('');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('');
   const [authorName, setAuthorName] = useState('আত-তামরীন টিম');
   const [readTime, setReadTime] = useState('৫ মিনিট');
   const [status, setStatus] = useState<'published' | 'draft'>('published');
@@ -54,15 +57,30 @@ export const CreateBlog: React.FC = () => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(['NTRCA', 'শিক্ষক নিবন্ধন']);
 
+  // Hierarchical 3-Level Category States
+  // Level 1: Main Category
+  const [selectedMainCatId, setSelectedMainCatId] = useState<string>('');
+  const [selectedMainCatName, setSelectedMainCatName] = useState<string>('');
+  
+  // Level 2: Sub Category
+  const [selectedSubCatId, setSelectedSubCatId] = useState<string>('');
+  const [selectedSubCatName, setSelectedSubCatName] = useState<string>('');
+
+  // Level 3: Subject / Topic
+  const [selectedTopicId, setSelectedTopicId] = useState<string>('');
+  const [selectedTopicName, setSelectedTopicName] = useState<string>('');
+
   // Thumbnail State
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [thumbnailMode, setThumbnailMode] = useState<'upload' | 'url'>('upload');
   const [isUploadingThumb, setIsUploadingThumb] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Categories State
+  // Categories & Modal State
   const [categories, setCategories] = useState<BlogCategory[]>([]);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categoryModalLevel, setCategoryModalLevel] = useState<'main' | 'sub' | 'topic'>('main');
+  const [categoryModalParentId, setCategoryModalParentId] = useState<string | undefined>(undefined);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
   // UI / Status states
@@ -75,17 +93,39 @@ export const CreateBlog: React.FC = () => {
   // Load Categories & Edit Data (if in edit mode)
   useEffect(() => {
     loadCategories();
-    if (editBlogId) {
+  }, []);
+
+  useEffect(() => {
+    if (editBlogId && categories.length > 0) {
       loadBlogForEdit(editBlogId);
     }
-  }, [editBlogId]);
+  }, [editBlogId, categories.length]);
 
   const loadCategories = async () => {
     setLoadingCategories(true);
     const { categories: fetchedCats } = await fetchBlogCategories();
     setCategories(fetchedCats);
-    if (fetchedCats.length > 0 && !category) {
-      setCategory(fetchedCats[0].name);
+
+    // Set initial default selections if not set
+    const mainList = fetchedCats.filter((c) => c.level === 'main' || !c.parent_id);
+    if (mainList.length > 0 && !selectedMainCatId) {
+      const firstMain = mainList[0];
+      setSelectedMainCatId(firstMain.id);
+      setSelectedMainCatName(firstMain.name);
+
+      const subList = fetchedCats.filter((c) => c.parent_id === firstMain.id || c.level === 'sub');
+      if (subList.length > 0) {
+        const firstSub = subList.find((s) => s.parent_id === firstMain.id) || subList[0];
+        setSelectedSubCatId(firstSub.id);
+        setSelectedSubCatName(firstSub.name);
+
+        const topicList = fetchedCats.filter((c) => c.parent_id === firstSub.id || c.level === 'topic');
+        if (topicList.length > 0) {
+          const firstTopic = topicList.find((t) => t.parent_id === firstSub.id) || topicList[0];
+          setSelectedTopicId(firstTopic.id);
+          setSelectedTopicName(firstTopic.name);
+        }
+      }
     }
     setLoadingCategories(false);
   };
@@ -99,7 +139,24 @@ export const CreateBlog: React.FC = () => {
       setIsCustomSlug(true);
       setExcerpt(existing.excerpt || '');
       setContent(existing.content || '');
-      setCategory(existing.category);
+      
+      // Rehydrate category hierarchy
+      if (existing.category) {
+        setSelectedMainCatName(existing.category);
+        const matchMain = categories.find((c) => c.name === existing.category || c.id === existing.category_id);
+        if (matchMain) setSelectedMainCatId(matchMain.id);
+      }
+      if (existing.sub_category) {
+        setSelectedSubCatName(existing.sub_category);
+        const matchSub = categories.find((c) => c.name === existing.sub_category || c.id === existing.sub_category_id);
+        if (matchSub) setSelectedSubCatId(matchSub.id);
+      }
+      if (existing.topic) {
+        setSelectedTopicName(existing.topic);
+        const matchTopic = categories.find((c) => c.name === existing.topic || c.id === existing.topic_id);
+        if (matchTopic) setSelectedTopicId(matchTopic.id);
+      }
+
       setThumbnailUrl(existing.thumbnail_url || '');
       setExternalLink(existing.external_link || '');
       setAuthorName(existing.author_name || 'আত-তামরীন টিম');
@@ -107,6 +164,92 @@ export const CreateBlog: React.FC = () => {
       setStatus(existing.status);
       setTags(existing.tags || []);
     }
+  };
+
+  // Filtered lists for 3-level cascading dropdowns
+  const mainCategoriesList = useMemo(() => {
+    return categories.filter((c) => c.level === 'main' || !c.parent_id);
+  }, [categories]);
+
+  const subCategoriesList = useMemo(() => {
+    if (!selectedMainCatId) return [];
+    return categories.filter(
+      (c) => c.parent_id === selectedMainCatId || (c.level === 'sub' && c.parent_id === selectedMainCatId)
+    );
+  }, [categories, selectedMainCatId]);
+
+  const topicsList = useMemo(() => {
+    if (!selectedSubCatId) return [];
+    return categories.filter(
+      (c) => c.parent_id === selectedSubCatId || (c.level === 'topic' && c.parent_id === selectedSubCatId)
+    );
+  }, [categories, selectedSubCatId]);
+
+  // Handler when Main Category changes
+  const handleMainCategoryChange = (catId: string) => {
+    const found = categories.find((c) => c.id === catId);
+    if (!found) return;
+
+    setSelectedMainCatId(found.id);
+    setSelectedMainCatName(found.name);
+
+    // Find first matching sub-category under new main category
+    const subs = categories.filter((c) => c.parent_id === found.id);
+    if (subs.length > 0) {
+      setSelectedSubCatId(subs[0].id);
+      setSelectedSubCatName(subs[0].name);
+
+      const tops = categories.filter((c) => c.parent_id === subs[0].id);
+      if (tops.length > 0) {
+        setSelectedTopicId(tops[0].id);
+        setSelectedTopicName(tops[0].name);
+      } else {
+        setSelectedTopicId('');
+        setSelectedTopicName('');
+      }
+    } else {
+      setSelectedSubCatId('');
+      setSelectedSubCatName('');
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+    }
+  };
+
+  // Handler when Sub Category changes
+  const handleSubCategoryChange = (subId: string) => {
+    const found = categories.find((c) => c.id === subId);
+    if (!found) {
+      setSelectedSubCatId('');
+      setSelectedSubCatName('');
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+      return;
+    }
+
+    setSelectedSubCatId(found.id);
+    setSelectedSubCatName(found.name);
+
+    // Auto update topics
+    const tops = categories.filter((c) => c.parent_id === found.id);
+    if (tops.length > 0) {
+      setSelectedTopicId(tops[0].id);
+      setSelectedTopicName(tops[0].name);
+    } else {
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+    }
+  };
+
+  // Handler when Topic changes
+  const handleTopicChange = (topId: string) => {
+    const found = categories.find((c) => c.id === topId);
+    if (!found) {
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+      return;
+    }
+    setSelectedTopicId(found.id);
+    setSelectedTopicName(found.name);
   };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -168,7 +311,7 @@ export const CreateBlog: React.FC = () => {
     setTags(tags.filter((t) => t !== tagToRemove));
   };
 
-  // Save / Publish Blog
+  // Save / Publish Blog with 3-Level Hierarchy
   const handleSavePost = async (publishStatus: 'published' | 'draft') => {
     if (!title.trim()) {
       showToast('দয়া করে ব্লগের শিরোনাম (Title) লিখুন', 'error');
@@ -183,15 +326,18 @@ export const CreateBlog: React.FC = () => {
     setSaving(true);
 
     const postSlug = slug.trim() || generateBlogSlug(title);
-    const selectedCat = categories.find((c) => c.name === category);
 
     const blogPayload = {
       title: title.trim(),
       slug: postSlug,
       excerpt: excerpt.trim(),
       content,
-      category: category || 'NTRCA সার্কুলার ও নোটিশ',
-      category_id: selectedCat?.id,
+      category: selectedMainCatName || 'শিক্ষক নিবন্ধন প্রস্তুতি (NTRCA)',
+      category_id: selectedMainCatId || undefined,
+      sub_category: selectedSubCatName || undefined,
+      sub_category_id: selectedSubCatId || undefined,
+      topic: selectedTopicName || undefined,
+      topic_id: selectedTopicId || undefined,
       thumbnail_url: thumbnailUrl.trim(),
       external_link: externalLink.trim(),
       author_name: authorName.trim() || 'আত-তামরীন টিম',
@@ -228,11 +374,42 @@ export const CreateBlog: React.FC = () => {
     }
   };
 
+  // Open Add Category Modal for specific level
+  const openAddCategoryModal = (level: 'main' | 'sub' | 'topic') => {
+    setCategoryModalLevel(level);
+    if (level === 'sub') {
+      setCategoryModalParentId(selectedMainCatId);
+    } else if (level === 'topic') {
+      setCategoryModalParentId(selectedSubCatId);
+    } else {
+      setCategoryModalParentId(undefined);
+    }
+    setCategoryModalOpen(true);
+  };
+
   // New Category Created Callback
-  const handleCategoryCreated = (newCat: BlogCategory) => {
+  const handleCategoryCreated = (newCat: BlogCategory, createdLevel: 'main' | 'sub' | 'topic') => {
     setCategories((prev) => [newCat, ...prev.filter((c) => c.id !== newCat.id)]);
-    setCategory(newCat.name);
-    showToast(`নতুন ক্যাটাগরি "${newCat.name}" যুক্ত হয়েছে!`, 'success');
+    
+    if (createdLevel === 'main') {
+      setSelectedMainCatId(newCat.id);
+      setSelectedMainCatName(newCat.name);
+      setSelectedSubCatId('');
+      setSelectedSubCatName('');
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+      showToast(`মূল ক্যাটাগরি "${newCat.name}" যুক্ত হয়েছে!`, 'success');
+    } else if (createdLevel === 'sub') {
+      setSelectedSubCatId(newCat.id);
+      setSelectedSubCatName(newCat.name);
+      setSelectedTopicId('');
+      setSelectedTopicName('');
+      showToast(`সাব-ক্যাটাগরি "${newCat.name}" যুক্ত হয়েছে!`, 'success');
+    } else if (createdLevel === 'topic') {
+      setSelectedTopicId(newCat.id);
+      setSelectedTopicName(newCat.name);
+      showToast(`বিষয়/টপিক "${newCat.name}" যুক্ত হয়েছে!`, 'success');
+    }
   };
 
   const copyPostLink = (postSlug: string) => {
@@ -251,7 +428,6 @@ export const CreateBlog: React.FC = () => {
     setThumbnailUrl('');
     setExternalLink('');
     setPublishSuccessModal(null);
-    if (categories.length > 0) setCategory(categories[0].name);
   };
 
   return (
@@ -282,11 +458,11 @@ export const CreateBlog: React.FC = () => {
                 {editBlogId ? 'ব্লগ পোস্ট সম্পাদনা করুন' : 'নতুন ব্লগ তৈরি (Create Blog)'}
               </h1>
               <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/30">
-                WordPress & Blogspot Style
+                WordPress & Blogspot CMS
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              রিচ টেক্সট এডিটর, ক্যাটাগরি, থাম্বনেইল ও আবেদন লিংক সমন্বিত পূর্ণাঙ্গ ব্লগিং সিএমএস
+              ৩-স্তরের নেস্টেড ক্যাটাগরি, রিচ টেক্সট এডিটর ও থাম্বনেইল সমন্বিত ব্লগিং সিস্টেম
             </p>
           </div>
         </div>
@@ -342,16 +518,23 @@ export const CreateBlog: React.FC = () => {
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
-                placeholder="যেমন: ১৮তম NTRCA শিক্ষক নিবন্ধন সার্কুলার ও আবেদন পদ্ধতি ২০২৬"
+                placeholder="যেমন: ১৮তম শিক্ষক নিবন্ধন সহকারী মৌলভী আল-কুরআন প্রস্তুতি গাইড"
                 className="w-full px-4 py-3 text-base sm:text-lg font-bold bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
               />
             </div>
 
             {/* SEO Slug input */}
-            <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="font-bold text-slate-500 shrink-0 font-mono">পারমালিংক (Slug):</span>
-                <span className="text-slate-400 font-mono hidden sm:inline">/blog/</span>
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                  <span>পারমালিংক / স্লাগ (SEO URL Slug)</span>
+                </label>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
+                  <Sparkles className="w-3 h-3" /> ফ্রেন্ডলি ইউআরএল
+                </span>
+              </div>
+              <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl px-3 py-2 text-xs font-mono text-slate-500">
+                <span className="text-slate-400 select-none">/blog/</span>
                 <input
                   type="text"
                   value={slug}
@@ -360,186 +543,259 @@ export const CreateBlog: React.FC = () => {
                     setSlug(e.target.value);
                   }}
                   placeholder="post-slug-url"
-                  className="flex-1 px-2.5 py-1 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="flex-1 bg-transparent text-slate-900 dark:text-white focus:outline-none font-mono"
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCustomSlug(false);
-                  setSlug(generateBlogSlug(title));
-                }}
-                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold shrink-0"
-              >
-                <Sparkles className="w-3 h-3" /> রিলোড স্লাগ
-              </button>
             </div>
 
-            {/* Excerpt / 2-Line Summary */}
-            <div>
+            {/* Excerpt / Short Description */}
+            <div className="pt-1">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                সারসংক্ষেপ / শর্ট ডেসক্রিপশন (Short Excerpt - ২/৩ লাইনে সংক্ষেপ)
+                সংক্ষিপ্ত বিবরণ বা সারাংশ (Excerpt / Meta Description)
               </label>
               <textarea
                 rows={2}
                 value={excerpt}
                 onChange={(e) => setExcerpt(e.target.value)}
-                placeholder="পোস্টের মূল বিষয়বস্তুর আকর্ষণীয় সংক্ষিপ্ত বিবরণ যা পোস্ট কার্ড এবং গুগলের সার্চ রেজাল্টে দেখা যাবে..."
-                className="w-full px-4 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all leading-relaxed"
+                placeholder="ব্লগটির একটি চমৎকার ১-২ লাইনের সারসংক্ষেপ লিখুন, যা গুগল সার্চ ও সোশ্যাল মিডিয়ায় প্রিভিউ হিসেবে শো করবে..."
+                className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
               />
             </div>
           </div>
 
-          {/* Full WYSIWYG Content Editor */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <label className="block text-xs font-black uppercase text-slate-600 dark:text-slate-300 tracking-wider">
-                ব্লগের মূল বডি ও কনটেন্ট (WYSIWYG Rich Text Editor) *
+          {/* Rich Text Editor Card */}
+          <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase text-slate-600 dark:text-slate-300 tracking-wider">
+                ব্লগের মূল লেখা (Full Rich Text Body) *
               </label>
-              <span className="text-xs text-slate-400">
-                হেডিংস, টেবিল, লিস্ট, কালার ও ইমেজ টুলবার ব্যবহার করুন
+              <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
+                <Clock className="w-3.5 h-3.5 text-emerald-500" /> {readTime} পড়ার সময়
               </span>
             </div>
+
             <RichTextEditor
-              content={content}
+              value={content}
               onChange={handleContentChange}
-              placeholder="এখানে আপনার ব্লগের সম্পূর্ণ লেখা, নোটিশের বিস্তারিত, টেবিল, বুলেট পয়েন্ট এবং ছবি যুক্ত করুন..."
+              placeholder="এখানে আপনার সম্পূর্ণ ব্লগ পোস্টটি বিস্তারিতভাবে লিখুন... (হেডিং, লিস্ট, টেবিল, কোট, ইমেজ বা ভিডিও লিংক ইত্যাদি ব্যবহার করতে পারেন)"
             />
           </div>
 
-          {/* External Links & Action Widget */}
-          <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          {/* External Circular / Application Link */}
+          <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-sm space-y-3">
+            <h3 className="text-xs font-black uppercase text-slate-600 dark:text-slate-300 tracking-wider flex items-center gap-2">
               <ExternalLink className="w-4 h-4 text-emerald-500" />
-              অফিসিয়াল সার্কুলার / মূল আবেদন ও এক্সটার্নাল লিংক (External Application Link)
+              অফিসিয়াল সার্কুলার / আবেদন লিংক (Optional External Link)
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              শিক্ষার্থীরা ব্লগে এই লিংকের মাধ্যমে সরাসরি সরকারি ওয়েবসাইট বা সার্কুলার পোর্টালে আবেদন করতে পারবে।
-            </p>
-            <div className="relative">
+            <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl px-3.5 py-2.5 text-xs font-mono text-slate-800 dark:text-slate-200">
+              <LinkIcon className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
               <input
                 type="url"
                 value={externalLink}
                 onChange={(e) => setExternalLink(e.target.value)}
-                placeholder="যেমন: http://ntrca.teletalk.com.bd বা https://www.dpe.gov.bd"
-                className="w-full pl-10 pr-4 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="যেমন: http://ntrca.teletalk.com.bd অথবা সার্কুলার পিডিএফ লিংক"
+                className="w-full bg-transparent focus:outline-none"
               />
-              <LinkIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             </div>
+            <p className="text-[11px] text-slate-400">
+              শিক্ষার্থীরা ব্লগের শেষে এই লিংকে ক্লিক করে সরাসরি মূল সার্কুলার দেখতে বা অনলাইনে আবেদন করতে পারবে।
+            </p>
           </div>
         </div>
 
-        {/* Right 4-Cols: Post Settings & Metadata Sidebar */}
+        {/* Right 4-Cols: WordPress Style Meta Sidebar */}
         <div className="lg:col-span-4 space-y-6">
-          {/* 1. Status & Visibility Card */}
+          {/* 1. 3-LEVEL CASCADING CATEGORIES PANEL */}
           <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
-              <span>পাবলিশ ও স্ট্যাটাস সেটিংস</span>
-              <span
-                className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase ${
-                  status === 'published'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                }`}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <FolderTree className="w-4 h-4 text-emerald-500" />
+                ৩-স্তরের ক্যাটাগরি (3-Level Hierarchy)
+              </h3>
+              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-md">
+                নেস্টেড
+              </span>
+            </div>
+
+            {/* Visual Hierarchy Breadcrumb Badge Box */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/70 space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                নির্বাচিত ক্যাটাগরি পাথ (Selected Path):
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                <span className="bg-white dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                  📁 {selectedMainCatName || 'মূল ক্যাটাগরি'}
+                </span>
+                {selectedSubCatName && (
+                  <>
+                    <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="bg-white dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                      📂 {selectedSubCatName}
+                    </span>
+                  </>
+                )}
+                {selectedTopicName && (
+                  <>
+                    <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="bg-emerald-500 text-slate-950 px-2 py-1 rounded-lg shadow-sm">
+                      📖 {selectedTopicName}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Level 1: Main Category Dropdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center justify-center font-bold">১</span>
+                  মূল ক্যাটাগরি (Main Category) *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => openAddCategoryModal('main')}
+                  className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+                >
+                  <Plus className="w-3 h-3" /> নতুন মূল
+                </button>
+              </div>
+
+              <select
+                value={selectedMainCatId}
+                onChange={(e) => handleMainCategoryChange(e.target.value)}
+                disabled={loadingCategories}
+                className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
+                {mainCategoriesList.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    📁 {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Level 2: Sub-Category Dropdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center justify-center font-bold">২</span>
+                  সাব-ক্যাটাগরি (Sub-Category)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => openAddCategoryModal('sub')}
+                  className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+                >
+                  <Plus className="w-3 h-3" /> নতুন সাব
+                </button>
+              </div>
+
+              <select
+                value={selectedSubCatId}
+                onChange={(e) => handleSubCategoryChange(e.target.value)}
+                disabled={loadingCategories || subCategoriesList.length === 0}
+                className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+              >
+                <option value="">{subCategoriesList.length === 0 ? '(সাব-ক্যাটাগরি নেই)' : 'সাব-ক্যাটাগরি নির্বাচন করুন'}</option>
+                {subCategoriesList.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    📂 {sub.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Level 3: Subject / Topic Dropdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center justify-center font-bold">৩</span>
+                  বিষয় / টপিক (Subject / Topic)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => openAddCategoryModal('topic')}
+                  disabled={!selectedSubCatId}
+                  className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 disabled:opacity-40"
+                >
+                  <Plus className="w-3 h-3" /> নতুন বিষয়
+                </button>
+              </div>
+
+              <select
+                value={selectedTopicId}
+                onChange={(e) => handleTopicChange(e.target.value)}
+                disabled={loadingCategories || topicsList.length === 0}
+                className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+              >
+                <option value="">{topicsList.length === 0 ? '(নির্দিষ্ট বিষয় নেই / ঐচ্ছিক)' : 'বিষয় বা টপিক নির্বাচন করুন'}</option>
+                {topicsList.map((top) => (
+                  <option key={top.id} value={top.id}>
+                    📖 {top.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* 2. Publishing & Metadata Settings */}
+          <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <span className="flex items-center gap-2">
+                <Send className="w-4 h-4 text-emerald-500" />
+                প্রকাশনা সেটিংস (Publishing)
+              </span>
+              <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
+                status === 'published'
+                  ? 'bg-emerald-500/10 text-emerald-500'
+                  : 'bg-amber-500/10 text-amber-500'
+              }`}>
                 {status === 'published' ? 'পাবলিশড' : 'ড্রাফট'}
               </span>
             </h3>
 
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                পোস্টের অবস্থা নির্বাচন করুন
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatus('published')}
-                  className={`p-2.5 text-xs font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
-                    status === 'published'
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20'
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                  }`}
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                  পোস্টের অবস্থা (Status)
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>পাবলিশড (Live)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatus('draft')}
-                  className={`p-2.5 text-xs font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
-                    status === 'draft'
-                      ? 'bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/20'
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>ড্রাফট (Draft)</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" /> লেখক / Author:
-                </span>
-                <input
-                  type="text"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="w-36 px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold text-right"
-                />
+                  <option value="published">🚀 সরাসরি প্রকাশ (Published)</option>
+                  <option value="draft">📝 খসড়া / ড্রাফট (Draft)</option>
+                </select>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" /> পড়ার সময়:
-                </span>
+              <div>
+                <label className="block text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                  লেখকের নাম (Author Name)
+                </label>
+                <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white">
+                  <User className="w-3.5 h-3.5 text-slate-400 mr-2" />
+                  <input
+                    type="text"
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    className="w-full bg-transparent focus:outline-none font-semibold text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                  পড়ার সময় (Read Time)
+                </label>
                 <input
                   type="text"
                   value={readTime}
                   onChange={(e) => setReadTime(e.target.value)}
-                  className="w-24 px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold text-right"
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold text-xs"
                 />
               </div>
-            </div>
-          </div>
-
-          {/* 2. Dynamic Category Selector */}
-          <div className="bg-white dark:bg-[#0a111e] border border-slate-200 dark:border-slate-800/90 rounded-3xl p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-500" />
-                ব্লগ ক্যাটাগরি (Category) *
-              </h3>
-              <button
-                type="button"
-                onClick={() => setCategoryModalOpen(true)}
-                className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>নতুন ক্যাটাগরি</span>
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={loadingCategories}
-                className="w-full px-3.5 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-
-              <p className="text-[11px] text-slate-400">
-                ডাটাবেজের <code className="text-emerald-500 font-mono">blog_categories</code> টেবিল থেকে লাইভ লোড হচ্ছে।
-              </p>
             </div>
           </div>
 
@@ -675,7 +931,7 @@ export const CreateBlog: React.FC = () => {
                     handleAddTag();
                   }
                 }}
-                placeholder="যেমন: আরবি_প্রভাষক"
+                placeholder="যেমন: সহকারী_মৌলভী"
                 className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <button
@@ -708,11 +964,14 @@ export const CreateBlog: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Category Modal */}
+      {/* Add 3-Level Category Modal */}
       <AddBlogCategoryModal
         isOpen={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
         onCategoryCreated={handleCategoryCreated}
+        categories={categories}
+        initialLevel={categoryModalLevel}
+        initialParentId={categoryModalParentId}
       />
 
       {/* Live Preview Modal */}
@@ -724,7 +983,9 @@ export const CreateBlog: React.FC = () => {
           slug,
           excerpt,
           content,
-          category,
+          category: selectedMainCatName,
+          sub_category: selectedSubCatName,
+          topic: selectedTopicName,
           thumbnail_url: thumbnailUrl,
           external_link: externalLink,
           author_name: authorName,
@@ -748,8 +1009,25 @@ export const CreateBlog: React.FC = () => {
                 ব্লগ সফলভাবে {publishSuccessModal.status === 'published' ? 'প্রকাশিত' : 'সংরক্ষিত'} হয়েছে!
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                আপনার পোস্টটি সুপাবেজ ডাটাবেজে যুক্ত হয়েছে এবং লাইভ দেখা যাচ্ছে।
+                আপনার পোস্টটি ৩-স্তরের নেস্টেড ক্যাটাগরিসহ সুপাবেজ ডাটাবেজে সংরক্ষিত হয়েছে।
               </p>
+            </div>
+
+            {/* Category Hierarchy Breadcrumb Summary */}
+            <div className="p-3 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1.5 flex-wrap">
+              <span>📁 {publishSuccessModal.category}</span>
+              {publishSuccessModal.sub_category && (
+                <>
+                  <span>›</span>
+                  <span>📂 {publishSuccessModal.sub_category}</span>
+                </>
+              )}
+              {publishSuccessModal.topic && (
+                <>
+                  <span>›</span>
+                  <span>📖 {publishSuccessModal.topic}</span>
+                </>
+              )}
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-left space-y-2">

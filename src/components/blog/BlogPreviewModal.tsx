@@ -69,9 +69,23 @@ export const BlogPreviewModal: React.FC<BlogPreviewModalProps> = ({
           {/* Category & Metadata */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 bg-emerald-500 text-slate-950 font-extrabold text-xs rounded-full shadow-sm">
-                {blog.category || 'সাধারণ'}
-              </span>
+              {/* Hierarchical Breadcrumb Badges */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/15 p-1 px-2.5 rounded-2xl border border-emerald-500/25 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                <span>📁 {blog.category || 'সাধারণ'}</span>
+                {blog.sub_category && (
+                  <>
+                    <span className="text-emerald-400 dark:text-emerald-500">›</span>
+                    <span className="text-emerald-600 dark:text-emerald-300">📂 {blog.sub_category}</span>
+                  </>
+                )}
+                {blog.topic && (
+                  <>
+                    <span className="text-emerald-400 dark:text-emerald-500">›</span>
+                    <span className="text-emerald-800 dark:text-emerald-200">📖 {blog.topic}</span>
+                  </>
+                )}
+              </div>
+
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" /> {blog.read_time || '৫ মিনিট'} পড়ার সময়
               </span>

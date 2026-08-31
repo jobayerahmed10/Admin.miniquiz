@@ -198,9 +198,21 @@ export const BlogsManagement: React.FC = () => {
                   </div>
                 )}
 
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                  <span className="px-2.5 py-1 bg-slate-900/80 backdrop-blur-md text-emerald-400 text-[10px] font-extrabold rounded-lg border border-slate-700">
-                    {blog.category}
+                <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1 max-w-[80%]">
+                  <span className="px-2 py-0.5 bg-slate-950/85 backdrop-blur-md text-emerald-400 text-[10px] font-bold rounded-lg border border-slate-700 shadow-sm flex items-center gap-1">
+                    <span>📁 {blog.category}</span>
+                    {blog.sub_category && (
+                      <>
+                        <span className="text-slate-500">›</span>
+                        <span className="text-slate-200">📂 {blog.sub_category}</span>
+                      </>
+                    )}
+                    {blog.topic && (
+                      <>
+                        <span className="text-slate-500">›</span>
+                        <span className="text-emerald-300">📖 {blog.topic}</span>
+                      </>
+                    )}
                   </span>
                 </div>
 

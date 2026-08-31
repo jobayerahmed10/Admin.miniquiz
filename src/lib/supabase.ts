@@ -4974,16 +4974,15 @@ export const getLocalBlogCategories = (): BlogCategory[] => {
   try {
     const saved = localStorage.getItem(STORAGE_BLOG_CATEGORIES);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (e) {
     console.warn('Error reading local blog categories:', e);
   }
-  return DEFAULT_BLOG_CATEGORIES.map((cat, idx) => ({
-    id: `cat-${idx + 1}`,
-    name: cat,
-    slug: generateBlogSlug(cat),
-  }));
+  return DEFAULT_BLOG_CATEGORIES;
 };
 
 export const saveLocalBlogCategories = (categories: BlogCategory[]): void => {
@@ -5042,10 +5041,23 @@ export const fetchBlogCategories = async (): Promise<{ categories: BlogCategory[
         name: item.name || item.title || '',
         slug: item.slug || generateBlogSlug(item.name || ''),
         description: item.description || '',
+        parent_id: item.parent_id ? String(item.parent_id) : (item.parent_id === null ? null : undefined),
+        level: (item.level as 'main' | 'sub' | 'topic') || (item.parent_id ? 'sub' : 'main'),
+        order_index: item.order_index,
         created_at: item.created_at,
       }));
-      saveLocalBlogCategories(formatted);
-      return { categories: formatted, error: null };
+
+      // Merge with default categories to make sure rich options exist
+      const idMap = new Set(formatted.map((c) => c.name.toLowerCase()));
+      const merged = [...formatted];
+      for (const defCat of DEFAULT_BLOG_CATEGORIES) {
+        if (!idMap.has(defCat.name.toLowerCase())) {
+          merged.push(defCat);
+        }
+      }
+
+      saveLocalBlogCategories(merged);
+      return { categories: merged, error: null };
     }
 
     return { categories: localCats, error: null };
@@ -5056,12 +5068,14 @@ export const fetchBlogCategories = async (): Promise<{ categories: BlogCategory[
 };
 
 /**
- * Create a new blog category
+ * Create a new blog category (Main, Sub, or Topic)
  */
 export const createBlogCategory = async (
   name: string,
   description: string = '',
-  customSlug?: string
+  customSlug?: string,
+  parentId?: string | null,
+  level: 'main' | 'sub' | 'topic' = 'main'
 ): Promise<{ category: BlogCategory | null; error: string | null }> => {
   const trimmedName = name.trim();
   if (!trimmedName) {
@@ -5070,16 +5084,22 @@ export const createBlogCategory = async (
 
   const slug = customSlug?.trim() || generateBlogSlug(trimmedName);
   const newCat: BlogCategory = {
-    id: `cat-${Date.now()}`,
+    id: `cat-${level}-${Date.now()}`,
     name: trimmedName,
     slug,
     description: description.trim(),
+    parent_id: parentId || null,
+    level,
     created_at: new Date().toISOString(),
   };
 
   // 1. Save to local storage for immediate offline/sync availability
   const currentCats = getLocalBlogCategories();
-  const existing = currentCats.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+  const existing = currentCats.find(
+    (c) =>
+      c.name.toLowerCase() === trimmedName.toLowerCase() &&
+      (c.parent_id || null) === (parentId || null)
+  );
   if (existing) {
     return { category: existing, error: null };
   }
@@ -5091,21 +5111,29 @@ export const createBlogCategory = async (
   const client = getSupabaseClient();
   if (client) {
     try {
+      const payload: any = {
+        name: trimmedName,
+        slug,
+        description: description.trim(),
+      };
+      if (parentId) {
+        payload.parent_id = parentId;
+      }
+      if (level) {
+        payload.level = level;
+      }
+
       const { data, error } = await client
         .from('blog_categories')
-        .insert([
-          {
-            name: trimmedName,
-            slug,
-            description: description.trim(),
-          },
-        ])
+        .insert([payload])
         .select()
         .single();
 
       if (!error && data) {
         newCat.id = String(data.id);
-        const refreshedCats = updatedCats.map((c) => (c.name === trimmedName ? { ...c, id: String(data.id) } : c));
+        const refreshedCats = updatedCats.map((c) =>
+          c.name === trimmedName && c.parent_id === parentId ? { ...c, id: String(data.id) } : c
+        );
         saveLocalBlogCategories(refreshedCats);
       } else if (error) {
         console.warn('Note: Could not insert category into Supabase blog_categories (fallback used):', error.message);
@@ -5149,6 +5177,10 @@ export const fetchAllBlogs = async (): Promise<{ blogs: Blog[]; error: string | 
         content: b.content || b.body || '',
         category: b.category || b.category_name || 'সাধারণ',
         category_id: b.category_id ? String(b.category_id) : undefined,
+        sub_category: b.sub_category || b.subcategory || undefined,
+        sub_category_id: b.sub_category_id ? String(b.sub_category_id) : undefined,
+        topic: b.topic || b.topic_name || b.subject || undefined,
+        topic_id: b.topic_id ? String(b.topic_id) : undefined,
         thumbnail_url: b.thumbnail_url || b.featured_image || b.image_url || '',
         external_link: b.external_link || b.apply_link || b.source_url || '',
         author_name: b.author_name || b.author || 'আত-তামরীন টিম',
@@ -5187,8 +5219,12 @@ export const insertBlog = async (
     slug,
     excerpt: blogData.excerpt?.trim() || '',
     content: blogData.content || '',
-    category: blogData.category || 'NTRCA সার্কুলার ও নোটিশ',
+    category: blogData.category || 'শিক্ষক নিবন্ধন প্রস্তুতি (NTRCA)',
     category_id: blogData.category_id,
+    sub_category: blogData.sub_category,
+    sub_category_id: blogData.sub_category_id,
+    topic: blogData.topic,
+    topic_id: blogData.topic_id,
     thumbnail_url: blogData.thumbnail_url || '',
     external_link: blogData.external_link?.trim() || '',
     author_name: blogData.author_name?.trim() || 'আত-তামরীন টিম',
@@ -5220,6 +5256,12 @@ export const insertBlog = async (
         status: newBlog.status,
       };
 
+      if (newBlog.sub_category) payload.sub_category = newBlog.sub_category;
+      if (newBlog.topic) payload.topic = newBlog.topic;
+      if (newBlog.category_id) payload.category_id = newBlog.category_id;
+      if (newBlog.sub_category_id) payload.sub_category_id = newBlog.sub_category_id;
+      if (newBlog.topic_id) payload.topic_id = newBlog.topic_id;
+
       if (newBlog.tags && newBlog.tags.length > 0) {
         payload.tags = newBlog.tags;
       }
@@ -5232,7 +5274,6 @@ export const insertBlog = async (
 
       if (error) {
         console.warn('Supabase blogs insert issue (local fallback active):', error.message);
-        // If specific column error occurs, we still succeed locally
         return { blog: newBlog, error: null };
       }
 
@@ -5268,6 +5309,8 @@ export const updateBlog = async (
         slug: blogData.slug || '',
         content: blogData.content || '',
         category: blogData.category || '',
+        sub_category: blogData.sub_category,
+        topic: blogData.topic,
         author_name: blogData.author_name || 'আত-তামরীন টিম',
         read_time: blogData.read_time || '৫ মিনিট',
         status: blogData.status || 'published',
