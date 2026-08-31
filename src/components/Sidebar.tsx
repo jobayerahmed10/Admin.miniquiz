@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Layers,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -96,6 +97,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: AlertCircle,
       badge: 'রিপোর্ট',
       badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold',
+    },
+    {
+      id: 'create-blog',
+      path: '/admin/create-blog',
+      title: 'নতুন ব্লগ তৈরি',
+      subTitle: 'CREATE BLOG',
+      icon: FileText,
+      badge: 'WP স্টাইল',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold',
+    },
+    {
+      id: 'blogs',
+      path: '/admin/blogs',
+      title: 'সকল ব্লগ ও নোটিশ',
+      subTitle: 'BLOG POSTS CMS',
+      icon: BookOpen,
+      badge: null,
+      badgeColor: '',
     },
     {
       id: 'ai-hub',

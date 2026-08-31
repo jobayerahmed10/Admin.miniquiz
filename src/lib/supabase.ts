@@ -14,6 +14,9 @@ import {
   CourseSheet,
   CourseApplication,
   ApplicationStatus,
+  Blog,
+  BlogCategory,
+  DEFAULT_BLOG_CATEGORIES,
 } from '../types';
 
 const STORAGE_KEY_URL = 'miniquiz_supabase_url';
@@ -4948,3 +4951,445 @@ export const updateQuestionReportStatus = async (id: string, status: 'resolved')
     return { success: false, error: err.message };
   }
 };
+
+// ==========================================
+// BLOG & BLOG CATEGORIES MANAGEMENT SYSTEM
+// ==========================================
+
+const STORAGE_BLOG_CATEGORIES = 'miniquiz_blog_categories';
+const STORAGE_BLOGS = 'miniquiz_blogs_list';
+
+export const generateBlogSlug = (title: string): string => {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\u0980-\u09FFa-zA-Z0-9\s-]/g, '') // Keep Bengali, English alphanumeric, whitespace and hyphen
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/-+/g, '-') // Replace multiple hyphens with single -
+    .replace(/^-+|-+$/g, ''); // Trim leading/trailing hyphens
+};
+
+export const getLocalBlogCategories = (): BlogCategory[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_BLOG_CATEGORIES);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn('Error reading local blog categories:', e);
+  }
+  return DEFAULT_BLOG_CATEGORIES.map((cat, idx) => ({
+    id: `cat-${idx + 1}`,
+    name: cat,
+    slug: generateBlogSlug(cat),
+  }));
+};
+
+export const saveLocalBlogCategories = (categories: BlogCategory[]): void => {
+  try {
+    localStorage.setItem(STORAGE_BLOG_CATEGORIES, JSON.stringify(categories));
+  } catch (e) {
+    console.warn('Error saving local blog categories:', e);
+  }
+};
+
+export const getLocalBlogs = (): Blog[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_BLOGS);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn('Error reading local blogs:', e);
+  }
+  return [];
+};
+
+export const saveLocalBlogs = (blogs: Blog[]): void => {
+  try {
+    localStorage.setItem(STORAGE_BLOGS, JSON.stringify(blogs));
+  } catch (e) {
+    console.warn('Error saving local blogs:', e);
+  }
+};
+
+/**
+ * Fetch all categories from `blog_categories` table
+ */
+export const fetchBlogCategories = async (): Promise<{ categories: BlogCategory[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  const localCats = getLocalBlogCategories();
+
+  if (!client) {
+    return { categories: localCats, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('blog_categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.warn('Supabase blog_categories table query:', error.message);
+      return { categories: localCats, error: null };
+    }
+
+    if (data && data.length > 0) {
+      const formatted: BlogCategory[] = data.map((item: any) => ({
+        id: String(item.id),
+        name: item.name || item.title || '',
+        slug: item.slug || generateBlogSlug(item.name || ''),
+        description: item.description || '',
+        created_at: item.created_at,
+      }));
+      saveLocalBlogCategories(formatted);
+      return { categories: formatted, error: null };
+    }
+
+    return { categories: localCats, error: null };
+  } catch (err: any) {
+    console.error('Exception fetching blog categories:', err);
+    return { categories: localCats, error: null };
+  }
+};
+
+/**
+ * Create a new blog category
+ */
+export const createBlogCategory = async (
+  name: string,
+  description: string = '',
+  customSlug?: string
+): Promise<{ category: BlogCategory | null; error: string | null }> => {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { category: null, error: 'ক্যাটাগরির নাম আবশ্যক' };
+  }
+
+  const slug = customSlug?.trim() || generateBlogSlug(trimmedName);
+  const newCat: BlogCategory = {
+    id: `cat-${Date.now()}`,
+    name: trimmedName,
+    slug,
+    description: description.trim(),
+    created_at: new Date().toISOString(),
+  };
+
+  // 1. Save to local storage for immediate offline/sync availability
+  const currentCats = getLocalBlogCategories();
+  const existing = currentCats.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+  if (existing) {
+    return { category: existing, error: null };
+  }
+
+  const updatedCats = [newCat, ...currentCats];
+  saveLocalBlogCategories(updatedCats);
+
+  // 2. Insert into Supabase if client is ready
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('blog_categories')
+        .insert([
+          {
+            name: trimmedName,
+            slug,
+            description: description.trim(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (!error && data) {
+        newCat.id = String(data.id);
+        const refreshedCats = updatedCats.map((c) => (c.name === trimmedName ? { ...c, id: String(data.id) } : c));
+        saveLocalBlogCategories(refreshedCats);
+      } else if (error) {
+        console.warn('Note: Could not insert category into Supabase blog_categories (fallback used):', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Supabase category insert exception (fallback used):', e.message);
+    }
+  }
+
+  return { category: newCat, error: null };
+};
+
+/**
+ * Fetch all blogs from `blogs` table
+ */
+export const fetchAllBlogs = async (): Promise<{ blogs: Blog[]; error: string | null }> => {
+  const client = getSupabaseClient();
+  const localBlogs = getLocalBlogs();
+
+  if (!client) {
+    return { blogs: localBlogs, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('blogs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase blogs fetch error (using local cache):', error.message);
+      return { blogs: localBlogs, error: null };
+    }
+
+    if (data) {
+      const formattedBlogs: Blog[] = data.map((b: any) => ({
+        id: String(b.id),
+        title: b.title || 'শিরোনামহীন ব্লগ',
+        slug: b.slug || generateBlogSlug(b.title || ''),
+        excerpt: b.excerpt || b.short_description || '',
+        content: b.content || b.body || '',
+        category: b.category || b.category_name || 'সাধারণ',
+        category_id: b.category_id ? String(b.category_id) : undefined,
+        thumbnail_url: b.thumbnail_url || b.featured_image || b.image_url || '',
+        external_link: b.external_link || b.apply_link || b.source_url || '',
+        author_name: b.author_name || b.author || 'আত-তামরীন টিম',
+        read_time: b.read_time || '৫ মিনিট',
+        status: b.status === 'draft' ? 'draft' : 'published',
+        views_count: b.views_count || 0,
+        tags: Array.isArray(b.tags) ? b.tags : [],
+        created_at: b.created_at || new Date().toISOString(),
+        updated_at: b.updated_at,
+      }));
+
+      saveLocalBlogs(formattedBlogs);
+      return { blogs: formattedBlogs, error: null };
+    }
+
+    return { blogs: localBlogs, error: null };
+  } catch (err: any) {
+    console.error('Exception fetching blogs:', err);
+    return { blogs: localBlogs, error: err.message };
+  }
+};
+
+/**
+ * Insert a new blog post into Supabase `blogs`
+ */
+export const insertBlog = async (
+  blogData: Omit<Blog, 'id' | 'created_at' | 'updated_at'> & { id?: string }
+): Promise<{ blog: Blog | null; error: string | null }> => {
+  const client = getSupabaseClient();
+  const slug = blogData.slug?.trim() || generateBlogSlug(blogData.title);
+  const now = new Date().toISOString();
+
+  const newBlog: Blog = {
+    id: blogData.id || `blog-${Date.now()}`,
+    title: blogData.title.trim(),
+    slug,
+    excerpt: blogData.excerpt?.trim() || '',
+    content: blogData.content || '',
+    category: blogData.category || 'NTRCA সার্কুলার ও নোটিশ',
+    category_id: blogData.category_id,
+    thumbnail_url: blogData.thumbnail_url || '',
+    external_link: blogData.external_link?.trim() || '',
+    author_name: blogData.author_name?.trim() || 'আত-তামরীন টিম',
+    read_time: blogData.read_time?.trim() || '৫ মিনিট',
+    status: blogData.status || 'published',
+    views_count: 0,
+    tags: blogData.tags || [],
+    created_at: now,
+    updated_at: now,
+  };
+
+  // Local storage save
+  const currentBlogs = getLocalBlogs();
+  const updatedList = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
+  saveLocalBlogs(updatedList);
+
+  if (client) {
+    try {
+      const payload: any = {
+        title: newBlog.title,
+        slug: newBlog.slug,
+        excerpt: newBlog.excerpt,
+        content: newBlog.content,
+        category: newBlog.category,
+        thumbnail_url: newBlog.thumbnail_url,
+        external_link: newBlog.external_link,
+        author_name: newBlog.author_name,
+        read_time: newBlog.read_time,
+        status: newBlog.status,
+      };
+
+      if (newBlog.tags && newBlog.tags.length > 0) {
+        payload.tags = newBlog.tags;
+      }
+
+      const { data, error } = await client
+        .from('blogs')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.warn('Supabase blogs insert issue (local fallback active):', error.message);
+        // If specific column error occurs, we still succeed locally
+        return { blog: newBlog, error: null };
+      }
+
+      if (data) {
+        newBlog.id = String(data.id);
+        const refreshed = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
+        saveLocalBlogs(refreshed);
+      }
+    } catch (e: any) {
+      console.warn('Exception during Supabase blog insert:', e);
+      return { blog: newBlog, error: null };
+    }
+  }
+
+  return { blog: newBlog, error: null };
+};
+
+/**
+ * Update existing blog post
+ */
+export const updateBlog = async (
+  id: string,
+  blogData: Partial<Blog>
+): Promise<{ success: boolean; error: string | null }> => {
+  const currentBlogs = getLocalBlogs();
+  const existingIdx = currentBlogs.findIndex((b) => b.id === id);
+
+  const updated: Blog = existingIdx >= 0
+    ? { ...currentBlogs[existingIdx], ...blogData, updated_at: new Date().toISOString() }
+    : {
+        id,
+        title: blogData.title || '',
+        slug: blogData.slug || '',
+        content: blogData.content || '',
+        category: blogData.category || '',
+        author_name: blogData.author_name || 'আত-তামরীন টিম',
+        read_time: blogData.read_time || '৫ মিনিট',
+        status: blogData.status || 'published',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...blogData,
+      };
+
+  if (existingIdx >= 0) {
+    currentBlogs[existingIdx] = updated;
+  } else {
+    currentBlogs.unshift(updated);
+  }
+  saveLocalBlogs(currentBlogs);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const payload: any = { ...blogData, updated_at: new Date().toISOString() };
+      delete payload.id;
+      delete payload.created_at;
+
+      const { error } = await client
+        .from('blogs')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        console.warn('Supabase update blog warning:', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Supabase update blog exception:', e);
+    }
+  }
+
+  return { success: true, error: null };
+};
+
+/**
+ * Delete a blog post
+ */
+export const deleteBlog = async (id: string): Promise<{ success: boolean; error: string | null }> => {
+  const currentBlogs = getLocalBlogs().filter((b) => b.id !== id);
+  saveLocalBlogs(currentBlogs);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { error } = await client
+        .from('blogs')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.warn('Supabase delete blog warning:', error.message);
+      }
+    } catch (e: any) {
+      console.warn('Supabase delete blog exception:', e);
+    }
+  }
+
+  return { success: true, error: null };
+};
+
+/**
+ * Upload image to Supabase Storage bucket (`blog-thumbnails`)
+ */
+export const uploadBlogThumbnail = async (
+  file: File
+): Promise<{ url: string | null; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    // Convert to Base64 data URL as offline fallback
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ url: reader.result as string, error: null });
+      reader.onerror = () => resolve({ url: null, error: 'ফাইল রিড করতে ব্যর্থ হয়েছে' });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  try {
+    const fileExt = file.name.split('.').pop() || 'png';
+    const fileName = `thumb-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    const filePath = `thumbnails/${fileName}`;
+
+    // Upload to 'blog-thumbnails' bucket
+    const { data: uploadData, error: uploadError } = await client.storage
+      .from('blog-thumbnails')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Supabase storage upload issue (using Base64 fallback):', uploadError.message);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ url: reader.result as string, error: null });
+        reader.onerror = () => resolve({ url: null, error: uploadError.message });
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (uploadData) {
+      const { data: publicUrlData } = client.storage
+        .from('blog-thumbnails')
+        .getPublicUrl(filePath);
+
+      return { url: publicUrlData.publicUrl, error: null };
+    }
+
+    return { url: null, error: 'ইমেজ আপলোড ব্যর্থ হয়েছে' };
+  } catch (err: any) {
+    console.error('Storage upload exception:', err);
+    // Fallback to data URL
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ url: reader.result as string, error: null });
+      reader.onerror = () => resolve({ url: null, error: err.message });
+      reader.readAsDataURL(file);
+    });
+  }
+};
+

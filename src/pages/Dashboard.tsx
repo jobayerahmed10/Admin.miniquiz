@@ -107,6 +107,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenAiModal }) => {
             </button>
 
             <Link
+              to="/admin/create-blog"
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 font-bold text-xs rounded-2xl transition-all flex items-center gap-2"
+            >
+              <FileEdit className="w-4 h-4 text-teal-400" />
+              <span>নতুন ব্লগ তৈরি</span>
+            </Link>
+
+            <Link
               to="/admin/courses"
               className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-2xl transition-all flex items-center gap-2"
             >

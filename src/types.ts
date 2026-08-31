@@ -391,6 +391,44 @@ export interface SubjectPost {
   updated_at?: string;
 }
 
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at?: string;
+}
+
+export interface Blog {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content: string; // Full Rich HTML content
+  category: string;
+  category_id?: string;
+  thumbnail_url?: string;
+  external_link?: string; // সার্কুলার / মূল আবেদন / ওয়েবসাইট লিংক
+  author_name: string;
+  read_time: string; // e.g. '৫ মিনিট'
+  status: 'published' | 'draft';
+  views_count?: number;
+  tags?: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export const DEFAULT_BLOG_CATEGORIES = [
+  'NTRCA সার্কুলার ও নোটিশ',
+  'আরবি প্রভাষক স্পেশাল গাইড',
+  'মডেল টেস্ট ও প্রস্তুতি কৌশল',
+  'সিলেবাস ও বিষয়ভিত্তিক সহায়িকা',
+  'সহকারী মৌলভী ও শিক্ষক নিবন্ধন',
+  'চাকরি বিজ্ঞপ্তি ও আবেদন লিংক',
+  'সাধারণ জ্ঞান ও সাম্প্রতিক তথ্য',
+  'মাদ্রাসা শিক্ষা ও কারিকুলাম',
+];
+
 
 
 
