@@ -264,7 +264,8 @@ export default function App() {
           <Route path="/admin/students" element={<StudentsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
           <Route path="/admin/reports" element={<QuestionReportsManagement />} />
-          <Route path="/admin/create-blog" element={<CreateBlog />} />
+          <Route path="/admin/create-blog" element={<BlogsManagement />} />
+          <Route path="/admin/create-blog/new" element={<CreateBlog />} />
           <Route path="/admin/create-blog/edit/:id" element={<CreateBlog />} />
           <Route path="/admin/blogs" element={<BlogsManagement />} />
           <Route path="/admin/blogs/create" element={<CreateBlog />} />
