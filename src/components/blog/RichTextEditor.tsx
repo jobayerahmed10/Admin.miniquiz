@@ -159,8 +159,45 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // Format block (Headings, Paragraph, Blockquote)
   const formatBlock = (tag: string) => {
-    execCmd('formatBlock', `<${tag}>`);
+    // Using uppercase tag names without brackets is more reliable for execCommand
+    execCmd('formatBlock', tag.toUpperCase());
+    setBlockType(tag);
   };
+
+  const [blockType, setBlockType] = useState('p');
+
+  // Update toolbar state based on current selection
+  const updateToolbarState = () => {
+    if (isSourceMode) return;
+    
+    // Check current block type
+    try {
+      const type = document.queryCommandValue('formatBlock');
+      if (type) {
+        // Some browsers return the tag name, some return a string with brackets
+        const normalizedType = type.toLowerCase().replace(/[<>]/g, '');
+        setBlockType(normalizedType || 'p');
+      }
+    } catch (e) {
+      // Ignore errors if queryCommandValue fails
+    }
+  };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (editor) {
+      const handleEvent = () => {
+        updateToolbarState();
+        handleEditorInput();
+      };
+      editor.addEventListener('mouseup', updateToolbarState);
+      editor.addEventListener('keyup', handleEvent);
+      return () => {
+        editor.removeEventListener('mouseup', updateToolbarState);
+        editor.removeEventListener('keyup', handleEvent);
+      };
+    }
+  }, [isSourceMode]);
 
   // Link Insertion
   const openLinkModal = () => {
@@ -286,8 +323,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           {/* Headings / Style Dropdown */}
           <div className="relative inline-flex items-center">
             <select
+              value={blockType}
               onChange={(e) => formatBlock(e.target.value)}
-              defaultValue="p"
               disabled={isSourceMode}
               className="px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
             >
@@ -649,7 +686,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onInput={handleEditorInput}
             onBlur={handleEditorInput}
             data-placeholder={placeholder}
-            className="prose dark:prose-invert max-w-none w-full flex-1 p-5 outline-none text-slate-800 dark:text-slate-100 text-sm sm:text-base leading-relaxed overflow-y-auto min-h-[360px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400"
+            className="prose dark:prose-invert max-w-none w-full flex-1 p-5 outline-none text-slate-800 dark:text-slate-100 text-sm sm:text-base leading-relaxed overflow-y-auto min-h-[360px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:mb-2 [&_h4]:text-lg [&_h4]:font-bold [&_h4]:mb-2 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_pre]:bg-slate-100 [&_pre]:dark:bg-slate-800 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs"
             style={{ minHeight: '360px' }}
           />
         )}

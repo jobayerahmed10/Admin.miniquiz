@@ -425,48 +425,7 @@ export interface Blog {
   updated_at?: string;
 }
 
-export const DEFAULT_BLOG_CATEGORIES: BlogCategory[] = [
-  // 1. মূল ক্যাটাগরি: শিক্ষক নিবন্ধন প্রস্তুতি (NTRCA)
-  { id: 'main-1', name: 'শিক্ষক নিবন্ধন প্রস্তুতি (NTRCA)', slug: 'ntrca-preparation', level: 'main', parent_id: null },
-  { id: 'sub-1-1', name: 'সহকারী মৌলভী', slug: 'assistant-maulvi', level: 'sub', parent_id: 'main-1' },
-  { id: 'topic-1-1-1', name: 'আল-কুরআন ও তাফসীর', slug: 'quran-tafseer', level: 'topic', parent_id: 'sub-1-1' },
-  { id: 'topic-1-1-2', name: 'আল-হাদিস ও উসুলুল হাদিস', slug: 'hadith-usul', level: 'topic', parent_id: 'sub-1-1' },
-  { id: 'topic-1-1-3', name: 'আরবি ব্যাকরণ ও সাহিত্য (নাহু ও সরফ)', slug: 'arabic-grammar-nahu-saraf', level: 'topic', parent_id: 'sub-1-1' },
-  { id: 'topic-1-1-4', name: 'ফিকহ ও উসুলুল ফিকহ', slug: 'fiqh-usulul-fiqh', level: 'topic', parent_id: 'sub-1-1' },
-  { id: 'topic-1-1-5', name: 'ইসলামের ইতিহাস ও সংস্কৃতি', slug: 'islamic-history', level: 'topic', parent_id: 'sub-1-1' },
-
-  { id: 'sub-1-2', name: 'প্রভাষক আরবি', slug: 'lecturer-arabic', level: 'sub', parent_id: 'main-1' },
-  { id: 'topic-1-2-1', name: 'বালাগাত ও মানতিক', slug: 'balagat-mantiq', level: 'topic', parent_id: 'sub-1-2' },
-  { id: 'topic-1-2-2', name: 'উচ্চতর আরবি সাহিত্য', slug: 'advanced-arabic-literature', level: 'topic', parent_id: 'sub-1-2' },
-  { id: 'topic-1-2-3', name: 'ইলমুল কালাম ও আকিদা', slug: 'ilmul-kalam', level: 'topic', parent_id: 'sub-1-2' },
-
-  { id: 'sub-1-3', name: 'স্কুল ও কলেজ সাধারণ বিষয়', slug: 'school-college-general', level: 'sub', parent_id: 'main-1' },
-  { id: 'topic-1-3-1', name: 'বাংলা সাহিত্য ও ব্যাকরণ', slug: 'bangla-language-literature', level: 'topic', parent_id: 'sub-1-3' },
-  { id: 'topic-1-3-2', name: 'ইংরেজি ব্যাকরণ ও ভোকাবুলারি', slug: 'english-grammar-vocabulary', level: 'topic', parent_id: 'sub-1-3' },
-  { id: 'topic-1-3-3', name: 'গণিত ও মানসিক দক্ষতা', slug: 'math-mental-ability', level: 'topic', parent_id: 'sub-1-3' },
-  { id: 'topic-1-3-4', name: 'বাংলাদেশ ও আন্তর্জাতিক বিষয়াবলী', slug: 'general-knowledge', level: 'topic', parent_id: 'sub-1-3' },
-
-  // 2. মূল ক্যাটাগরি: NTRCA সার্কুলার ও নোটিশ
-  { id: 'main-2', name: 'NTRCA সার্কুলার ও নোটিশ', slug: 'ntrca-circulars-notices', level: 'main', parent_id: null },
-  { id: 'sub-2-1', name: '১৮তম শিক্ষক নিবন্ধন', slug: '18th-ntrca-circular', level: 'sub', parent_id: 'main-2' },
-  { id: 'topic-2-1-1', name: 'অফিসিয়াল বিজ্ঞপ্তি ও সময়সূচি', slug: 'official-notice-schedule', level: 'topic', parent_id: 'sub-2-1' },
-  { id: 'topic-2-1-2', name: 'অনলাইন আবেদন ও ফি প্রদান নির্দেশিকা', slug: 'application-guide-fees', level: 'topic', parent_id: 'sub-2-1' },
-  { id: 'topic-2-1-3', name: 'সিলেবাস ও পরীক্ষার মানবণ্টন', slug: 'syllabus-mark-distribution', level: 'topic', parent_id: 'sub-2-1' },
-
-  { id: 'sub-2-2', name: 'বিশেষ গণবিজ্ঞপ্তি ও নিয়োগ সুপারিশ', slug: 'special-recruitment-circular', level: 'sub', parent_id: 'main-2' },
-  { id: 'topic-2-2-1', name: 'শূন্যপদের তালিকা (Vacant Posts)', slug: 'vacant-posts-list', level: 'topic', parent_id: 'sub-2-2' },
-  { id: 'topic-2-2-2', name: 'চয়েস লিস্ট ও আবেদন কৌশল', slug: 'choice-list-strategy', level: 'topic', parent_id: 'sub-2-2' },
-  { id: 'topic-2-2-3', name: 'ফাইনাল নিয়োগ সুপারিশ ও যোগদান', slug: 'final-recommendation-joining', level: 'topic', parent_id: 'sub-2-2' },
-
-  // 3. মূল ক্যাটাগরি: মাদ্রাসা শিক্ষা ও কারিকুলাম
-  { id: 'main-3', name: 'মাদ্রাসা শিক্ষা ও কারিকুলাম', slug: 'madrasa-education-curriculum', level: 'main', parent_id: null },
-  { id: 'sub-3-1', name: 'দাখিল ও আলিম স্তরের গাইডলাইন', slug: 'dakhil-alim-guidelines', level: 'sub', parent_id: 'main-3' },
-  { id: 'topic-3-1-1', name: 'দাখিল আরবি পাঠদান কৌশল', slug: 'dakhil-arabic-teaching', level: 'topic', parent_id: 'sub-3-1' },
-  { id: 'topic-3-1-2', name: 'আলিম হাদিস ও ফিকহ প্রস্তুতি', slug: 'alim-hadith-fiqh', level: 'topic', parent_id: 'sub-3-1' },
-
-  { id: 'sub-3-2', name: 'ফাজিল ও কামিল পরীক্ষা', slug: 'fazil-kamil-exams', level: 'sub', parent_id: 'main-3' },
-  { id: 'topic-3-2-1', name: 'ইসলামিক স্টাডিজ ও গবেষণা', slug: 'islamic-studies-research', level: 'topic', parent_id: 'sub-3-2' },
-];
+export const DEFAULT_BLOG_CATEGORIES: BlogCategory[] = [];
 
 
 

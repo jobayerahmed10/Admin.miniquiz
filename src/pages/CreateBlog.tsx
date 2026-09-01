@@ -106,24 +106,26 @@ export const CreateBlog: React.FC = () => {
     const { categories: fetchedCats } = await fetchBlogCategories();
     setCategories(fetchedCats);
 
-    // Set initial default selections if not set
-    const mainList = fetchedCats.filter((c) => c.level === 'main' || !c.parent_id);
-    if (mainList.length > 0 && !selectedMainCatId) {
-      const firstMain = mainList[0];
-      setSelectedMainCatId(firstMain.id);
-      setSelectedMainCatName(firstMain.name);
+    // ONLY set initial default selections if NOT in edit mode
+    if (!editBlogId) {
+      const mainList = fetchedCats.filter((c) => c.level === 'main' || !c.parent_id);
+      if (mainList.length > 0 && !selectedMainCatId) {
+        const firstMain = mainList[0];
+        setSelectedMainCatId(firstMain.id);
+        setSelectedMainCatName(firstMain.name);
 
-      const subList = fetchedCats.filter((c) => c.parent_id === firstMain.id || c.level === 'sub');
-      if (subList.length > 0) {
-        const firstSub = subList.find((s) => s.parent_id === firstMain.id) || subList[0];
-        setSelectedSubCatId(firstSub.id);
-        setSelectedSubCatName(firstSub.name);
+        const subList = fetchedCats.filter((c) => c.parent_id === firstMain.id || c.level === 'sub');
+        if (subList.length > 0) {
+          const firstSub = subList.find((s) => s.parent_id === firstMain.id) || subList[0];
+          setSelectedSubCatId(firstSub.id);
+          setSelectedSubCatName(firstSub.name);
 
-        const topicList = fetchedCats.filter((c) => c.parent_id === firstSub.id || c.level === 'topic');
-        if (topicList.length > 0) {
-          const firstTopic = topicList.find((t) => t.parent_id === firstSub.id) || topicList[0];
-          setSelectedTopicId(firstTopic.id);
-          setSelectedTopicName(firstTopic.name);
+          const topicList = fetchedCats.filter((c) => c.parent_id === firstSub.id || c.level === 'topic');
+          if (topicList.length > 0) {
+            const firstTopic = topicList.find((t) => t.parent_id === firstSub.id) || topicList[0];
+            setSelectedTopicId(firstTopic.id);
+            setSelectedTopicName(firstTopic.name);
+          }
         }
       }
     }
@@ -140,21 +142,49 @@ export const CreateBlog: React.FC = () => {
       setExcerpt(existing.excerpt || '');
       setContent(existing.content || '');
       
-      // Rehydrate category hierarchy
+      // Rehydrate category hierarchy - Ensure we set IDs and Names correctly
       if (existing.category) {
         setSelectedMainCatName(existing.category);
         const matchMain = categories.find((c) => c.name === existing.category || c.id === existing.category_id);
-        if (matchMain) setSelectedMainCatId(matchMain.id);
+        if (matchMain) {
+          setSelectedMainCatId(matchMain.id);
+          setSelectedMainCatName(matchMain.name);
+        }
       }
+      
       if (existing.sub_category) {
         setSelectedSubCatName(existing.sub_category);
-        const matchSub = categories.find((c) => c.name === existing.sub_category || c.id === existing.sub_category_id);
-        if (matchSub) setSelectedSubCatId(matchSub.id);
+        const matchSub = categories.find((c) => 
+          (c.name === existing.sub_category || c.id === existing.sub_category_id) && 
+          (existing.category_id ? c.parent_id === existing.category_id : true)
+        );
+        if (matchSub) {
+          setSelectedSubCatId(matchSub.id);
+          setSelectedSubCatName(matchSub.name);
+        } else {
+          // Fallback if ID is missing but name exists
+          setSelectedSubCatId('');
+        }
+      } else {
+        setSelectedSubCatId('');
+        setSelectedSubCatName('');
       }
+
       if (existing.topic) {
         setSelectedTopicName(existing.topic);
-        const matchTopic = categories.find((c) => c.name === existing.topic || c.id === existing.topic_id);
-        if (matchTopic) setSelectedTopicId(matchTopic.id);
+        const matchTopic = categories.find((c) => 
+          (c.name === existing.topic || c.id === existing.topic_id) &&
+          (existing.sub_category_id ? c.parent_id === existing.sub_category_id : true)
+        );
+        if (matchTopic) {
+          setSelectedTopicId(matchTopic.id);
+          setSelectedTopicName(matchTopic.name);
+        } else {
+          setSelectedTopicId('');
+        }
+      } else {
+        setSelectedTopicId('');
+        setSelectedTopicName('');
       }
 
       setThumbnailUrl(existing.thumbnail_url || '');
@@ -333,7 +363,7 @@ export const CreateBlog: React.FC = () => {
       slug: postSlug,
       excerpt: excerpt.trim(),
       content,
-      category: selectedMainCatName || 'শিক্ষক নিবন্ধন প্রস্তুতি (NTRCA)',
+      category: selectedMainCatName || '',
       category_id: selectedMainCatId || undefined,
       sub_category: selectedSubCatName || undefined,
       sub_category_id: selectedSubCatId || undefined,
