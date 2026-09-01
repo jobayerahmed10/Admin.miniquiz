@@ -5242,69 +5242,82 @@ export const insertBlog = async (
   const updatedList = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
   saveLocalBlogs(updatedList);
 
-  if (client) {
-    try {
-      const payload: any = {
+  if (!client) {
+    console.warn('Supabase client not initialized. Saved in local storage only.');
+    return { blog: newBlog, error: null };
+  }
+
+  try {
+    const payload: any = {
+      title: newBlog.title,
+      slug: newBlog.slug,
+      excerpt: newBlog.excerpt,
+      content: newBlog.content,
+      category: newBlog.category,
+      thumbnail: newBlog.thumbnail_url,
+      thumbnail_url: newBlog.thumbnail_url,
+      external_link: newBlog.external_link,
+      author_name: newBlog.author_name,
+      author: newBlog.author_name,
+      read_time: newBlog.read_time,
+      reading_time: newBlog.read_time,
+      status: newBlog.status,
+      published_at: now,
+    };
+
+    if (newBlog.sub_category) payload.sub_category = newBlog.sub_category;
+    if (newBlog.topic) payload.topic = newBlog.topic;
+    if (newBlog.category_id) payload.category_id = newBlog.category_id;
+    if (newBlog.sub_category_id) payload.sub_category_id = newBlog.sub_category_id;
+    if (newBlog.topic_id) payload.topic_id = newBlog.topic_id;
+
+    if (newBlog.tags && newBlog.tags.length > 0) {
+      payload.tags = newBlog.tags;
+    }
+
+    console.log('Attempting to insert blog into Supabase `blogs` table with payload:', payload);
+
+    let insertRes = await client
+      .from('blogs')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (insertRes.error) {
+      console.error('Supabase blogs insert error (first attempt):', insertRes.error);
+      // Retry with standard minimal payload
+      const standardPayload: any = {
         title: newBlog.title,
         slug: newBlog.slug,
         excerpt: newBlog.excerpt,
         content: newBlog.content,
         category: newBlog.category,
         thumbnail: newBlog.thumbnail_url,
-        thumbnail_url: newBlog.thumbnail_url,
-        external_link: newBlog.external_link,
-        author_name: newBlog.author_name,
-        author: newBlog.author_name,
-        read_time: newBlog.read_time,
-        reading_time: newBlog.read_time,
         status: newBlog.status,
+        published_at: now,
       };
-
-      if (newBlog.sub_category) payload.sub_category = newBlog.sub_category;
-      if (newBlog.topic) payload.topic = newBlog.topic;
-      if (newBlog.category_id) payload.category_id = newBlog.category_id;
-      if (newBlog.sub_category_id) payload.sub_category_id = newBlog.sub_category_id;
-      if (newBlog.topic_id) payload.topic_id = newBlog.topic_id;
-
-      if (newBlog.tags && newBlog.tags.length > 0) {
-        payload.tags = newBlog.tags;
-      }
-
-      // Try insert with comprehensive payload
-      let insertRes = await client
+      console.log('Retrying insert with standard payload:', standardPayload);
+      insertRes = await client
         .from('blogs')
-        .insert([payload])
+        .insert([standardPayload])
         .select()
         .single();
-
-      // If failed due to extra column names, retry with core standardized payload
-      if (insertRes.error) {
-        console.warn('Supabase blogs insert retry with standard payload:', insertRes.error.message);
-        const standardPayload: any = {
-          title: newBlog.title,
-          slug: newBlog.slug,
-          excerpt: newBlog.excerpt,
-          content: newBlog.content,
-          category: newBlog.category,
-          thumbnail: newBlog.thumbnail_url,
-          status: newBlog.status,
-        };
-        insertRes = await client
-          .from('blogs')
-          .insert([standardPayload])
-          .select()
-          .single();
-      }
-
-      if (insertRes.data) {
-        newBlog.id = String(insertRes.data.id);
-        const refreshed = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
-        saveLocalBlogs(refreshed);
-      }
-    } catch (e: any) {
-      console.warn('Exception during Supabase blog insert:', e);
-      return { blog: newBlog, error: null };
     }
+
+    if (insertRes.error) {
+      console.error('Supabase blogs insert final error:', insertRes.error);
+      return { blog: newBlog, error: insertRes.error.message };
+    }
+
+    if (insertRes.data) {
+      console.log('Blog successfully inserted into Supabase:', insertRes.data);
+      newBlog.id = String(insertRes.data.id);
+      const refreshed = [newBlog, ...currentBlogs.filter((b) => b.id !== newBlog.id)];
+      saveLocalBlogs(refreshed);
+    }
+  } catch (e: any) {
+    console.error('Exception during Supabase blog insert:', e);
+    return { blog: newBlog, error: e.message || 'Unknown network error' };
   }
 
   return { blog: newBlog, error: null };
