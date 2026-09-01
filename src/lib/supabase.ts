@@ -1978,26 +1978,12 @@ export const deleteExam = async (id: string): Promise<{ success: boolean; error:
   const current = getLocalCachedExams();
   setLocalCachedExams(current.filter((e) => String(e.id) !== String(id)));
 
-  // Also clear linked questions from the local cache
-  const localQuestions = getLocalCachedQuestions();
-  setLocalCachedQuestions(localQuestions.filter((q) => String(q.exam_id) !== String(id)));
-
   const client = getSupabaseClient();
   if (!client) {
     return { success: true, error: null };
   }
 
   try {
-    // 1. First, delete questions associated with this exam from the 'questions' table
-    const { error: questionsDeleteError } = await client
-      .from('questions')
-      .delete()
-      .eq('exam_id', id);
-
-    if (questionsDeleteError) {
-      console.warn('Supabase delete associated questions error (handled):', questionsDeleteError);
-    }
-
     // 2. Then, delete the exam from the 'exams' table
     const { error: examDeleteError } = await client
       .from('exams')
