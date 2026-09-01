@@ -352,11 +352,9 @@ export const CreateBlog: React.FC = () => {
         const { success, error } = await updateBlog(editBlogId, blogPayload);
         if (!success) throw new Error(error || 'ব্লগ আপডেট করতে সমস্যা হয়েছে');
         showToast('ব্লগ পোস্ট সফলভাবে আপডেট হয়েছে!', 'success');
-        setPublishSuccessModal({
-          ...blogPayload,
-          id: editBlogId,
-          created_at: new Date().toISOString(),
-        });
+        setTimeout(() => {
+          navigate('/admin/blogs');
+        }, 1200);
       } else {
         const { blog, error } = await insertBlog(blogPayload);
         if (error) throw new Error(error);
