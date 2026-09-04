@@ -72,7 +72,7 @@ Parsing Rules:
    - Map Option C / গ / 3 / ج -> "option_c"
    - Map Option D / ঘ / 4 / د -> "option_d"
    - Recognize Arabic answer indicators like "الإجابة الصحيحة", "الجواب", "الإجابة".
-7. "explanation": Clear, educational explanation or background context in the corresponding language (Bengali, Arabic, or English).
+7. "explanation": Extract ONLY IF an explicit explanation, note, or commentary already exists in the raw text (e.g. marked with "ব্যাখ্যা:", "Explanation:", "নোট:", "Note:", "الشرح:"). If the raw text does NOT include an explanation, you MUST set "explanation" to "" (an empty string). STRICT CRITICAL RULE: NEVER put the answer, correct option text, option letters (like "ক", "A"), or phrases like "উত্তর: ক" in the explanation field. If no explicit explanation is given, leave it completely empty ("").
 8. "subject": Must be strictly "${defaultSubject || 'ইংরেজি'}".
 
 Here is the raw unformatted text:
@@ -125,6 +125,40 @@ ${text}`;
       console.error('JSON parse error from Gemini extraction output:', jsonText);
       return res.status(500).json({ error: 'এআই থেকে প্রাপ্ত উত্তর সঠিক JSON ফরম্যাটে নেই।' });
     }
+
+    // Sanitize explanation: Keep empty if no explanation or if it just repeats answer/options
+    parsedQuestions = (Array.isArray(parsedQuestions) ? parsedQuestions : []).map((q: any) => {
+      let exp = (q.explanation || '').trim();
+      const optA = (q.option_a || '').trim();
+      const optB = (q.option_b || '').trim();
+      const optC = (q.option_c || '').trim();
+      const optD = (q.option_d || '').trim();
+      const optTexts = [optA.toLowerCase(), optB.toLowerCase(), optC.toLowerCase(), optD.toLowerCase()].filter(Boolean);
+      const expLower = exp.toLowerCase();
+
+      // If explanation is identical to one of the options
+      if (optTexts.length > 0 && optTexts.includes(expLower)) {
+        exp = '';
+      } else if (/^[\(\[\{]?[কখগঘa-dA-D1-4أ-د][\)\]\}]?[\.\:\-\s]*$/.test(exp)) {
+        // Pure option letter
+        exp = '';
+      } else if (/^(?:(?:সঠিক\s*)?উত্তর|Ans(?:wer)?|الإجابة|الجواب)[\:\-\=\s]*(?:[\(\[\{]?[কখগঘa-dA-D1-4أ-د][\)\]\}]?[\.\:\-\s]*)?$/i.test(exp)) {
+        // Answer label
+        exp = '';
+      } else if (/^(?:(?:সঠিক\s*)?উত্তর|Ans(?:wer)?|الإجابة|الجواب)[\:\-\=\s]+/i.test(exp)) {
+        const explicitExpMatch = exp.match(/(?:ব্যাখ্যা|Explanation|নোট|Note|الشرح|ملاحظة)[\:\-\=\s]+(.+)/i);
+        if (explicitExpMatch) {
+          exp = explicitExpMatch[1].trim();
+        } else {
+          exp = '';
+        }
+      }
+
+      return {
+        ...q,
+        explanation: exp,
+      };
+    });
 
     return res.json({ success: true, questions: parsedQuestions });
   } catch (error: any) {

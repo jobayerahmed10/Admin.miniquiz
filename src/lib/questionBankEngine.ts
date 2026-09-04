@@ -1,6 +1,7 @@
 import { Question } from '../types';
 import { WorkingQuestion, DuplicateCheckResult, AiAutoGenerateConfig } from '../types/questionBank';
 import { getDefaultSubjectPrefix } from './supabase';
+import { sanitizeExplanation } from './sanitizeExplanation';
 import {
   lookupSubjectPrefixAndSequence,
   generateProposedPrefixForSubject,
@@ -409,7 +410,8 @@ export const validateAndCheckDuplicates = (
     }
 
     // 4. Explanation check (informational)
-    if (!wq.explanation || !wq.explanation.trim()) {
+    const cleanExplanation = sanitizeExplanation(wq.explanation, wq.options);
+    if (!cleanExplanation) {
       noExplanationCount++;
     }
 
@@ -484,12 +486,13 @@ export const validateAndCheckDuplicates = (
     const dirInfo = getQuestionBankDirectionality({
       question: qText,
       options: [optA, optB, optC, optD],
-      explanation: wq.explanation,
+      explanation: cleanExplanation,
       language: wq.language,
     });
 
     return {
       ...wq,
+      explanation: cleanExplanation,
       isDuplicate,
       duplicateReason,
       duplicateMatchId,
@@ -521,6 +524,8 @@ export const validateAndCheckDuplicates = (
   return { checkedQuestions, summary };
 };
 
+export { sanitizeExplanation } from './sanitizeExplanation';
+
 /**
  * Intelligent AI Copy-Paste Text Parser
  * Parses single or multi-line questions in Bengali, English, Arabic, or mixed formats.
@@ -546,6 +551,7 @@ export const parsePastedQuestionsText = (
   const parsedList: WorkingQuestion[] = [];
 
   let currentQ: Partial<WorkingQuestion> | null = null;
+  let inExplanationMode = false;
 
   const saveCurrentQ = () => {
     if (currentQ && (currentQ.question || (currentQ.options && Object.keys(currentQ.options).length > 0))) {
@@ -558,10 +564,17 @@ export const parsePastedQuestionsText = (
       const optC = (options.C || '').trim();
       const optD = (options.D || '').trim();
 
+      const cleanedExplanation = sanitizeExplanation(currentQ.explanation, {
+        A: optA,
+        B: optB,
+        C: optC,
+        D: optD,
+      });
+
       const dirInfo = getQuestionBankDirectionality({
         question: qText,
         options: [optA, optB, optC, optD],
-        explanation: currentQ.explanation,
+        explanation: cleanedExplanation,
         language: defaultMeta.language,
       });
 
@@ -585,7 +598,7 @@ export const parsePastedQuestionsText = (
           D: optD,
         },
         correctAnswer: finalCorrect,
-        explanation: (currentQ.explanation || '').trim(),
+        explanation: cleanedExplanation,
         reference: (currentQ.reference || '').trim(),
         subject: defaultMeta.subject,
         topic: defaultMeta.topic,
@@ -626,6 +639,7 @@ export const parsePastedQuestionsText = (
 
     if (isExplicitQ) {
       saveCurrentQ();
+      inExplanationMode = false;
       const content = qMatch ? qMatch[2] : line.replace(/^(প্রশ্ন:|Question:|سؤال:)\s*/i, '');
       currentQ = {
         question: content.trim(),
@@ -637,6 +651,7 @@ export const parsePastedQuestionsText = (
     }
 
     if (!currentQ) {
+      inExplanationMode = false;
       currentQ = {
         question: line,
         options: { A: '', B: '', C: '', D: '' },
@@ -649,6 +664,7 @@ export const parsePastedQuestionsText = (
     // Check options
     const matchA = line.match(optionAPattern);
     if (matchA) {
+      inExplanationMode = false;
       if (!currentQ.options) currentQ.options = { A: '', B: '', C: '', D: '' };
       currentQ.options.A = matchA[2].trim();
       continue;
@@ -656,6 +672,7 @@ export const parsePastedQuestionsText = (
 
     const matchB = line.match(optionBPattern);
     if (matchB) {
+      inExplanationMode = false;
       if (!currentQ.options) currentQ.options = { A: '', B: '', C: '', D: '' };
       currentQ.options.B = matchB[2].trim();
       continue;
@@ -663,6 +680,7 @@ export const parsePastedQuestionsText = (
 
     const matchC = line.match(optionCPattern);
     if (matchC) {
+      inExplanationMode = false;
       if (!currentQ.options) currentQ.options = { A: '', B: '', C: '', D: '' };
       currentQ.options.C = matchC[2].trim();
       continue;
@@ -670,6 +688,7 @@ export const parsePastedQuestionsText = (
 
     const matchD = line.match(optionDPattern);
     if (matchD) {
+      inExplanationMode = false;
       if (!currentQ.options) currentQ.options = { A: '', B: '', C: '', D: '' };
       currentQ.options.D = matchD[2].trim();
       continue;
@@ -678,6 +697,7 @@ export const parsePastedQuestionsText = (
     // Check Answer
     const matchAns = line.match(ansPattern);
     if (matchAns) {
+      inExplanationMode = false;
       const rawAns = matchAns[1].toUpperCase();
       let normAns: 'A' | 'B' | 'C' | 'D' = 'A';
       if (['A', '1', '১', 'ক', 'أ'].includes(rawAns)) normAns = 'A';
@@ -686,8 +706,15 @@ export const parsePastedQuestionsText = (
       else if (['D', '4', '৪', 'ঘ', 'د'].includes(rawAns)) normAns = 'D';
 
       currentQ.correctAnswer = normAns;
-      if (matchAns[2] && !currentQ.explanation) {
-        currentQ.explanation = matchAns[2].trim();
+
+      // DO NOT put the answer or option into explanation!
+      // Only extract explanation if matchAns[2] explicitly has an explanation marker:
+      if (matchAns[2]) {
+        const trailingExpMatch = matchAns[2].match(/(?:Explanation|ব্যাখ্যা|নোট|Note|الشرح|ملاحظة)[\:\-\=\s]+(.+)/i);
+        if (trailingExpMatch) {
+          currentQ.explanation = (currentQ.explanation ? currentQ.explanation + ' ' : '') + trailingExpMatch[1].trim();
+          inExplanationMode = true;
+        }
       }
       continue;
     }
@@ -695,13 +722,16 @@ export const parsePastedQuestionsText = (
     // Check Explanation
     const matchExp = line.match(expPattern);
     if (matchExp) {
+      inExplanationMode = true;
       currentQ.explanation = (currentQ.explanation ? currentQ.explanation + ' ' : '') + matchExp[1].trim();
       continue;
     }
 
-    // If options not filled yet and question has text, append line to question or explanation
-    if (currentQ.options && currentQ.options.D) {
+    // If already in explanation mode, subsequent lines continue the explanation
+    if (inExplanationMode) {
       currentQ.explanation = (currentQ.explanation ? currentQ.explanation + ' ' : '') + line;
+    } else if (currentQ.options && (currentQ.options.A || currentQ.options.B)) {
+      // Past options and no explanation tag was encountered - do NOT append to explanation
     } else {
       currentQ.question = (currentQ.question ? currentQ.question + ' ' : '') + line;
     }
@@ -721,7 +751,7 @@ export const parsePastedQuestionsText = (
         D: 'বিকল্প ৪',
       },
       correctAnswer: 'A',
-      explanation: 'স্বয়ংক্রিয় এআই পার্স করা হয়েছে।',
+      explanation: '',
       subject: defaultMeta.subject,
       topic: defaultMeta.topic,
       post: defaultMeta.post,

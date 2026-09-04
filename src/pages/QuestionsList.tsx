@@ -20,7 +20,7 @@ import { Interface06AiAutoGenerate } from '../components/questionBank/Interface0
 import { Interface07AiGeneratedPreview } from '../components/questionBank/Interface07AiGeneratedPreview';
 import { EditQuestionModal } from '../components/questionBank/EditQuestionModal';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { formatSequentialId } from '../lib/questionBankEngine';
+import { formatSequentialId, sanitizeExplanation } from '../lib/questionBankEngine';
 
 export const QuestionsList: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,7 +94,7 @@ export const QuestionsList: React.FC = () => {
         option_c: wq.options.C || '',
         option_d: wq.options.D || '',
         correct_answer: `option_${optKey.toLowerCase()}`,
-        explanation: wq.explanation || '',
+        explanation: sanitizeExplanation(wq.explanation, wq.options) || '',
         status: wq.status || 'published',
         subject: wq.subject || 'সাধারণ',
         topic: wq.topic || '',
@@ -144,7 +144,7 @@ export const QuestionsList: React.FC = () => {
         D: q.option_d,
       },
       correctAnswer: optKey,
-      explanation: q.explanation || '',
+      explanation: sanitizeExplanation(q.explanation, { A: q.option_a, B: q.option_b, C: q.option_c, D: q.option_d }) || '',
       subject: q.subject || 'সাধারণ',
       topic: q.topic || '',
       post: q.post || '',
@@ -168,7 +168,7 @@ export const QuestionsList: React.FC = () => {
       option_c: updated.options.C,
       option_d: updated.options.D,
       correct_answer: `option_${optKey.toLowerCase()}`,
-      explanation: updated.explanation,
+      explanation: sanitizeExplanation(updated.explanation, updated.options) || '',
       status: updated.status,
     });
 

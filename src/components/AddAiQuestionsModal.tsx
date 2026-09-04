@@ -22,6 +22,7 @@ import { Question } from '../types';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 import { MultiPostSelector } from './MultiPostSelector';
 import { formatPosts } from '../lib/postManager';
+import { sanitizeExplanation } from '../lib/sanitizeExplanation';
 
 // Helper to detect Arabic characters for RTL alignment.
 // If text contains Bengali or English characters (mixed text), force LTR (return false)
@@ -177,7 +178,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
             option_c: currentQ.option_c || 'গ',
             option_d: currentQ.option_d || 'ঘ',
             correct_answer: currentQ.correct_answer || 'option_a',
-            explanation: currentQ.explanation || '',
+            explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
             subject: defaultSub,
             status: 'published',
             is_rtl: isArabicText(currentQ.question),
@@ -220,7 +221,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         option_c: currentQ.option_c || 'গ',
         option_d: currentQ.option_d || 'ঘ',
         correct_answer: currentQ.correct_answer || 'option_a',
-        explanation: currentQ.explanation || '',
+        explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
         subject: defaultSub,
         status: 'published',
         is_rtl: isArabicText(currentQ.question),
@@ -262,6 +263,7 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
         setExtractedQuestions(
           data.questions.map((q: any) => ({
             ...q,
+            explanation: sanitizeExplanation(q.explanation, q) || '',
             subject: subject || 'বাংলা',
             is_rtl: isArabicText(q.question) || isArabicText(q.option_a),
           }))

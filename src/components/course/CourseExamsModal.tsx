@@ -32,6 +32,7 @@ import {
 import { Course, CourseExam, CourseExamQuestion, Question, Exam } from '../../types';
 import { fetchAllQuestions, fetchAllExams, fetchQuestionsByExamId, fetchQuestionsForCourseExam, updateQuestion } from '../../lib/supabase';
 import { isArabicText } from '../AddAiQuestionsModal';
+import { sanitizeExplanation } from '../../lib/sanitizeExplanation';
 
 interface CourseExamsModalProps {
   isOpen: boolean;
@@ -510,7 +511,7 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
             option_c: currentQ.option_c || 'গ',
             option_d: currentQ.option_d || 'ঘ',
             correct_answer: currentQ.correct_answer || 'option_a',
-            explanation: currentQ.explanation || '',
+            explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
             subject: defaultSub,
           });
         }
@@ -552,7 +553,7 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
         option_c: currentQ.option_c || 'গ',
         option_d: currentQ.option_d || 'ঘ',
         correct_answer: currentQ.correct_answer || 'option_a',
-        explanation: currentQ.explanation || '',
+        explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
         subject: defaultSub,
       });
     }
@@ -599,7 +600,7 @@ export const CourseExamsModal: React.FC<CourseExamsModalProps> = ({
             option_c: q.option_c || 'গ',
             option_d: q.option_d || 'ঘ',
             correct_answer: q.correct_answer || 'option_a',
-            explanation: q.explanation || '',
+            explanation: sanitizeExplanation(q.explanation, q) || '',
             subject: subjectToUse,
             topic: activeExamForQuestions?.topic || '',
           }))

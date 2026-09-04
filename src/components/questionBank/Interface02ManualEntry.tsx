@@ -90,7 +90,7 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
           D: 'গোলাপ',
         },
         correctAnswer: 'B',
-        explanation: 'বাংলাদেশের জাতীয় ফুল হলো সাদা শাপলা।',
+        explanation: '',
         reference: 'বাংলাদেশ সংবিধান ও সাধারণ জ্ঞান',
         subject: 'বাংলা',
         topic: 'সাধারণ জ্ঞান',

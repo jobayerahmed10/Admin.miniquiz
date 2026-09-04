@@ -13,6 +13,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { Question } from '../../types';
+import { sanitizeExplanation } from '../../lib/sanitizeExplanation';
 
 interface CopyPasteQuestionFormProps {
   onAddBatchQuestions: (questions: Omit<Question, 'id'>[]) => void;
@@ -86,7 +87,7 @@ export const CopyPasteQuestionForm: React.FC<CopyPasteQuestionFormProps> = ({
           option_c: optC || 'অপশন ৩',
           option_d: optD || 'অপশন ৪',
           correct_answer: answer,
-          explanation: explanation || null,
+          explanation: sanitizeExplanation(explanation, { option_a: optA, option_b: optB, option_c: optC, option_d: optD }) || null,
           subject: defaultSubject || 'বাংলা',
           topic: defaultTopic || null,
           post: defaultPost || null,
@@ -127,7 +128,7 @@ export const CopyPasteQuestionForm: React.FC<CopyPasteQuestionFormProps> = ({
             option_c: q.option_c || '',
             option_d: q.option_d || '',
             correct_answer: q.correct_answer || 'option_a',
-            explanation: q.explanation || null,
+            explanation: sanitizeExplanation(q.explanation, q) || null,
             subject: defaultSubject || q.subject || 'বাংলা',
             topic: defaultTopic || null,
             post: defaultPost || null,

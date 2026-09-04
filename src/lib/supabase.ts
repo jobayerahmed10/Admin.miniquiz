@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { saveSubjectPrefixMapping } from './subjectPrefixManager';
 import { sanitizeSubjectName } from './subjectManager';
+import { sanitizeExplanation } from './sanitizeExplanation';
 import {
   Question,
   SupabaseConfig,
@@ -435,7 +436,7 @@ function normalizeQuestionRow(row: any): Question {
     option_c: row.option_c || (Array.isArray(row.options) ? row.options[2] : '') || '',
     option_d: row.option_d || (Array.isArray(row.options) ? row.options[3] : '') || '',
     correct_answer: row.correct_answer || row.correct_option || row.answer || 'option_a',
-    explanation: row.explanation || row.description || '',
+    explanation: sanitizeExplanation(row.explanation || row.description, row) || '',
     slug: row.slug || generateQuestionSlug(qText),
     status: row.status === 'published' ? 'published' : 'draft',
     subject: cleanSubject,
@@ -648,7 +649,7 @@ export const insertQuestion = async (
     option_c: newQuestion.option_c,
     option_d: newQuestion.option_d,
     correct_answer: newQuestion.correct_answer,
-    explanation: newQuestion.explanation || '',
+    explanation: sanitizeExplanation(newQuestion.explanation, newQuestion) || '',
     slug: generatedSlug,
     status: newQuestion.status || 'published',
     subject: cleanSubject,
@@ -836,7 +837,7 @@ export const insertBatchQuestions = async (
       option_c: q.option_c,
       option_d: q.option_d,
       correct_answer: q.correct_answer,
-      explanation: q.explanation || '',
+      explanation: sanitizeExplanation(q.explanation, q) || '',
       slug: generatedSlug,
       status: q.status || 'published',
       subject: cleanSub,
@@ -873,7 +874,7 @@ export const insertBatchQuestions = async (
         option_c: optC,
         option_d: optD,
         correct_answer: q.correct_answer || (q as any).correctAnswer || 'option_a',
-        explanation: q.explanation || '',
+        explanation: sanitizeExplanation(q.explanation, q) || '',
         status: q.status || 'published',
         subject: sanitizeSubjectName(q.subject),
         topic: (q.topic || '').replace(/\s+/g, ' ').trim(),
@@ -1067,7 +1068,7 @@ export const updateQuestion = async (
     if (updatedFields.option_c !== undefined) payload.option_c = updatedFields.option_c;
     if (updatedFields.option_d !== undefined) payload.option_d = updatedFields.option_d;
     if (updatedFields.correct_answer !== undefined) payload.correct_answer = updatedFields.correct_answer;
-    if (updatedFields.explanation !== undefined) payload.explanation = updatedFields.explanation;
+    if (updatedFields.explanation !== undefined) payload.explanation = sanitizeExplanation(updatedFields.explanation, updatedFields) || '';
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if ((updatedFields as any).questions !== undefined) payload.questions = (updatedFields as any).questions;
     if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;

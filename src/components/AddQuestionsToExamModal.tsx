@@ -33,6 +33,7 @@ import {
 import { isArabicText } from './AddAiQuestionsModal';
 import { getAllSubjects, addCustomSubject } from '../lib/subjectManager';
 import { ExamStepWizardHeader } from './exam/ExamStepWizardHeader';
+import { sanitizeExplanation } from '../lib/sanitizeExplanation';
 import { ExamQuestionPreviewCard } from './exam/ExamQuestionPreviewCard';
 import { QuickAddQuestionInline } from './exam/QuickAddQuestionInline';
 
@@ -470,7 +471,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
             option_c: currentQ.option_c || 'গ',
             option_d: currentQ.option_d || 'ঘ',
             correct_answer: currentQ.correct_answer || 'option_a',
-            explanation: currentQ.explanation || '',
+            explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
             subject: exam.subject || 'সাধারণ',
           });
         }
@@ -511,7 +512,7 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
         option_c: currentQ.option_c || 'গ',
         option_d: currentQ.option_d || 'ঘ',
         correct_answer: currentQ.correct_answer || 'option_a',
-        explanation: currentQ.explanation || '',
+        explanation: sanitizeExplanation(currentQ.explanation, currentQ) || '',
         subject: exam.subject || 'সাধারণ',
       });
     }
@@ -549,7 +550,12 @@ export const AddQuestionsToExamModal: React.FC<AddQuestionsToExamModalProps> = (
       setExtracting(false);
 
       if (response.ok && data?.success && Array.isArray(data.questions) && data.questions.length > 0) {
-        setExtractedQuestions(data.questions);
+        setExtractedQuestions(
+          data.questions.map((q: any) => ({
+            ...q,
+            explanation: sanitizeExplanation(q.explanation, q) || '',
+          }))
+        );
         return;
       }
 
