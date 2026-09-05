@@ -29,6 +29,8 @@ import {
   Award,
   AlertTriangle,
   Trash2,
+  Bookmark,
+  Sparkles,
 } from 'lucide-react';
 import {
   fetchAllExams,
@@ -46,6 +48,7 @@ import { ExamAnalyticsModal } from '../components/exam/ExamAnalyticsModal';
 import { ExamScheduleModal } from '../components/exam/ExamScheduleModal';
 import { ExamQuestionsListModal } from '../components/exam/ExamQuestionsListModal';
 import { CreateExamWizard } from '../components/exam/CreateExamWizard';
+import { QuickEditExamTopicModal } from '../components/exam/QuickEditExamTopicModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const ExamsManagement: React.FC = () => {
@@ -69,6 +72,7 @@ export const ExamsManagement: React.FC = () => {
   // Modals & Sheets State
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardExamToEdit, setWizardExamToEdit] = useState<Exam | null>(null);
+  const [quickEditTopicExam, setQuickEditTopicExam] = useState<Exam | null>(null);
 
   const [selectedExamForMenu, setSelectedExamForMenu] = useState<Exam | null>(null);
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
@@ -272,25 +276,81 @@ export const ExamsManagement: React.FC = () => {
     }
   };
 
+  const handleAutoSyncExamTopics = async () => {
+    setLoading(true);
+    let updatedCount = 0;
+    try {
+      for (const ex of exams) {
+        if (!ex.topic || !ex.topic.trim()) {
+          let detectedTopic = '';
+          if (ex.questions && ex.questions.length > 0) {
+            detectedTopic = ex.questions.find((q) => q.topic && q.topic.trim())?.topic?.trim() || '';
+          }
+          if (detectedTopic) {
+            await updateExam(ex.id, { topic: detectedTopic });
+            updatedCount++;
+          }
+        }
+      }
+      await loadExams();
+      alert(updatedCount > 0 ? `${updatedCount}টি পরীক্ষায় সফলভাবে টপিক যুক্ত করা হয়েছে!` : 'পরীক্ষাসমূহে স্বয়ংক্রিয় টপিক সিঙ্ক সম্পন্ন হয়েছে।');
+    } catch (err: any) {
+      alert('টপিক সিঙ্ক করতে সমস্যা হয়েছে: ' + (err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // SQL code for setup
-  const createTableSql = `-- Supabase SQL Editor এ নিচের কমান্ডটি এক্সিকিউট করে public.exams টেবিল তৈরি করুন:
+  const createTableSql = `-- Supabase SQL Editor এ নিচের কমান্ডটি এক্সিকিউট করে public.exams টেবিল তৈরি অথবা আপডেট করুন:
 
 CREATE TABLE IF NOT EXISTS public.exams (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     badge TEXT NOT NULL DEFAULT 'মডেল টেস্ট',
     badge_type TEXT NOT NULL DEFAULT 'daily',
     subject TEXT NOT NULL DEFAULT 'সকল বিষয়',
+    topic TEXT DEFAULT '',
+    post TEXT DEFAULT '',
+    pass_mark NUMERIC(5,2) DEFAULT 0,
+    category TEXT DEFAULT 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
+    exam_type TEXT DEFAULT 'free',
+    exam_format TEXT DEFAULT 'MCQ (বহুনির্বাচনি)',
+    selected_question_codes JSONB DEFAULT '[]'::jsonb,
+    question_ids JSONB DEFAULT '[]'::jsonb,
     question_count INTEGER NOT NULL DEFAULT 10,
     time_minutes INTEGER NOT NULL DEFAULT 15,
     negative_marks NUMERIC(4,2) NOT NULL DEFAULT 0.25,
     total_marks INTEGER NOT NULL DEFAULT 10,
+    marks_per_question NUMERIC(4,2) DEFAULT 1,
+    instructions TEXT,
+    start_date TIMESTAMPTZ,
+    end_date TIMESTAMPTZ,
+    max_attempts INTEGER DEFAULT 1,
+    id_pattern TEXT,
     description TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- বিদ্যমান টেবিলে 'topic' ও অন্যান্য কলাম যোগ করতে:
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS topic TEXT DEFAULT '';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS post TEXT DEFAULT '';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS pass_mark NUMERIC(5,2) DEFAULT 0;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'ফ্রি ট্রায়াল টেস্ট (Free Test)';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS exam_type TEXT DEFAULT 'free';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS exam_format TEXT DEFAULT 'MCQ (বহুনির্বাচনি)';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS selected_question_codes JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS question_ids JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS marks_per_question NUMERIC(4,2) DEFAULT 1;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS instructions TEXT;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS start_date TIMESTAMPTZ;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS max_attempts INTEGER DEFAULT 1;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS id_pattern TEXT;
+
+-- Row Level Security (RLS) উন্মুক্ত করতে:
 ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
 
   const handleCopySql = () => {
@@ -365,6 +425,16 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
 
             {showHeaderExtraMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-[#0b1322] border border-slate-800 rounded-2xl shadow-2xl p-1.5 z-30 space-y-1 text-xs font-semibold animate-scaleUp">
+                <button
+                  onClick={() => {
+                    setShowHeaderExtraMenu(false);
+                    handleAutoSyncExamTopics();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 hover:text-white text-left"
+                >
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span>পরীক্ষাসমূহে টপিক সিঙ্ক</span>
+                </button>
                 <button
                   onClick={() => {
                     setShowHeaderExtraMenu(false);
@@ -694,6 +764,7 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
               onPreview={(target) => setPreviewExam(target)}
               onEdit={(target) => handleOpenEditModal(target)}
               onOpenMenu={(target) => setSelectedExamForMenu(target)}
+              onQuickEditTopic={(target) => setQuickEditTopicExam(target)}
               onResults={(target) => setAnalyticsExam(target)}
               onManageLive={(target) => setAnalyticsExam(target)}
             />
@@ -747,6 +818,7 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
         onClose={() => setSelectedExamForMenu(null)}
         exam={selectedExamForMenu}
         onEdit={(target) => handleOpenEditModal(target)}
+        onQuickEditTopic={(target) => setQuickEditTopicExam(target)}
         onPreview={(target) => setPreviewExam(target)}
         onDuplicate={(target) => handleDuplicateExam(target)}
         onViewQuestions={(target) => setQuestionsListExam(target)}
@@ -755,6 +827,19 @@ ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;`;
         onAnalytics={(target) => setAnalyticsExam(target)}
         onTogglePublish={(target) => handleTogglePublish(target)}
         onDelete={(target) => setDeletingExam(target)}
+      />
+
+      {/* Quick Edit Exam Topic Modal */}
+      <QuickEditExamTopicModal
+        isOpen={Boolean(quickEditTopicExam)}
+        onClose={() => setQuickEditTopicExam(null)}
+        exam={quickEditTopicExam}
+        onSuccess={(updatedExam) => {
+          setExams((prev) =>
+            prev.map((item) => (item.id === updatedExam.id ? updatedExam : item))
+          );
+          loadExams();
+        }}
       />
 
       {/* Student Interactive Preview Modal */}

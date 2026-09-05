@@ -18,6 +18,8 @@ import {
   FileText,
   MinusCircle,
   HelpCircle,
+  BookOpen,
+  Bookmark,
 } from 'lucide-react';
 import { Exam, ExamBadgeType } from '../../types';
 import { CircularProgressIndicator } from './CircularProgressIndicator';
@@ -27,6 +29,7 @@ interface ExamCardProps {
   onPreview: (exam: Exam) => void;
   onEdit: (exam: Exam) => void;
   onOpenMenu: (exam: Exam) => void;
+  onQuickEditTopic?: (exam: Exam) => void;
   onResults?: (exam: Exam) => void;
   onManageLive?: (exam: Exam) => void;
 }
@@ -36,6 +39,7 @@ export const ExamCard: React.FC<ExamCardProps> = ({
   onPreview,
   onEdit,
   onOpenMenu,
+  onQuickEditTopic,
   onResults,
   onManageLive,
 }) => {
@@ -229,6 +233,43 @@ export const ExamCard: React.FC<ExamCardProps> = ({
               <FileText className="w-3.5 h-3.5 text-indigo-400" />
               <span>ID: {exam.id}</span>
             </div>
+
+            {/* Subject */}
+            {exam.subject && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-sans font-bold">
+                <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{exam.subject}</span>
+              </div>
+            )}
+
+            {/* Topic */}
+            {exam.topic ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onQuickEditTopic) onQuickEditTopic(exam);
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 font-sans font-bold hover:bg-cyan-900/60 hover:border-cyan-400/50 transition-all cursor-pointer group"
+                title="টপিক পরিবর্তন করতে ক্লিক করুন"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span>{exam.topic}</span>
+              </button>
+            ) : onQuickEditTopic ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickEditTopic(exam);
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 font-sans font-bold hover:bg-amber-900/60 hover:border-amber-400 transition-all cursor-pointer animate-pulse"
+                title="এই পরীক্ষায় টপিক যোগ করুন"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+                <span>+ টপিক সেট করুন</span>
+              </button>
+            ) : null}
 
             {/* Question count */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300">

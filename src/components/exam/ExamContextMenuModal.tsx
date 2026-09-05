@@ -5,6 +5,7 @@ import {
   Eye,
   Copy,
   BookOpen,
+  Bookmark,
   PlusCircle,
   Calendar,
   BarChart2,
@@ -19,6 +20,7 @@ interface ExamContextMenuModalProps {
   onClose: () => void;
   exam: Exam | null;
   onEdit: (exam: Exam) => void;
+  onQuickEditTopic?: (exam: Exam) => void;
   onPreview: (exam: Exam) => void;
   onDuplicate: (exam: Exam) => void;
   onViewQuestions: (exam: Exam) => void;
@@ -34,6 +36,7 @@ export const ExamContextMenuModal: React.FC<ExamContextMenuModalProps> = ({
   onClose,
   exam,
   onEdit,
+  onQuickEditTopic,
   onPreview,
   onDuplicate,
   onViewQuestions,
@@ -88,6 +91,27 @@ export const ExamContextMenuModal: React.FC<ExamContextMenuModalProps> = ({
               <span className="text-[10px] text-slate-400">শিরোনাম, সময়, নম্বর ও অপশন পরিবর্তন</span>
             </div>
           </button>
+
+          {/* 1.5 Quick Topic Edit */}
+          {onQuickEditTopic && (
+            <button
+              onClick={() => {
+                onClose();
+                onQuickEditTopic(exam);
+              }}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-slate-800/80 text-slate-200 hover:text-white transition-colors"
+            >
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                <Bookmark className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="block font-bold">টপিক ও বিষয় সেট করুন</span>
+                <span className="text-[10px] text-slate-400">
+                  {exam.topic ? `বর্তমান টপিক: "${exam.topic}"` : 'কোনো টপিক সেট করা নেই'}
+                </span>
+              </div>
+            </button>
+          )}
 
           {/* 2. Preview */}
           <button

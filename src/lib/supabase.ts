@@ -1704,12 +1704,16 @@ export const insertExam = async (
 
     if (error) {
       console.error('Supabase insertExam error:', error);
-      const basicPayload = {
+      const basicPayload: any = {
         id: String(customId || examId),
         title: newExam.title,
         badge: newExam.badge,
         badge_type: newExam.badge_type,
         subject: newExam.subject,
+        topic: newExam.topic || '',
+        post: newExam.post || '',
+        category: newExam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
+        exam_type: newExam.exam_type || 'free',
         question_count: newExam.question_count || selectedQuestionCodes.length,
         time_minutes: newExam.time_minutes,
         negative_marks: newExam.negative_marks,
@@ -1717,6 +1721,20 @@ export const insertExam = async (
         description: newExam.description || '',
         status: newExam.status,
       };
+
+      const errStr = ((error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '')).toLowerCase();
+      if (errStr.includes('topic') || error.code === '42703' || error.code === 'PGRST204') {
+        delete basicPayload.topic;
+      }
+      if (errStr.includes('post')) {
+        delete basicPayload.post;
+      }
+      if (errStr.includes('category')) {
+        delete basicPayload.category;
+      }
+      if (errStr.includes('exam_type')) {
+        delete basicPayload.exam_type;
+      }
 
       console.log('Payload: Exam retry basicPayload', JSON.stringify(basicPayload, null, 2));
 
@@ -1745,9 +1763,14 @@ export const insertExam = async (
     // Sync question linkages in Supabase questions table
     if (selectedQuestionCodes.length > 0) {
       try {
+        const updatePayload: any = { exam_id: finalExamId };
+        if (newExam.topic) updatePayload.topic = newExam.topic;
+        if (newExam.subject) updatePayload.subject = newExam.subject;
+        if (newExam.post) updatePayload.post = newExam.post;
+
         await client
           .from('questions')
-          .update({ exam_id: finalExamId })
+          .update(updatePayload)
           .in('id', selectedQuestionCodes);
       } catch (syncErr) {
         console.warn('Could not update questions exam_id on insertExam:', syncErr);
@@ -1905,9 +1928,14 @@ export const updateExam = async (
       try {
         // 1. Link selected questions to this exam
         if (selectedCodes.length > 0) {
+          const updatePayload: any = { exam_id: String(id) };
+          if (updatedFields.topic) updatePayload.topic = updatedFields.topic;
+          if (updatedFields.subject) updatePayload.subject = updatedFields.subject;
+          if (updatedFields.post) updatePayload.post = updatedFields.post;
+
           await client
             .from('questions')
-            .update({ exam_id: String(id) })
+            .update(updatePayload)
             .in('id', selectedCodes);
         }
 
