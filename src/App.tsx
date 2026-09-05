@@ -14,6 +14,7 @@ import { EditQuestion } from './pages/EditQuestion';
 import { StudentsManagement } from './pages/StudentsManagement';
 import { SubjectPostsManagement } from './pages/SubjectPostsManagement';
 import { QuestionReportsManagement } from './pages/QuestionReportsManagement';
+import { QuestionExplanationsManagement } from './pages/QuestionExplanationsManagement';
 import { CreateBlog } from './pages/CreateBlog';
 import { BlogsManagement } from './pages/BlogsManagement';
 import { StudentApp } from './pages/StudentApp';
@@ -264,6 +265,7 @@ export default function App() {
           <Route path="/admin/students" element={<StudentsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
           <Route path="/admin/reports" element={<QuestionReportsManagement />} />
+          <Route path="/admin/explanations" element={<QuestionExplanationsManagement />} />
           <Route path="/admin/create-blog" element={<BlogsManagement />} />
           <Route path="/admin/create-blog/new" element={<CreateBlog />} />
           <Route path="/admin/create-blog/edit/:id" element={<CreateBlog />} />

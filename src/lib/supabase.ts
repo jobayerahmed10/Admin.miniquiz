@@ -18,6 +18,8 @@ import {
   Blog,
   BlogCategory,
   DEFAULT_BLOG_CATEGORIES,
+  QuestionExplanation,
+  ExplanationStatus,
 } from '../types';
 
 const STORAGE_KEY_URL = 'miniquiz_supabase_url';
@@ -4964,6 +4966,283 @@ export const updateQuestionReportStatus = async (id: string, status: 'resolved')
   } catch (err: any) {
     console.error('Exception updating report status:', err);
     return { success: false, error: err.message };
+  }
+};
+
+// --- Question Explanations Management ---
+
+const LOCAL_EXPLANATIONS_KEY = 'miniquiz_cached_question_explanations';
+
+export const getLocalCachedQuestionExplanations = (): QuestionExplanation[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_EXPLANATIONS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+};
+
+export const setLocalCachedQuestionExplanations = (items: QuestionExplanation[]): void => {
+  try {
+    localStorage.setItem(LOCAL_EXPLANATIONS_KEY, JSON.stringify(items));
+  } catch (err) {
+    console.warn('Failed to save local question explanations cache:', err);
+  }
+};
+
+export const fetchQuestionExplanations = async (): Promise<{
+  explanations: QuestionExplanation[];
+  error: string | null;
+  isTableMissing?: boolean;
+}> => {
+  const localItems = getLocalCachedQuestionExplanations();
+  const localQuestions = getLocalCachedQuestions();
+  const client = getSupabaseClient();
+
+  if (!client) {
+    const mergedLocal = localItems.map((exp) => ({
+      ...exp,
+      question: exp.question || localQuestions.find((q) => String(q.id) === String(exp.question_id)),
+    }));
+    return { explanations: mergedLocal, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('question_explanations')
+      .select(`
+        *,
+        questions (*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetchQuestionExplanations error:', error);
+      const isMissing = error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('question_explanations');
+      const mergedLocal = localItems.map((exp) => ({
+        ...exp,
+        question: exp.question || localQuestions.find((q) => String(q.id) === String(exp.question_id)),
+      }));
+      return { explanations: mergedLocal, error: error.message, isTableMissing: isMissing };
+    }
+
+    const normalizedData: QuestionExplanation[] = (data || []).map((row: any) => {
+      let qObj: Question | undefined = undefined;
+      if (row.questions) {
+        qObj = {
+          id: row.questions.id,
+          question: row.questions.question || row.questions.question_text || '',
+          option_a: row.questions.option_a || '',
+          option_b: row.questions.option_b || '',
+          option_c: row.questions.option_c || '',
+          option_d: row.questions.option_d || '',
+          correct_answer: row.questions.correct_answer || row.questions.answer || '',
+          explanation: row.questions.explanation || '',
+          subject: row.questions.subject || '',
+          topic: row.questions.topic || '',
+          status: row.questions.status || 'published',
+        };
+      } else {
+        qObj = localQuestions.find((q) => String(q.id) === String(row.question_id));
+      }
+
+      return {
+        id: String(row.id),
+        question_id: String(row.question_id),
+        explanation: row.explanation || '',
+        submitted_by: row.submitted_by || 'শিক্ষার্থী',
+        status: (row.status as ExplanationStatus) || 'pending',
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at,
+        question: qObj,
+      };
+    });
+
+    setLocalCachedQuestionExplanations(normalizedData);
+    return { explanations: normalizedData, error: null };
+  } catch (err: any) {
+    console.error('Exception fetching question explanations:', err);
+    return { explanations: localItems, error: err?.message || String(err) };
+  }
+};
+
+export const submitQuestionExplanation = async (payload: {
+  question_id: string | number;
+  explanation: string;
+  submitted_by?: string;
+}): Promise<{ success: boolean; data?: QuestionExplanation; error: string | null }> => {
+  const cleanExp = payload.explanation.trim();
+  if (!cleanExp) {
+    return { success: false, error: 'ব্যাখ্যার বিবরণ ফাঁকা রাখা যাবে না।' };
+  }
+
+  const qIdStr = String(payload.question_id);
+  const localQuestions = getLocalCachedQuestions();
+  const matchedQ = localQuestions.find((q) => String(q.id) === qIdStr);
+
+  const localNewItem: QuestionExplanation = {
+    id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    question_id: qIdStr,
+    explanation: cleanExp,
+    submitted_by: payload.submitted_by || 'শিক্ষার্থী',
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    question: matchedQ,
+  };
+
+  // Add to local cache immediately
+  const localItems = getLocalCachedQuestionExplanations();
+  setLocalCachedQuestionExplanations([localNewItem, ...localItems]);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, data: localNewItem, error: null };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('question_explanations')
+      .insert({
+        question_id: qIdStr,
+        explanation: cleanExp,
+        submitted_by: payload.submitted_by || 'শিক্ষার্থী',
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Supabase submitQuestionExplanation insert error:', error);
+      return { success: true, data: localNewItem, error: 'সুপাবেসে সরাসরি সেভ হয়নি, স্থানীয় ক্যাশে যুক্ত করা হয়েছে: ' + error.message };
+    }
+
+    const savedItem: QuestionExplanation = {
+      id: String(data.id),
+      question_id: String(data.question_id),
+      explanation: data.explanation,
+      submitted_by: data.submitted_by,
+      status: (data.status as ExplanationStatus) || 'pending',
+      created_at: data.created_at,
+      question: matchedQ,
+    };
+
+    const updatedLocal = localItems.map((item) => (item.id === localNewItem.id ? savedItem : item));
+    setLocalCachedQuestionExplanations([savedItem, ...updatedLocal.filter((i) => i.id !== savedItem.id)]);
+
+    return { success: true, data: savedItem, error: null };
+  } catch (err: any) {
+    console.error('Exception submitting question explanation:', err);
+    return { success: true, data: localNewItem, error: err?.message || null };
+  }
+};
+
+export const updateQuestionExplanationStatus = async (
+  id: string,
+  questionId: string | number,
+  status: ExplanationStatus,
+  explanationText?: string
+): Promise<{ success: boolean; error: string | null }> => {
+  const qIdStr = String(questionId);
+
+  // Update local explanations cache
+  const localExplanations = getLocalCachedQuestionExplanations();
+  const targetExp = localExplanations.find((e) => String(e.id) === String(id));
+  const finalExpText = (explanationText !== undefined ? explanationText : targetExp?.explanation || '').trim();
+
+  const updatedExplanations = localExplanations.map((e) => {
+    if (String(e.id) === String(id)) {
+      return {
+        ...e,
+        status,
+        explanation: finalExpText || e.explanation,
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return e;
+  });
+  setLocalCachedQuestionExplanations(updatedExplanations);
+
+  // If APPROVED, also update the main questions table/cache with this new explanation!
+  if (status === 'approved' && finalExpText) {
+    const localQuestions = getLocalCachedQuestions();
+    const updatedQuestions = localQuestions.map((q) => {
+      if (String(q.id) === qIdStr) {
+        return { ...q, explanation: finalExpText, updated_at: new Date().toISOString() };
+      }
+      return q;
+    });
+    setLocalCachedQuestions(updatedQuestions);
+
+    // Update question explanation in Supabase
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client
+          .from('questions')
+          .update({ explanation: finalExpText, updated_at: new Date().toISOString() })
+          .eq('id', qIdStr);
+      } catch (qErr) {
+        console.warn('Could not sync approved explanation to questions table:', qErr);
+      }
+    }
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const updatePayload: any = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (finalExpText) {
+      updatePayload.explanation = finalExpText;
+    }
+
+    const { error } = await client
+      .from('question_explanations')
+      .update(updatePayload)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase updateQuestionExplanationStatus error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error('Exception in updateQuestionExplanationStatus:', err);
+    return { success: false, error: err?.message || String(err) };
+  }
+};
+
+export const deleteQuestionExplanation = async (id: string): Promise<{ success: boolean; error: string | null }> => {
+  const localExplanations = getLocalCachedQuestionExplanations();
+  setLocalCachedQuestionExplanations(localExplanations.filter((e) => String(e.id) !== String(id)));
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, error: null };
+  }
+
+  try {
+    const { error } = await client
+      .from('question_explanations')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase deleteQuestionExplanation error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error('Exception deleting question explanation:', err);
+    return { success: false, error: err?.message || String(err) };
   }
 };
 

@@ -1,5 +1,18 @@
 export type QuestionStatus = 'published' | 'draft';
 
+export type ExplanationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface QuestionExplanation {
+  id: string;
+  question_id: string;
+  explanation: string;
+  submitted_by?: string | null;
+  status: ExplanationStatus;
+  created_at?: string;
+  updated_at?: string;
+  question?: Question;
+}
+
 export interface Question {
   id: string | number;
   question_code?: string; // নির্দিষ্ট Question Code / ইউনিক প্রিফিক্স কোড

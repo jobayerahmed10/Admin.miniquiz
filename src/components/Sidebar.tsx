@@ -15,6 +15,7 @@ import {
   Layers,
   AlertCircle,
   FileText,
+  HelpCircle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -97,6 +98,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: AlertCircle,
       badge: 'রিপোর্ট',
       badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold',
+    },
+    {
+      id: 'explanations',
+      path: '/admin/explanations',
+      title: 'ব্যাখ্যা অনুমোদন ও সঞ্চয়',
+      subTitle: 'EXPLANATIONS',
+      icon: HelpCircle,
+      badge: 'ব্যাখ্যা',
+      badgeColor: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold',
     },
     {
       id: 'create-blog',
