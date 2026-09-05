@@ -55,15 +55,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     },
     {
-      id: 'subject-posts',
-      path: '/admin/subject-posts',
-      title: 'বিষয়ভিত্তিক পদ ও সিলেবাস ব্যবস্থাপনা',
-      subTitle: 'SUBJECT POSTS & TOPICS',
-      icon: Layers,
-      badge: 'মাস্টার',
-      badgeColor: 'bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold',
-    },
-    {
       id: 'courses',
       path: '/admin/courses',
       title: 'কোর্স ও লাইভ ব্যাচ',

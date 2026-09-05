@@ -542,11 +542,11 @@ export const SubjectPostsManagement: React.FC = () => {
 
           <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
             <Layers className="w-7 h-7 text-emerald-400" />
-            <span>বিষয়ভিত্তিক পদ ও সিলেবাস ব্যবস্থাপনা</span>
+            <span>বিষয়ভিত্তিক সিলেবাস ও টপিক ব্যবস্থাপনা</span>
           </h1>
 
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-            মাদ্রাসা ও সাধারণ শিক্ষক নিবন্ধনের সকল পদ, কোড, ট্যাগলাইন এবং সিলেবাসের অধ্যায়সমূহ সরাসরি Supabase ডাটাবেসে পরিচালনা করুন।
+            সকল বিষয়, কোড, ট্যাগলাইন এবং সিলেবাসের অধ্যায়সমূহ সরাসরি Supabase ডাটাবেসে পরিচালনা করুন।
           </p>
         </div>
 
@@ -567,7 +567,7 @@ export const SubjectPostsManagement: React.FC = () => {
             className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-2xl font-black text-xs shadow-lg shadow-emerald-950 flex items-center gap-2 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>নতুন পদ যুক্ত করুন</span>
+            <span>নতুন বিষয় যুক্ত করুন</span>
           </button>
         </div>
       </div>

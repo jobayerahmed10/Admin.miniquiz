@@ -185,7 +185,7 @@ export const SubjectWisePractice: React.FC<SubjectWisePracticeProps> = ({
     return (
       <div className="py-16 text-center text-slate-400 space-y-3">
         <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-500" />
-        <p className="text-xs font-semibold">বিষয়ভিত্তিক পদ ও সিলেবাস লোড হচ্ছে...</p>
+        <p className="text-xs font-semibold">বিষয়ভিত্তিক তথ্য ও সিলেবাস লোড হচ্ছে...</p>
       </div>
     );
   }
@@ -491,13 +491,13 @@ export const SubjectWisePractice: React.FC<SubjectWisePracticeProps> = ({
       <div className="bg-gradient-to-r from-slate-900 to-slate-850 p-5 rounded-3xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="text-[10px] font-extrabold text-teal-400 uppercase tracking-wider flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5" /> পদভিত্তিক সিলেবাস ও স্বয়ংক্রিয় প্রশ্নব্যাংক
+            <Layers className="w-3.5 h-3.5" /> বিষয়ভিত্তিক সিলেবাস ও স্বয়ংক্রিয় প্রশ্নব্যাংক
           </span>
           <h2 className="text-lg sm:text-xl font-black text-white mt-1">
-            বিষয়ভিত্তিক ও পদভিত্তিক প্রস্তুতি
+            বিষয়ভিত্তিক অনুশীলন ও প্রস্তুতি
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            আপনার পদ নির্বাচন করুন এবং প্রতিটি টপিক অনুযায়ী কুইজ ও অনুশীলন শুরু করুন
+            আপনার বিষয় নির্বাচন করুন এবং প্রতিটি টপিক অনুযায়ী কুইজ ও অনুশীলন শুরু করুন
           </p>
         </div>
 
@@ -513,7 +513,7 @@ export const SubjectWisePractice: React.FC<SubjectWisePracticeProps> = ({
       {/* Post Selector Tabs (Horizontal Scrollable) */}
       <div className="space-y-2">
         <label className="block text-xs font-bold text-slate-400">
-          পদ / বিভাগ নির্বাচন করুন:
+          বিষয় নির্বাচন করুন:
         </label>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
           {posts.map((post) => {

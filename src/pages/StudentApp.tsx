@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Eye,
   Calendar,
-  Layers,
   GraduationCap,
   Play,
   RotateCcw,
@@ -45,11 +44,9 @@ import {
 import { Exam, Course, Question, StudentUser, StudentDashboardGrowthData } from '../types';
 import { CourseDetailsModal } from '../components/course/CourseDetailsModal';
 import { AddAiQuestionsModal } from '../components/AddAiQuestionsModal';
-import { SubjectWisePractice } from '../components/student/SubjectWisePractice';
 
 export const StudentApp: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'exams' | 'courses' | 'ai' | 'dashboard' | 'profile'>('exams');
-  const [examSubTab, setExamSubTab] = useState<'subject_posts' | 'model_tests'>('subject_posts');
   const [student, setStudent] = useState<StudentUser | null>(null);
   const [growthData, setGrowthData] = useState<StudentDashboardGrowthData | null>(null);
 
@@ -441,69 +438,25 @@ export const StudentApp: React.FC = () => {
                 )}
               </div>
             ) : (
-              /* Exams & Subject-Wise Prep Section */
-              <div className="space-y-5">
-                {/* Sub-tabs Navigation */}
-                <div className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 gap-1.5">
+              /* Exams Section */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-extrabold text-white">
+                      মডেল টেস্ট ও ফ্রি পরীক্ষা
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      আপনার শিক্ষক নিবন্ধন ও জব প্রস্তুতির জন্য লাইভ টেস্ট দিন
+                    </p>
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => setExamSubTab('subject_posts')}
-                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      examSubTab === 'subject_posts'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    onClick={loadData}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                    title="রিফ্রেশ করুন"
                   >
-                    <Layers className="w-4 h-4" />
-                    <span>বিষয়ভিত্তিক ও পদভিত্তিক প্রস্তুতি</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setExamSubTab('model_tests')}
-                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      examSubTab === 'model_tests'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Award className="w-4 h-4" />
-                    <span>পূর্ণাঙ্গ মডেল টেস্ট ({exams.length})</span>
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
-
-                {/* Sub-tab 1: Dynamic Subject Posts & Syllabus Topics */}
-                {examSubTab === 'subject_posts' && (
-                  <SubjectWisePractice
-                    student={student}
-                    onRefreshGrowth={() => {
-                      if (student) {
-                        setGrowthData(getStudentDashboardGrowthData(student));
-                      }
-                    }}
-                  />
-                )}
-
-                {/* Sub-tab 2: Full Model Tests Grid */}
-                {examSubTab === 'model_tests' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg sm:text-xl font-extrabold text-white">
-                          মডেল টেস্ট ও ফ্রি পরীক্ষা
-                        </h2>
-                        <p className="text-xs text-slate-400">
-                          আপনার শিক্ষক নিবন্ধন ও জব প্রস্তুতির জন্য লাইভ টেস্ট দিন
-                        </p>
-                      </div>
-                      <button
-                        onClick={loadData}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                        title="রিফ্রেশ করুন"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                      </button>
-                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {exams.map((exam) => (
@@ -559,8 +512,6 @@ export const StudentApp: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
             )}
           </div>
         )}

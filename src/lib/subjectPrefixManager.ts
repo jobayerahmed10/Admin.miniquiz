@@ -7,11 +7,25 @@ const PREFIX_STORAGE_KEY = 'miniquiz_subject_prefix_map';
  * Standard predefined subject keywords to prefix mapping
  */
 const KNOWN_SUBJECT_MAP: Record<string, string> = {
+  // 13 Main Exam Subjects
+  'কারেন্ট অ্যাফেয়ার্স': 'Q-CA-',
+  'বাংলা সাহিত্য': 'Q-BANGLA-',
+  'বাংলা ভাষা ও ব্যাকরণ': 'Q-BANGLA-',
+  'English Literature': 'Q-ENGLISH-',
+  'English Language': 'Q-ENGLISH-',
+  'গাণিতিক যুক্তি': 'Q-MATH-',
+  'সাধারণ বিজ্ঞান': 'Q-SCIENCE-',
+  'বাংলাদেশ বিষয়াবলি': 'Q-BD-',
+  'আন্তর্জাতিক বিষয়াবলি': 'Q-INT-',
+  'ভূগোল ও দুর্যোগ ব্যবস্থাপনা': 'Q-GEO-',
+  'নৈতিকতা, মূল্যবোধ ও সুশাসন': 'Q-ETHICS-',
+  'কম্পিউটার ও তথ্যপ্রযুক্তি': 'Q-ICT-',
+  'মানসিক দক্ষতা': 'Q-IQ-',
+
   // বাংলা
   বাংলা: 'Q-BANGLA-',
   bangla: 'Q-BANGLA-',
   bengali: 'Q-BANGLA-',
-  'বাংলা সাহিত্য': 'Q-BANGLA-',
   'বাংলা ব্যাকরণ': 'Q-BANGLA-',
 
   // ইংরেজি
@@ -35,21 +49,18 @@ const KNOWN_SUBJECT_MAP: Record<string, string> = {
   'general knowledge': 'Q-GK-',
 
   // বাংলাদেশ বিষয়াবলি
-  'বাংলাদেশ বিষয়াবলি': 'Q-BD-',
   'বাংলাদেশ বিষয়াবলি': 'Q-BD-',
   বাংলাদেশ: 'Q-BD-',
   bangladesh: 'Q-BD-',
   'বাংলাদেশ প্রসঙ্গ': 'Q-BD-',
 
   // আন্তর্জাতিক বিষয়াবলি
-  'আন্তর্জাতিক বিষয়াবলি': 'Q-INT-',
   'আন্তর্জাতিক বিষয়াবলি': 'Q-INT-',
   আন্তর্জাতিক: 'Q-INT-',
   international: 'Q-INT-',
   'আন্তর্জাতিক সম্পর্ক': 'Q-INT-',
 
   // আইসিটি ও কম্পিউটার
-  'কম্পিউটার ও তথ্যপ্রযুক্তি': 'Q-ICT-',
   'তথ্য ও যোগাযোগ প্রযুক্তি': 'Q-ICT-',
   কম্পিউটার: 'Q-ICT-',
   তথ্যপ্রযুক্তি: 'Q-ICT-',
@@ -58,7 +69,6 @@ const KNOWN_SUBJECT_MAP: Record<string, string> = {
   computer: 'Q-ICT-',
 
   // বিজ্ঞান
-  'সাধারণ বিজ্ঞান': 'Q-SCIENCE-',
   বিজ্ঞান: 'Q-SCIENCE-',
   science: 'Q-SCIENCE-',
   পদার্থবিজ্ঞান: 'Q-PHYSICS-',
