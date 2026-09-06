@@ -264,32 +264,47 @@ export const LiveExamStudentPreviewModal: React.FC<LiveExamStudentPreviewModalPr
           </div>
 
           {/* Results Summary Box (if submitted) */}
-          {isSubmitted && (
-            <div className="p-4 bg-slate-900/90 border border-emerald-500/40 rounded-2xl space-y-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Award className="w-5 h-5" />
-                <span>পরীক্ষার ফলাফল সারসংক্ষেপ</span>
+          {isSubmitted && (() => {
+            const passThreshold = exam.pass_mark !== undefined && exam.pass_mark > 0
+              ? exam.pass_mark
+              : Math.round(exam.total_marks * 0.4);
+            const isPassed = scoreStats.finalScore >= passThreshold;
+            return (
+              <div className="p-4 bg-slate-900/90 border border-emerald-500/40 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                    <Award className="w-5 h-5" />
+                    <span>পরীক্ষার ফলাফল সারসংক্ষেপ</span>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                    isPassed
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  }`}>
+                    {isPassed ? `উত্তীর্ণ (পাস মার্ক: ${passThreshold})` : `অনুত্তীর্ণ (পাস মার্ক: ${passThreshold})`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
+                  <div className="p-2.5 bg-slate-950 rounded-xl">
+                    <span className="text-slate-400 block text-[10px]">সঠিক উত্তর</span>
+                    <span className="text-emerald-400 font-bold text-sm">{scoreStats.correct} টি</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl">
+                    <span className="text-slate-400 block text-[10px]">ভুল উত্তর</span>
+                    <span className="text-rose-400 font-bold text-sm">{scoreStats.wrong} টি</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl">
+                    <span className="text-slate-400 block text-[10px]">উত্তর দেননি</span>
+                    <span className="text-slate-400 font-bold text-sm">{scoreStats.unanswered} টি</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-emerald-500/30">
+                    <span className="text-slate-400 block text-[10px]">অর্জিত নম্বর</span>
+                    <span className="text-emerald-300 font-bold text-sm">{scoreStats.finalScore} / {exam.total_marks}</span>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
-                <div className="p-2.5 bg-slate-950 rounded-xl">
-                  <span className="text-slate-400 block text-[10px]">সঠিক উত্তর</span>
-                  <span className="text-emerald-400 font-bold text-sm">{scoreStats.correct} টি</span>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-xl">
-                  <span className="text-slate-400 block text-[10px]">ভুল উত্তর</span>
-                  <span className="text-rose-400 font-bold text-sm">{scoreStats.wrong} টি</span>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-xl">
-                  <span className="text-slate-400 block text-[10px]">উত্তর দেননি</span>
-                  <span className="text-slate-400 font-bold text-sm">{scoreStats.unanswered} টি</span>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-xl border border-emerald-500/30">
-                  <span className="text-slate-400 block text-[10px]">অর্জিত নম্বর</span>
-                  <span className="text-emerald-300 font-bold text-sm">{scoreStats.finalScore} / {exam.total_marks}</span>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Footer Navigation */}

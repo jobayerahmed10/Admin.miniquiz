@@ -51,6 +51,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
     question_count: 50,
     total_marks: 50,
     marks_per_question: 1,
+    pass_mark: 20,
     time_minutes: 30,
     has_negative_marking: true,
     negative_marks: 0.25,
@@ -77,6 +78,10 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         question_count: examToEdit.question_count || 50,
         total_marks: examToEdit.total_marks || 50,
         marks_per_question: examToEdit.marks_per_question || 1,
+        pass_mark:
+          examToEdit.pass_mark !== undefined
+            ? examToEdit.pass_mark
+            : Math.round((examToEdit.total_marks || 50) * 0.4),
         time_minutes: examToEdit.time_minutes || 30,
         has_negative_marking: examToEdit.has_negative_marking !== undefined
           ? examToEdit.has_negative_marking
@@ -111,6 +116,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         question_count: 50,
         total_marks: 50,
         marks_per_question: 1,
+        pass_mark: 20,
         time_minutes: 30,
         has_negative_marking: true,
         negative_marks: 0.25,
@@ -195,6 +201,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
         subject: examInfo.subject.trim(),
         topic: examInfo.topic.trim(),
         post: examInfo.post.trim(),
+        pass_mark: examInfo.pass_mark !== undefined ? Number(examInfo.pass_mark) : Math.round(Number(examInfo.total_marks || 50) * 0.4),
         exam_type: examToEdit?.exam_type || 'free',
         exam_format: examInfo.exam_format,
         question_count: updatedQuestions.length || examInfo.question_count,

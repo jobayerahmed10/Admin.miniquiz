@@ -11,6 +11,8 @@ import {
   LogOut,
   ShieldCheck,
   CheckCircle,
+  CheckCircle2,
+  AlertCircle,
   Clock,
   ChevronRight,
   TrendingUp,
@@ -285,7 +287,12 @@ export const StudentApp: React.FC = () => {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                         <span>প্রশ্ন নং {currentQIndex + 1} / {examQuestions.length}</span>
-                        <span>বিষয়: {examQuestions[currentQIndex]?.subject || activeTakingExam.subject}</span>
+                        <div className="flex items-center gap-3">
+                          <span>বিষয়: {examQuestions[currentQIndex]?.subject || activeTakingExam.subject}</span>
+                          {activeTakingExam.pass_mark !== undefined && activeTakingExam.pass_mark > 0 && (
+                            <span className="text-emerald-400 font-bold">পাস মার্ক: {activeTakingExam.pass_mark}</span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Animated Question Content */}
@@ -394,26 +401,52 @@ export const StudentApp: React.FC = () => {
                       </p>
                     </div>
 
-                    {examScore && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto">
-                        <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
-                          <span className="text-[10px] text-slate-400 font-bold">প্রাপ্ত নম্বর</span>
-                          <p className="text-lg font-black text-emerald-400">{examScore.score}</p>
+                    {examScore && (() => {
+                      const passThreshold = activeTakingExam.pass_mark !== undefined && activeTakingExam.pass_mark > 0
+                        ? activeTakingExam.pass_mark
+                        : Math.round((activeTakingExam.total_marks || examScore.total) * 0.4);
+                      const isPassed = examScore.score >= passThreshold;
+                      return (
+                        <div className="space-y-4 max-w-lg mx-auto">
+                          <div className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2 ${
+                            isPassed 
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          }`}>
+                            {isPassed ? (
+                              <>
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                <span>অভিনন্দন! আপনি পাস করেছেন (পাস মার্ক: {passThreshold})</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-5 h-5 text-rose-400" />
+                                <span>দুঃখিত, আপনি পাস করতে পারেননি (পাস মার্ক: {passThreshold})</span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
+                              <span className="text-[10px] text-slate-400 font-bold">প্রাপ্ত নম্বর</span>
+                              <p className="text-lg font-black text-emerald-400">{examScore.score}</p>
+                            </div>
+                            <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
+                              <span className="text-[10px] text-slate-400 font-bold">সঠিক উত্তর</span>
+                              <p className="text-lg font-black text-teal-400">{examScore.correct}</p>
+                            </div>
+                            <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
+                              <span className="text-[10px] text-slate-400 font-bold">ভুল উত্তর</span>
+                              <p className="text-lg font-black text-rose-400">{examScore.wrong}</p>
+                            </div>
+                            <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
+                              <span className="text-[10px] text-slate-400 font-bold">মোট প্রশ্ন</span>
+                              <p className="text-lg font-black text-slate-300">{examScore.total}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
-                          <span className="text-[10px] text-slate-400 font-bold">সঠিক উত্তর</span>
-                          <p className="text-lg font-black text-teal-400">{examScore.correct}</p>
-                        </div>
-                        <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
-                          <span className="text-[10px] text-slate-400 font-bold">ভুল উত্তর</span>
-                          <p className="text-lg font-black text-rose-400">{examScore.wrong}</p>
-                        </div>
-                        <div className="p-3 bg-slate-800 rounded-2xl border border-slate-700">
-                          <span className="text-[10px] text-slate-400 font-bold">মোট প্রশ্ন</span>
-                          <p className="text-lg font-black text-slate-300">{examScore.total}</p>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="flex items-center justify-center gap-3 pt-2">
                       <button
@@ -486,9 +519,16 @@ export const StudentApp: React.FC = () => {
                           </div>
 
                           <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-emerald-400">
-                              পূর্ণমান: {exam.total_marks || 20}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-emerald-400">
+                                পূর্ণমান: {exam.total_marks || 20}
+                              </span>
+                              {exam.pass_mark !== undefined && exam.pass_mark > 0 ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                  পাস: {exam.pass_mark}
+                                </span>
+                              ) : null}
+                            </div>
 
                             {exam.status === 'upcoming' ? (
                               <button

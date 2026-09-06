@@ -26,12 +26,14 @@ import { getAllSubjects } from '../../lib/subjectManager';
 export interface ExamInfoFormData {
   title: string;
   subject: string;
+  category?: string;
   topic: string;
   post: string;
   exam_format: string;
   question_count: number;
   total_marks: number;
   marks_per_question: number;
+  pass_mark: number;
   time_minutes: number;
   has_negative_marking: boolean;
   negative_marks: number;
@@ -66,6 +68,10 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
     question_count: initialData.question_count || 50,
     total_marks: initialData.total_marks || 50,
     marks_per_question: initialData.marks_per_question || 1,
+    pass_mark:
+      initialData.pass_mark !== undefined
+        ? initialData.pass_mark
+        : Math.round((initialData.total_marks || 50) * 0.4),
     time_minutes: initialData.time_minutes || 30,
     has_negative_marking:
       initialData.has_negative_marking !== undefined
@@ -436,8 +442,8 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
           </h2>
         </div>
 
-        {/* 3-col Row: প্রশ্ন সংখ্যা, পূর্ণমান, প্রতি প্রশ্নের নম্বর */}
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
+        {/* 4-col Row: প্রশ্ন সংখ্যা, পূর্ণমান, প্রতি প্রশ্নের নম্বর, পাস মার্ক */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
           <div>
             <label className="block text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
               প্রশ্ন সংখ্যা <span className="text-rose-500">*</span>
@@ -449,10 +455,12 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               value={formData.question_count || ''}
               onChange={(e) => {
                 const count = parseInt(e.target.value) || 0;
+                const newTotal = count * formData.marks_per_question;
                 setFormData({
                   ...formData,
                   question_count: count,
-                  total_marks: count * formData.marks_per_question,
+                  total_marks: newTotal,
+                  pass_mark: formData.pass_mark || Math.round(newTotal * 0.4),
                 });
               }}
               placeholder="৫০"
@@ -468,7 +476,14 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               type="number"
               min="1"
               value={formData.total_marks || ''}
-              onChange={(e) => setFormData({ ...formData, total_marks: parseInt(e.target.value) || 0 })}
+              onChange={(e) => {
+                const total = parseInt(e.target.value) || 0;
+                setFormData({
+                  ...formData,
+                  total_marks: total,
+                  pass_mark: formData.pass_mark || Math.round(total * 0.4),
+                });
+              }}
               placeholder="৫০"
               className="w-full px-3 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
             />
@@ -485,14 +500,37 @@ export const Step1ExamInfo: React.FC<Step1ExamInfoProps> = ({
               value={formData.marks_per_question || ''}
               onChange={(e) => {
                 const mark = parseFloat(e.target.value) || 1;
+                const newTotal = formData.question_count * mark;
                 setFormData({
                   ...formData,
                   marks_per_question: mark,
-                  total_marks: formData.question_count * mark,
+                  total_marks: newTotal,
+                  pass_mark: formData.pass_mark || Math.round(newTotal * 0.4),
                 });
               }}
               placeholder="১"
               className="w-full px-3 py-2.5 sm:py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5B36F5]/20 focus:border-[#5B36F5]"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                পাস মার্ক <span className="text-rose-500">*</span>
+              </label>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hidden sm:inline">ম্যানুয়াল</span>
+            </div>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={formData.pass_mark !== undefined ? formData.pass_mark : ''}
+              onChange={(e) => {
+                const p = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                setFormData({ ...formData, pass_mark: p });
+              }}
+              placeholder="যেমন: ২০"
+              className="w-full px-3 py-2.5 sm:py-3 bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-400/60 dark:border-emerald-500/40 rounded-xl text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
             />
           </div>
         </div>

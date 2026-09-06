@@ -144,8 +144,8 @@ export const Step3PreviewPublish: React.FC<Step3PreviewPublishProps> = ({
 
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400 font-medium">পাস নম্বর:</span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {Math.round(examInfo.total_marks * 0.4)} নম্বর
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {examInfo.pass_mark !== undefined ? examInfo.pass_mark : Math.round(examInfo.total_marks * 0.4)} নম্বর
               </span>
             </div>
 

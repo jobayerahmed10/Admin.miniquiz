@@ -289,6 +289,14 @@ export const ExamCard: React.FC<ExamCardProps> = ({
               <span>{exam.total_marks} নম্বর</span>
             </div>
 
+            {/* Pass mark */}
+            {exam.pass_mark !== undefined && exam.pass_mark > 0 ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-emerald-900/40 text-emerald-400 font-semibold" title="পাস মার্ক">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>পাস: {exam.pass_mark}</span>
+              </div>
+            ) : null}
+
             {/* Negative mark */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-rose-400">
               <MinusCircle className="w-3.5 h-3.5 text-rose-400" />

@@ -1714,6 +1714,7 @@ export const insertExam = async (
         subject: newExam.subject,
         topic: newExam.topic || '',
         post: newExam.post || '',
+        pass_mark: Number(newExam.pass_mark !== undefined ? newExam.pass_mark : 0),
         category: newExam.category || 'ফ্রি ট্রায়াল টেস্ট (Free Test)',
         exam_type: newExam.exam_type || 'free',
         question_count: newExam.question_count || selectedQuestionCodes.length,
@@ -1730,6 +1731,9 @@ export const insertExam = async (
       }
       if (errStr.includes('post')) {
         delete basicPayload.post;
+      }
+      if (errStr.includes('pass_mark')) {
+        delete basicPayload.pass_mark;
       }
       if (errStr.includes('category')) {
         delete basicPayload.category;
