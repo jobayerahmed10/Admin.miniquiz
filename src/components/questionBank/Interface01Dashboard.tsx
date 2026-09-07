@@ -777,8 +777,13 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                             </span>
                           )}
                           {q.topic && (
-                            <span className="text-[10px] font-medium text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg">
+                            <span className="text-[10px] font-medium text-cyan-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
                               {q.topic}
+                            </span>
+                          )}
+                          {q.sub_topic && (
+                            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                              {q.sub_topic}
                             </span>
                           )}
                           {isArab && (

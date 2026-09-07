@@ -535,6 +535,10 @@ export const parsePastedQuestionsText = (
   defaultMeta: {
     subject: string;
     topic: string;
+    sub_topic?: string;
+    subject_id?: string | number;
+    topic_id?: string | number;
+    sub_topic_id?: string | number;
     post: string;
     language: 'বাংলা' | 'English' | 'العربية';
     questionType: string;
@@ -602,6 +606,10 @@ export const parsePastedQuestionsText = (
         reference: (currentQ.reference || '').trim(),
         subject: defaultMeta.subject,
         topic: defaultMeta.topic,
+        sub_topic: defaultMeta.sub_topic,
+        subject_id: defaultMeta.subject_id,
+        topic_id: defaultMeta.topic_id,
+        sub_topic_id: defaultMeta.sub_topic_id,
         post: defaultMeta.post,
         language: defaultMeta.language,
         questionType: defaultMeta.questionType,

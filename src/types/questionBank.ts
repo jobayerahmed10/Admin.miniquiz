@@ -17,6 +17,7 @@ export interface MCQOption {
 export interface WorkingQuestion {
   tempId: string;
   id?: string;
+  custom_question_id?: string;
   question: string;
   options: {
     A: string;
@@ -31,6 +32,10 @@ export interface WorkingQuestion {
   reference?: string;
   subject: string;
   topic: string;
+  sub_topic?: string;
+  subject_id?: string | number;
+  topic_id?: string | number;
+  sub_topic_id?: string | number;
   post: string;
   language: 'বাংলা' | 'English' | 'العربية';
   questionType: string;
@@ -70,6 +75,10 @@ export interface DuplicateCheckResult {
 export interface AiAutoGenerateConfig {
   subject: string;
   topic: string;
+  sub_topic?: string;
+  subject_id?: string | number;
+  topic_id?: string | number;
+  sub_topic_id?: string | number;
   post: string;
   language: 'বাংলা' | 'English' | 'العربية';
   questionType: string;

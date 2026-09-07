@@ -16,6 +16,7 @@ export interface QuestionExplanation {
 export interface Question {
   id: string | number;
   question_code?: string; // নির্দিষ্ট Question Code / ইউনিক প্রিফিক্স কোড
+  custom_question_id?: string | null;
   question: string;
   option_a: string;
   option_b: string;
@@ -26,7 +27,11 @@ export interface Question {
   slug?: string | null;
   status: QuestionStatus;
   subject?: string | null; // বিষয় (যেমন: বাংলা, ইংরেজি, ইত্যাদি)
-  topic?: string | null; // টপিক (যেমন: কারক ও বিভক্তি, ব্যাকরণ)
+  topic?: string | null; // মূল টপিক
+  sub_topic?: string | null; // সাব-টপিক
+  subject_id?: string | null; // Subject foreign key / id
+  topic_id?: string | null; // Main topic foreign key / id
+  sub_topic_id?: string | null; // Sub-topic foreign key / id
   post?: string | null; // পদ / পদের নাম (যেমন: সহকারী শিক্ষক, প্রভাষক)
   exam_id?: string | number | null; // এই প্রশ্নটি নির্দিষ্ট কোনো মডেল টেস্টের অন্তর্ভুক্ত কি না
   created_at?: string;

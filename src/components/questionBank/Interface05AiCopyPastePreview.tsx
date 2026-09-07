@@ -8,10 +8,8 @@ import {
   Trash2,
   Rocket,
   Info,
-  Check,
-  ChevronDown,
   Layers,
-  Filter,
+  FolderTree,
 } from 'lucide-react';
 import { WorkingQuestion } from '../../types/questionBank';
 import { QuestionBankHeader } from './Header';
@@ -21,10 +19,10 @@ import { EditQuestionModal } from './EditQuestionModal';
 import { SuccessPublishModal } from './SuccessPublishModal';
 import {
   validateAndCheckDuplicates,
-  isArabicText,
   getQuestionBankDirectionality,
 } from '../../lib/questionBankEngine';
 import { Question } from '../../types';
+import { formatLiveQuestionId } from '../../lib/subjectTopicManager';
 
 interface Interface05AiCopyPastePreviewProps {
   parsedQuestions: WorkingQuestion[];
@@ -86,7 +84,28 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
   const handleFinalPublish = async () => {
     setIsPublishing(true);
     try {
-      await onPublish(checkedQuestions);
+      const prefix = meta?.prefix || 'Q-BANGLA-';
+      const startNum = meta?.nextNumber || 1;
+
+      // Attach complete metadata & custom question IDs to questions
+      const finalEnriched: WorkingQuestion[] = checkedQuestions.map((q, idx) => {
+        const assignedId = formatLiveQuestionId(prefix, startNum + idx);
+        return {
+          ...q,
+          id: assignedId,
+          custom_question_id: assignedId,
+          subject: q.subject || meta?.subject || 'সাধারণ',
+          topic: q.topic || meta?.topic || '',
+          sub_topic: q.sub_topic || meta?.sub_topic || '',
+          subject_id: q.subject_id || meta?.subject_id || undefined,
+          topic_id: q.topic_id || meta?.topic_id || undefined,
+          sub_topic_id: q.sub_topic_id || meta?.sub_topic_id || undefined,
+          post: q.post || meta?.post || '',
+          prefix: prefix,
+        };
+      });
+
+      await onPublish(finalEnriched);
       setShowSuccessModal(true);
     } catch (err) {
       console.error('Publish error:', err);
@@ -115,17 +134,48 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
         }}
       />
 
-      {/* 3. AI Parsing Summary Card (Screenshot 5) */}
+      {/* 3. AI Parsing Summary Card with 3-Level Category Meta */}
       <div className="bg-[#0b1322] border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-            <Sparkles className="w-5 h-5" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-white">AI পার্সিং প্রিভিউ</h2>
+              <p className="text-xs text-slate-400">
+                AI আপনার পেস্ট করা প্রশ্নগুলো বিশ্লেষণ করেছে
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm sm:text-base font-black text-white">AI পার্সিং প্রিভিউ</h2>
-            <p className="text-xs text-slate-400">
-              AI আপনার পেস্ট করা প্রশ্নগুলো বিশ্লেষণ করেছে
-            </p>
+
+          {/* Hierarchical Category Badges */}
+          <div className="flex items-center gap-2 flex-wrap text-[11px]">
+            <span className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-bold flex items-center gap-1">
+              <FolderTree className="w-3 h-3 text-emerald-400" />
+              <span>{meta?.subject || 'সাধারণ'}</span>
+              {meta?.subject_code && (
+                <span className="text-emerald-400 font-mono">({meta.subject_code})</span>
+              )}
+            </span>
+
+            {meta?.topic && (
+              <span className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
+                {meta.topic} {meta?.topic_code && `(${meta.topic_code})`}
+              </span>
+            )}
+
+            {meta?.sub_topic && (
+              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
+                {meta.sub_topic} {meta?.sub_topic_code && `(${meta.sub_topic_code})`}
+              </span>
+            )}
+
+            {meta?.prefix && (
+              <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono font-black">
+                প্রিফিক্স: {meta.prefix}
+              </span>
+            )}
           </div>
         </div>
 
@@ -187,7 +237,7 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
         </button>
       </div>
 
-      {/* 5. Question Cards List (Screenshot 5) */}
+      {/* 5. Question Cards List */}
       <div className="space-y-4">
         {filteredQuestions.map((q, idx) => {
           const dirInfo = getQuestionBankDirectionality({
@@ -209,6 +259,10 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
             D: 'د',
           };
 
+          const prefix = meta?.prefix || 'Q-BANGLA-';
+          const startNum = meta?.nextNumber || 1;
+          const assignedId = formatLiveQuestionId(prefix, startNum + idx);
+
           return (
             <div
               key={q.tempId}
@@ -224,8 +278,8 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
               <div className="flex items-start justify-between gap-3 border-b border-slate-800/80 pb-3">
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-black text-emerald-400 font-mono">
-                      {String(idx + 1).padStart(2, '0')}.
+                    <span className="text-xs font-black text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                      {assignedId}
                     </span>
                     {isProblem ? (
                       <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/40">
@@ -255,6 +309,11 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                     {q.subject && (
                       <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-bold">
                         {q.subject}
+                      </span>
+                    )}
+                    {q.topic && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-900 text-cyan-300 text-[10px] font-bold border border-slate-800">
+                        {q.topic}
                       </span>
                     )}
                   </div>
@@ -289,7 +348,7 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                 </div>
               </div>
 
-              {/* Problem Alert Box (Screenshot 5) */}
+              {/* Problem Alert Box */}
               {isProblem && (
                 <div className="bg-amber-950/30 border border-amber-500/40 rounded-2xl p-3 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -299,33 +358,35 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
                     </span>
                   </div>
                   <button
-                    type="button"
                     onClick={() => setEditingQuestion(q)}
-                    className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-all shrink-0"
+                    className="px-3 py-1 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-amber-400 shrink-0"
                   >
-                    উত্তর নির্বাচন করুন
+                    সংশোধন করুন
                   </button>
                 </div>
               )}
 
-              {/* Options */}
+              {/* Options Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" dir={optDir}>
                 {(['A', 'B', 'C', 'D'] as const).map((opt) => {
                   const isCorrect = q.correctAnswer === opt;
                   const optText = q.options[opt];
                   const optLabel = optDir === 'rtl' ? arabicOptionLabels[opt] || opt : opt;
+
                   return (
                     <div
                       key={opt}
-                      className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs transition-all ${
+                      className={`flex items-center gap-2.5 p-3 rounded-2xl border text-xs transition-all ${
                         isCorrect
-                          ? 'bg-emerald-950/30 border-emerald-500/60 text-emerald-300 font-bold'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300 font-bold'
                           : 'bg-[#050914] border-slate-800 text-slate-300'
                       }`}
                     >
                       <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                          isCorrect ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                        className={`w-6 h-6 rounded-xl flex items-center justify-center font-bold font-mono text-[11px] shrink-0 ${
+                          isCorrect
+                            ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                            : 'bg-slate-900 text-slate-400'
                         }`}
                       >
                         {optLabel}
@@ -362,7 +423,7 @@ export const Interface05AiCopyPastePreview: React.FC<Interface05AiCopyPastePrevi
         })}
       </div>
 
-      {/* 6. Validation Checklist (Screenshot 5) */}
+      {/* 6. Validation Checklist */}
       <DuplicateValidationCard
         summary={summary}
         totalQuestions={checkedQuestions.length}
