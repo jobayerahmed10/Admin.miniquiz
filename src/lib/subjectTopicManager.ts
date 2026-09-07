@@ -892,6 +892,18 @@ export const filterTopicsForSubject = (topics: TopicItem[], subjectId?: string):
       targetCodes.push('BD-ACH');
       targetCodes.push('BD-BUD');
     }
+    if (matchedSub.code === 'INT' || matchedSub.code === 'GK-INT' || cleanId.includes('gk_int') || cleanId.includes('international') || cleanId.includes('আন্তর্জাতিক')) {
+      targetIds.add('sub_gk_int');
+      targetIds.add('international_affairs');
+      targetCodes.push('INT');
+      targetCodes.push('GK-INT');
+      targetCodes.push('INT-HIS');
+      targetCodes.push('INT-SEC');
+      targetCodes.push('INT-ENV');
+      targetCodes.push('INT-ORG');
+      targetCodes.push('INT-CUR');
+      targetCodes.push('INT-MISC');
+    }
   }
 
   return topics.filter((t) => {

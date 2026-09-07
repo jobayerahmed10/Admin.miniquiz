@@ -300,10 +300,12 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     order_index: 9,
     created_at: new Date().toISOString(),
     topics: [
-      { id: 'top-int-1', name: 'জাতিসংঘ ও আন্তর্জাতিক সংস্থাসমূহ', description: 'UN, WB, IMF, WHO, UNESCO, WTO ইত্যাদি', order_index: 1 },
-      { id: 'top-int-2', name: 'আঞ্চলিক ও অর্থনৈতিক জোট', description: 'SAARC, ASEAN, EU, NATO, BRICS, BIMSTEC', order_index: 2 },
-      { id: 'top-int-3', name: 'আন্তর্জাতিক পরিবেশ, নিরাপত্তা ও চুক্তি', description: 'জলবায়ু চুক্তি, পারমাণবিক চুক্তি ও প্রোটোকল', order_index: 3 },
-      { id: 'top-int-4', name: 'বিশ্ব ইতিহাস ও সাম্প্রতিক ভূ-রাজনীতি', description: 'বিশ্বযুদ্ধ, বিখ্যাত প্রণালী, সীমারেখা ও রাজধানী', order_index: 4 },
+      { id: 'top-int-1', name: 'বৈশ্বিক ইতিহাস, আঞ্চলিক ও আন্তর্জাতিক ব্যবস্থা', description: 'বৈশ্বিক ইতিহাস, মহাদেশ, দেশ, রাজধানী, মুদ্রা, যুদ্ধ ও ইতিহাস', order_index: 1 },
+      { id: 'top-int-2', name: 'আন্তর্জাতিক নিরাপত্তা ও আন্তঃরাষ্ট্রীয় ক্ষমতা সম্পর্ক', description: 'NATO, সীমারেখা, জোট, গেরিলা দল, চুক্তি ও সরকার ব্যবস্থা', order_index: 2 },
+      { id: 'top-int-3', name: 'আন্তর্জাতিক পরিবেশগত ইস্যু ও কূটনীতি', description: 'পরিবেশ ইস্যু, পরিবেশ সংস্থা, চুক্তি, সম্মেলন ও আইন', order_index: 3 },
+      { id: 'top-int-4', name: 'আন্তর্জাতিক সংগঠন এবং বৈশ্বিক অর্থনৈতিক প্রতিষ্ঠান', description: 'জাতিসংঘ, বিশ্বব্যাংক, IMF, রাজনৈতিক ও অর্থনৈতিক সংস্থাসমূহ', order_index: 4 },
+      { id: 'top-int-5', name: 'বিশ্বের সাম্প্রতিক ও চলমান ঘটনা প্রবাহ', description: 'নোবেল, খেলাধুলা, সাম্প্রতিক সম্মেলন, সংকট ও সমীক্ষা', order_index: 5 },
+      { id: 'top-int-6', name: 'গুরুত্বপূর্ণ আন্তর্জাতিক বিষয়সমূহ', description: 'মহাবিশ্ব, সংস্কৃতি, শিল্পকলা ও আন্তর্জাতিক দিবসসমূহ', order_index: 6 },
     ],
   },
   {

@@ -514,7 +514,7 @@ export const Interface04AiCopyPaste: React.FC<Interface04AiCopyPasteProps> = ({
             </div>
           </div>
 
-          {/* Tabs & RTL Toggle */}
+          {/* Tabs */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="bg-[#050914] p-1 rounded-2xl border border-slate-800 flex items-center">
               <button
@@ -540,19 +540,6 @@ export const Interface04AiCopyPaste: React.FC<Interface04AiCopyPasteProps> = ({
                 ফাইল আপলোড
               </button>
             </div>
-
-            {/* Manual RTL Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsRtlManual(isRtl ? false : true)}
-              className={`px-3 py-2 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                isRtl
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                  : 'bg-slate-900 hover:bg-slate-800 text-slate-400 border-slate-800'
-              }`}
-            >
-              <span>{isRtl ? 'RTL (ডান দিক)' : 'LTR (বাম দিক)'}</span>
-            </button>
           </div>
         </div>
 
@@ -563,11 +550,9 @@ export const Interface04AiCopyPaste: React.FC<Interface04AiCopyPasteProps> = ({
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
               rows={12}
-              dir={isRtl ? 'rtl' : 'ltr'}
+              dir="ltr"
               placeholder="এখানে আপনার প্রশ্ন পেস্ট করুন..."
-              className={`w-full bg-[#050914] border border-slate-700/80 rounded-2xl p-4 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed font-mono ${
-                isRtl ? 'font-amiri text-base leading-loose text-right' : 'text-left'
-              }`}
+              className="w-full bg-[#050914] border border-slate-700/80 rounded-2xl p-4 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed font-mono text-left"
             />
           </div>
         ) : (
