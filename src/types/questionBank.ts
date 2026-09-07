@@ -7,7 +7,8 @@ export type QuestionBankView =
   | 'copypaste_step1' // Interface 04
   | 'copypaste_step2' // Interface 05
   | 'autogen_step1' // Interface 06
-  | 'autogen_step2'; // Interface 07
+  | 'autogen_step2' // Interface 07
+  | 'trash'; // Recycle Bin
 
 export interface MCQOption {
   id: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';

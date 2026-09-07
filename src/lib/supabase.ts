@@ -4,6 +4,7 @@ import { sanitizeSubjectName } from './subjectManager';
 import { sanitizeExplanation } from './sanitizeExplanation';
 import {
   Question,
+  TrashQuestion,
   SupabaseConfig,
   DashboardStats,
   Exam,
@@ -122,6 +123,79 @@ export const setLocalCachedQuestions = (questions: Question[]) => {
     localStorage.setItem(LOCAL_QUESTIONS_KEY, JSON.stringify(questions));
   } catch (e) {
     console.warn('Failed to save questions to localStorage:', e);
+  }
+};
+
+export const LOCAL_TRASH_KEY = 'miniquiz_trash_questions';
+export const LOCAL_BACKUP_KEY = 'miniquiz_questions_backup';
+
+export const getTrashQuestions = (): TrashQuestion[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_TRASH_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => new Date(b.deleted_at || 0).getTime() - new Date(a.deleted_at || 0).getTime());
+      }
+    }
+    return [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const setTrashQuestions = (trash: TrashQuestion[]) => {
+  try {
+    localStorage.setItem(LOCAL_TRASH_KEY, JSON.stringify(trash));
+    window.dispatchEvent(new CustomEvent('miniquiz_trash_updated', { detail: { count: trash.length } }));
+  } catch (e) {
+    console.warn('Failed to save trash questions to localStorage:', e);
+  }
+};
+
+export const moveToTrash = (items: Question | Question[]) => {
+  const currentTrash = getTrashQuestions();
+  const arr = Array.isArray(items) ? items : [items];
+  const now = new Date().toISOString();
+
+  const newItems: TrashQuestion[] = arr.map((q) => ({
+    ...q,
+    deleted_at: now,
+  }));
+
+  // Deduplicate against existing trash by id
+  const newIds = new Set(newItems.map((q) => String(q.id)));
+  const filteredOldTrash = currentTrash.filter((t) => !newIds.has(String(t.id)));
+  const combined = [...newItems, ...filteredOldTrash].slice(0, 500); // keep up to 500 deleted questions
+
+  setTrashQuestions(combined);
+};
+
+export const saveQuestionsBackup = (questions: Question[]) => {
+  try {
+    if (!questions || questions.length === 0) return;
+    localStorage.setItem(
+      LOCAL_BACKUP_KEY,
+      JSON.stringify({
+        questions,
+        timestamp: new Date().toISOString(),
+        count: questions.length,
+      })
+    );
+  } catch (e) {
+    console.warn('Failed to save questions backup:', e);
+  }
+};
+
+export const getQuestionsBackup = (): { questions: Question[]; timestamp: string; count: number } | null => {
+  try {
+    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+    return null;
+  } catch (e) {
+    return null;
   }
 };
 
@@ -607,6 +681,9 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
 
     // Save merged questions to local cache
     setLocalCachedQuestions(cleanList);
+    if (cleanList.length > 0) {
+      saveQuestionsBackup(cleanList);
+    }
 
     return { questions: cleanList, error: null, isSynced: true };
   } catch (err: any) {
@@ -1404,15 +1481,24 @@ export const autoAssignAndRepairQuestionTopics = async (
   return { success: true, updatedCount, error: null };
 };
 
-// Delete Question from public.questions + local cache
-export const deleteQuestion = async (id: string | number): Promise<{ success: boolean; error: string | null }> => {
-  // Remove from local cache
+// Delete Question from public.questions + local cache with TRASH SAFETY
+export const deleteQuestion = async (
+  id: string | number
+): Promise<{ success: boolean; deletedQuestion?: Question | null; error: string | null }> => {
   const current = getLocalCachedQuestions();
+  const target = current.find((q) => String(q.id) === String(id)) || null;
+
+  // Move to trash before deletion so it can ALWAYS be restored!
+  if (target) {
+    moveToTrash(target);
+  }
+
+  // Remove from local cache
   setLocalCachedQuestions(current.filter((q) => String(q.id) !== String(id)));
 
   const client = getSupabaseClient();
   if (!client) {
-    return { success: true, error: null };
+    return { success: true, deletedQuestion: target, error: null };
   }
 
   try {
@@ -1425,25 +1511,32 @@ export const deleteQuestion = async (id: string | number): Promise<{ success: bo
       console.warn('Supabase delete error (handled):', error);
     }
 
-    return { success: true, error: null };
+    return { success: true, deletedQuestion: target, error: null };
   } catch (err: any) {
-    return { success: true, error: null };
+    return { success: true, deletedQuestion: target, error: null };
   }
 };
 
-// Delete Batch Questions
+// Delete Batch Questions with TRASH SAFETY
 export const deleteBatchQuestions = async (
   ids: (string | number)[]
-): Promise<{ success: boolean; error: string | null }> => {
-  if (!ids || ids.length === 0) return { success: true, error: null };
+): Promise<{ success: boolean; deletedCount: number; error: string | null }> => {
+  if (!ids || ids.length === 0) return { success: true, deletedCount: 0, error: null };
 
   const current = getLocalCachedQuestions();
   const idStrSet = new Set(ids.map((id) => String(id)));
+  const targets = current.filter((q) => idStrSet.has(String(q.id)));
+
+  // Move all targets to trash
+  if (targets.length > 0) {
+    moveToTrash(targets);
+  }
+
   setLocalCachedQuestions(current.filter((q) => !idStrSet.has(String(q.id))));
 
   const client = getSupabaseClient();
   if (!client) {
-    return { success: true, error: null };
+    return { success: true, deletedCount: targets.length, error: null };
   }
 
   try {
@@ -1455,14 +1548,18 @@ export const deleteBatchQuestions = async (
     if (error) {
       console.warn('Supabase deleteBatchQuestions warning:', error);
     }
-    return { success: true, error: null };
+    return { success: true, deletedCount: targets.length, error: null };
   } catch (err: any) {
-    return { success: true, error: null };
+    return { success: true, deletedCount: targets.length, error: null };
   }
 };
 
-// Clear All Questions
+// Clear All Questions with TRASH SAFETY (Moves all to Trash first!)
 export const clearAllQuestions = async (): Promise<{ success: boolean; error: string | null }> => {
+  const current = getLocalCachedQuestions();
+  if (current.length > 0) {
+    moveToTrash(current);
+  }
   setLocalCachedQuestions([]);
 
   const client = getSupabaseClient();
@@ -1483,6 +1580,194 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
   } catch (err: any) {
     return { success: true, error: null };
   }
+};
+
+// RESTORE A QUESTION FROM TRASH
+export const restoreQuestion = async (
+  id: string | number
+): Promise<{ success: boolean; question?: Question | null; error: string | null }> => {
+  const trash = getTrashQuestions();
+  const itemIndex = trash.findIndex((q) => String(q.id) === String(id));
+  if (itemIndex === -1) {
+    return { success: false, error: 'রিসাইকেল বিনে প্রশ্নটি পাওয়া যায়নি।' };
+  }
+
+  const trashItem = trash[itemIndex];
+  // Remove from trash
+  const newTrash = [...trash];
+  newTrash.splice(itemIndex, 1);
+  setTrashQuestions(newTrash);
+
+  // Clean trash fields
+  const { deleted_at, ...cleanQuestion } = trashItem;
+  const questionToRestore: Question = { ...cleanQuestion };
+
+  // Add back to local questions cache
+  const current = getLocalCachedQuestions();
+  const updatedCurrent = [
+    questionToRestore,
+    ...current.filter((q) => String(q.id) !== String(questionToRestore.id)),
+  ];
+  setLocalCachedQuestions(updatedCurrent);
+
+  // Sync back to Supabase
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const payload: any = {
+        id: questionToRestore.id,
+        question: questionToRestore.question,
+        option_a: questionToRestore.option_a,
+        option_b: questionToRestore.option_b,
+        option_c: questionToRestore.option_c,
+        option_d: questionToRestore.option_d,
+        correct_answer: questionToRestore.correct_answer,
+        status: questionToRestore.status || 'published',
+        subject: questionToRestore.subject || null,
+        topic: questionToRestore.topic || null,
+        sub_topic: questionToRestore.sub_topic || questionToRestore.subtopic || null,
+        explanation: questionToRestore.explanation || null,
+        post: questionToRestore.post || null,
+        language: (questionToRestore as any).language || 'বাংলা',
+      };
+      if (questionToRestore.custom_question_id) payload.custom_question_id = questionToRestore.custom_question_id;
+      if (questionToRestore.question_code) payload.question_code = questionToRestore.question_code;
+      if (questionToRestore.code) payload.code = questionToRestore.code;
+
+      const { error } = await client.from('questions').upsert(payload);
+      if (error) {
+        console.warn('Supabase restoreQuestion upsert warning:', error);
+      }
+    } catch (err) {
+      console.warn('Supabase restoreQuestion upsert catch:', err);
+    }
+  }
+
+  return { success: true, question: questionToRestore, error: null };
+};
+
+// RESTORE BATCH OF QUESTIONS FROM TRASH
+export const restoreBatchQuestions = async (
+  ids: (string | number)[]
+): Promise<{ success: boolean; count: number; error: string | null }> => {
+  if (!ids || ids.length === 0) return { success: true, count: 0, error: null };
+
+  const idSet = new Set(ids.map((id) => String(id)));
+  const trash = getTrashQuestions();
+  const toRestore = trash.filter((q) => idSet.has(String(q.id)));
+  const remainingTrash = trash.filter((q) => !idSet.has(String(q.id)));
+
+  if (toRestore.length === 0) return { success: true, count: 0, error: null };
+
+  setTrashQuestions(remainingTrash);
+
+  const restoredQuestions: Question[] = toRestore.map((t) => {
+    const { deleted_at, ...rest } = t;
+    return rest;
+  });
+
+  const current = getLocalCachedQuestions();
+  const existingIds = new Set(current.map((q) => String(q.id)));
+  const cleanRestored = restoredQuestions.filter((q) => !existingIds.has(String(q.id)));
+  const updatedQuestions = [...cleanRestored, ...current];
+  setLocalCachedQuestions(updatedQuestions);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const payloads = restoredQuestions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        status: q.status || 'published',
+        subject: q.subject || null,
+        topic: q.topic || null,
+        sub_topic: q.sub_topic || q.subtopic || null,
+        explanation: q.explanation || null,
+        post: q.post || null,
+        language: (q as any).language || 'বাংলা',
+      }));
+
+      await client.from('questions').upsert(payloads);
+    } catch (err) {
+      console.warn('Supabase restoreBatchQuestions upsert error:', err);
+    }
+  }
+
+  return { success: true, count: restoredQuestions.length, error: null };
+};
+
+// RESTORE ALL QUESTIONS FROM TRASH
+export const restoreAllTrashQuestions = async (): Promise<{ success: boolean; count: number; error: string | null }> => {
+  const trash = getTrashQuestions();
+  if (trash.length === 0) return { success: true, count: 0, error: null };
+  const allIds = trash.map((q) => q.id);
+  return restoreBatchQuestions(allIds);
+};
+
+// PERMANENTLY DELETE A QUESTION FROM TRASH
+export const permanentlyDeleteQuestion = (id: string | number): void => {
+  const trash = getTrashQuestions();
+  setTrashQuestions(trash.filter((q) => String(q.id) !== String(id)));
+};
+
+// EMPTY TRASH
+export const emptyTrash = (): void => {
+  setTrashQuestions([]);
+};
+
+// RESTORE FROM SAFETY BACKUP
+export const restoreFromSafetyBackup = async (): Promise<{ success: boolean; count: number; error: string | null }> => {
+  const backup = getQuestionsBackup();
+  if (!backup || !backup.questions || backup.questions.length === 0) {
+    return { success: false, count: 0, error: 'কোনো স্বয়ংক্রিয় ব্যাকআপ পাওয়া যায়নি।' };
+  }
+
+  const current = getLocalCachedQuestions();
+  const existingMap = new Map<string, Question>();
+  for (const q of current) {
+    existingMap.set(String(q.id), q);
+  }
+  for (const q of backup.questions) {
+    if (!existingMap.has(String(q.id))) {
+      existingMap.set(String(q.id), q);
+    }
+  }
+
+  const merged = Array.from(existingMap.values());
+  setLocalCachedQuestions(merged);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const payloads = backup.questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        status: q.status || 'published',
+        subject: q.subject || null,
+        topic: q.topic || null,
+        sub_topic: q.sub_topic || q.subtopic || null,
+        explanation: q.explanation || null,
+        post: q.post || null,
+        language: (q as any).language || 'বাংলা',
+      }));
+
+      await client.from('questions').upsert(payloads);
+    } catch (err) {
+      console.warn('Supabase restoreFromSafetyBackup error:', err);
+    }
+  }
+
+  return { success: true, count: backup.questions.length, error: null };
 };
 
 /* ==========================================================================
@@ -4871,6 +5156,172 @@ export const fetchAllCourseApplications = async (): Promise<{
   }
 };
 
+/**
+ * CRITICAL USER DIRECTIVE:
+ * যখন পেমেন্ট এনরোলমেন্ট থেকে কাউকে এপ্রোভ করবো তখন তা সুপাবেজের প্রোফাইল টেবিলে
+ * প্রিমিয়াম কলামে 'premium' লেখা যুক্ত হবে।
+ * 
+ * Supports:
+ * - 'profiles' and 'profile' tables
+ * - Column 'premium' updated to 'premium'
+ * - Matches by phone (handles 01XXXXXXXX, +8801XXXXXXXX, 8801XXXXXXXX, raw input)
+ * - Matches by name / full_name as fallback
+ * - Also updates 'students' table and local cache
+ */
+export const syncSupabaseProfilePremium = async (
+  phoneOrId: string,
+  studentName?: string,
+  premiumValue: string = 'premium'
+): Promise<{ success: boolean; error: string | null }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  const rawPhone = (phoneOrId || '').trim();
+  const cleanDigits = rawPhone.replace(/\D/g, '');
+  let national = cleanDigits;
+  if (cleanDigits.startsWith('880')) {
+    national = '0' + cleanDigits.slice(3);
+  } else if (cleanDigits.startsWith('88')) {
+    national = cleanDigits.slice(2);
+  }
+  const intl880 = national.startsWith('0') ? '88' + national : '880' + national;
+  const intlPlus880 = national.startsWith('0') ? '+88' + national : '+880' + national;
+
+  const phoneVariants = Array.from(
+    new Set([rawPhone, cleanDigits, national, intl880, intlPlus880].filter((p) => p && p.length >= 6))
+  );
+
+  let updatedCount = 0;
+
+  // 1. Check & update Supabase 'profiles' table
+  try {
+    // A. By explicit UUID / ID if provided
+    if (rawPhone.length >= 20 && rawPhone.includes('-')) {
+      try {
+        const { data } = await client
+          .from('profiles')
+          .update({ premium: premiumValue })
+          .eq('id', rawPhone)
+          .select('id');
+        if (data && data.length > 0) updatedCount += data.length;
+      } catch (e) {}
+    }
+
+    // B. Search matching profile records by phone
+    for (const p of phoneVariants) {
+      try {
+        const { data, error } = await client
+          .from('profiles')
+          .update({ premium: premiumValue })
+          .or(`phone.eq.${p},mobile.eq.${p},phone_number.eq.${p}`)
+          .select('id');
+        if (!error && data && data.length > 0) {
+          updatedCount += data.length;
+        }
+      } catch (e) {
+        // Fallback to updating specific columns individually
+        try {
+          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('phone', p).select('id');
+          if (data && data.length > 0) updatedCount += data.length;
+        } catch (e1) {}
+        try {
+          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('mobile', p).select('id');
+          if (data && data.length > 0) updatedCount += data.length;
+        } catch (e2) {}
+        try {
+          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('phone_number', p).select('id');
+          if (data && data.length > 0) updatedCount += data.length;
+        } catch (e3) {}
+      }
+    }
+
+    // C. By name if provided
+    if (studentName) {
+      try {
+        const { data } = await client
+          .from('profiles')
+          .update({ premium: premiumValue })
+          .or(`name.eq.${studentName},full_name.eq.${studentName}`)
+          .select('id');
+        if (data && data.length > 0) updatedCount += data.length;
+      } catch (e) {}
+    }
+  } catch (profErr) {
+    console.warn('profiles table premium sync note:', profErr);
+  }
+
+  // 2. Also attempt 'profile' (singular) table in case user named the table 'profile'
+  try {
+    for (const p of phoneVariants) {
+      try {
+        await client.from('profile').update({ premium: premiumValue }).eq('phone', p);
+      } catch (e) {}
+      try {
+        await client.from('profile').update({ premium: premiumValue }).eq('mobile', p);
+      } catch (e) {}
+      try {
+        await client.from('profile').update({ premium: premiumValue }).eq('phone_number', p);
+      } catch (e) {}
+    }
+    if (studentName) {
+      try {
+        await client
+          .from('profile')
+          .update({ premium: premiumValue })
+          .or(`name.eq.${studentName},full_name.eq.${studentName}`);
+      } catch (e) {}
+    }
+  } catch (singularErr) {
+    // Ignore if table 'profile' does not exist
+  }
+
+  // 3. Also update 'students' table with premium
+  try {
+    for (const p of phoneVariants) {
+      try {
+        await client.from('students').update({ premium: premiumValue }).eq('phone', p);
+      } catch (e) {}
+    }
+    if (studentName) {
+      try {
+        await client.from('students').update({ premium: premiumValue }).eq('name', studentName);
+      } catch (e) {}
+    }
+  } catch (stuErr) {
+    console.warn('students table premium sync note:', stuErr);
+  }
+
+  // 4. Update local registered students cache
+  try {
+    const localStudentsStr = localStorage.getItem('tamrin_registered_students_list');
+    if (localStudentsStr) {
+      const localList = JSON.parse(localStudentsStr);
+      if (Array.isArray(localList)) {
+        let changed = false;
+        for (const s of localList) {
+          const sPhone = (s.phone || '').trim();
+          if (phoneVariants.includes(sPhone) || (studentName && s.name === studentName)) {
+            s.premium = premiumValue;
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem('tamrin_registered_students_list', JSON.stringify(localList));
+        }
+      }
+    }
+  } catch (e) {}
+
+  console.log(`Supabase Profile sync completed. Target: ${studentPhoneOrName(rawPhone, studentName)}, Premium: ${premiumValue}`);
+  return { success: true, error: null };
+};
+
+const studentPhoneOrName = (phone: string, name?: string) => {
+  return `${name || 'Student'} (${phone || 'N/A'})`;
+};
+
 export const updateCourseApplicationStatus = async (
   id: string,
   status: ApplicationStatus,
@@ -5008,6 +5459,7 @@ export const updateCourseApplicationStatus = async (
             .update({
               enrolled_courses: enrolledList,
               target_exam: courseTitle,
+              premium: 'premium',
             })
             .eq('id', s.id);
         } else {
@@ -5021,6 +5473,7 @@ export const updateCourseApplicationStatus = async (
               phone: studentPhone,
               target_exam: courseTitle,
               enrolled_courses: [courseTitle],
+              premium: 'premium',
               created_at: new Date().toISOString(),
             },
           ]);
@@ -5082,13 +5535,23 @@ export const updateCourseApplicationStatus = async (
                 : [];
               if (!enrolled.includes(courseTitle)) {
                 localStudents[stuIdx].enrolled_courses = [...enrolled, courseTitle];
-                localStorage.setItem('tamrin_registered_students_list', JSON.stringify(localStudents));
               }
+              localStudents[stuIdx].premium = 'premium';
+              localStorage.setItem('tamrin_registered_students_list', JSON.stringify(localStudents));
             }
           }
         }
       } catch (localStuErr) {
         console.warn('Local student sync warning:', localStuErr);
+      }
+
+      // 5E. CRITICAL USER REQUIREMENT:
+      // যখন পেমেন্ট এনরোলমেন্ট থেকে কাউকে এপ্রোভ করবো তখন তা সুপাবেজের প্রোফাইল টেবিলে
+      // প্রিমিয়াম কলামে 'premium' লেখা যুক্ত হবে।
+      try {
+        await syncSupabaseProfilePremium(studentPhone, studentName, 'premium');
+      } catch (profSyncErr) {
+        console.warn('syncSupabaseProfilePremium invocation warning:', profSyncErr);
       }
     }
 

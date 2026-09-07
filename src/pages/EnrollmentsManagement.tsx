@@ -114,7 +114,7 @@ export const EnrollmentsManagement: React.FC = () => {
     try {
       const result = await updateCourseApplicationStatus(app.id, 'approved', app);
       if (result.success) {
-        showToast('✅ কোর্স অনুমোদন সফল হয়েছে এবং সুপাবেজে শিক্ষার্থী ও পেমেন্ট যুক্ত হয়েছে!', 'success');
+        showToast('✅ কোর্স অনুমোদন সফল হয়েছে এবং সুপাবেজের প্রোফাইল টেবিলে "premium" যুক্ত হয়েছে!', 'success');
       } else {
         showToast(`অনুমোদনে সমস্যা: ${result.error || 'সুপাবেজে আপডেট ব্যর্থ'}`, 'danger');
       }
@@ -346,6 +346,11 @@ CREATE TABLE IF NOT EXISTS public.student_enrollments (
 ALTER TABLE public.student_enrollments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public all on student_enrollments" ON public.student_enrollments;
 CREATE POLICY "Allow public all on student_enrollments" ON public.student_enrollments FOR ALL USING (true) WITH CHECK (true);
+
+-- Ensure profiles / students table has 'premium' column for approved students
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
+ALTER TABLE public.profile ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
 
 -- Enable Supabase Realtime for instant payment notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;

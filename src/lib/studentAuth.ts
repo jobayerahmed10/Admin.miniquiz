@@ -141,6 +141,22 @@ export const loginStudentAccount = async (
 
       if (data && data.length > 0) {
         const row = data[0];
+        let premiumStatus = row.premium || (row.is_premium ? 'premium' : undefined);
+
+        // Also check profiles table if not set in students table
+        if (!premiumStatus) {
+          try {
+            const { data: prof } = await client
+              .from('profiles')
+              .select('premium')
+              .or(`phone.eq.${row.phone || clean},mobile.eq.${row.phone || clean},phone_number.eq.${row.phone || clean},email.eq.${clean}`)
+              .limit(1);
+            if (prof && prof.length > 0 && prof[0].premium) {
+              premiumStatus = prof[0].premium;
+            }
+          } catch (e) {}
+        }
+
         const student: StudentUser = {
           id: row.id,
           student_id_code: row.student_id_code || generateStudentIdCode(),
@@ -152,6 +168,7 @@ export const loginStudentAccount = async (
           total_exams_taken: row.total_exams_taken || 0,
           avg_score: row.avg_score || 0,
           study_streak_days: row.study_streak_days || 1,
+          premium: premiumStatus,
         };
         setCurrentStudentSession(student);
         return { success: true, student };
@@ -244,6 +261,7 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
           total_exams_taken: row.total_exams_taken || 0,
           avg_score: row.avg_score || 0,
           study_streak_days: row.study_streak_days || 1,
+          premium: row.premium || (row.is_premium ? 'premium' : undefined),
         }));
       }
 
@@ -265,6 +283,7 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
           total_exams_taken: row.total_exams_taken || 0,
           avg_score: row.avg_score || 0,
           study_streak_days: row.study_streak_days || 1,
+          premium: row.premium || (row.is_premium ? 'premium' : undefined),
         }));
       }
     } catch (e) {
@@ -273,6 +292,42 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
   }
 
   return getLocalRegisteredStudents();
+};
+
+// Admin manually toggle / set student premium status
+export const updateStudentPremiumAdmin = async (
+  studentIdOrPhone: string,
+  studentName?: string,
+  premiumValue: 'premium' | null = 'premium'
+): Promise<{ success: boolean; error?: string }> => {
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const val = premiumValue === 'premium' ? 'premium' : null;
+      // Update profiles
+      await client.from('profiles').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
+      // Update profile singular
+      try {
+        await client.from('profile').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
+      } catch (e) {}
+      // Update students
+      await client.from('students').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
+    } catch (e: any) {
+      console.warn('updateStudentPremiumAdmin note:', e);
+    }
+  }
+
+  // Update local list
+  const list = getLocalRegisteredStudents();
+  const idx = list.findIndex(
+    (s) => s.id === studentIdOrPhone || s.phone === studentIdOrPhone || (studentName && s.name === studentName)
+  );
+  if (idx >= 0) {
+    list[idx].premium = premiumValue;
+    saveLocalRegisteredStudents(list);
+  }
+
+  return { success: true };
 };
 
 // ----------------------------------------------------

@@ -14,6 +14,7 @@ import {
   Filter,
   Eye,
   Trash2,
+  RotateCcw,
   Edit,
   Download,
   BarChart3,
@@ -48,6 +49,8 @@ interface Interface01DashboardProps {
   onDeleteQuestion: (id: string | number) => void;
   onRefresh: () => void;
   onClearAll?: () => void;
+  onOpenTrash?: () => void;
+  trashCount?: number;
 }
 
 export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
@@ -59,6 +62,8 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   onDeleteQuestion,
   onRefresh,
   onClearAll,
+  onOpenTrash,
+  trashCount = 0,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'subject' | 'topic'>('subject');
@@ -653,6 +658,21 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             </button>
           </div>
           <div className="flex items-center gap-2">
+            {onOpenTrash && (
+              <button
+                onClick={onOpenTrash}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors"
+                title="মুছে ফেলা প্রশ্ন ও রিসাইকেল বিন দেখুন"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>রিসাইকেল বিন</span>
+                {trashCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] leading-none">
+                    {trashCount}
+                  </span>
+                )}
+              </button>
+            )}
             {questions.length > 0 && onClearAll && (
               <button
                 onClick={onClearAll}
@@ -866,6 +886,23 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
           </button>
 
           <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  `আপনি কি নির্বাচিত ${selectedQuestionIds.length} টি প্রশ্ন মুছে ফেলতে চান? মুছে ফেলা প্রশ্নগুলো রিসাইকেল বিনে জমা থাকবে এবং যেকোনো সময় ফিরিয়ে আনা যাবে।`
+                )
+              ) {
+                selectedQuestionIds.forEach((id) => onDeleteQuestion(id));
+                setSelectedQuestionIds([]);
+              }
+            }}
+            className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold flex items-center gap-1.5 transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>মুছুন</span>
+          </button>
+
+          <button
             onClick={() => setSelectedQuestionIds([])}
             className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
             title="নির্বাচন বাতিল করুন"
@@ -876,7 +913,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       )}
 
       {/* 6. Quick Actions Row at Bottom */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
         {/* 1. View All Questions */}
         <div
           onClick={onSelectManual}
@@ -930,16 +967,41 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
           onClick={onSelectAiGenerate}
           className="cursor-pointer bg-[#0b1322] hover:bg-[#101b30] border border-slate-800 hover:border-slate-700 rounded-3xl p-4 transition-all group flex flex-col justify-between"
         >
-          <div className="w-9 h-9 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
             <BarChart3 className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition-colors">
+            <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition-colors">
               রিপোর্টস
             </h4>
             <p className="text-[10px] text-slate-400">বিস্তারিত পরিসংখ্যান</p>
           </div>
         </div>
+
+        {/* 5. Recycle Bin */}
+        {onOpenTrash && (
+          <div
+            onClick={onOpenTrash}
+            className="cursor-pointer bg-[#0b1322] hover:bg-[#101b30] border border-amber-500/30 hover:border-amber-500/50 rounded-3xl p-4 transition-all group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-9 h-9 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <RotateCcw className="w-4 h-4" />
+              </div>
+              {trashCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                  {trashCount} টি
+                </span>
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-amber-300 group-hover:text-amber-200 transition-colors">
+                রিসাইকেল বিন
+              </h4>
+              <p className="text-[10px] text-slate-400">মুছে ফেলা প্রশ্ন পুনরুদ্ধার</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* QUESTION SUBJECT & TOPIC TRANSFER MODAL */}

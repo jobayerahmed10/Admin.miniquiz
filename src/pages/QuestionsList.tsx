@@ -8,6 +8,8 @@ import {
   getDefaultSubjectPrefix,
   clearAllQuestions,
   autoAssignAndRepairQuestionTopics,
+  restoreQuestion,
+  getTrashQuestions,
 } from '../lib/supabase';
 import { Question } from '../types';
 import { QuestionBankView, WorkingQuestion, AiAutoGenerateConfig } from '../types/questionBank';
@@ -21,6 +23,8 @@ import { Interface07AiGeneratedPreview } from '../components/questionBank/Interf
 import { EditQuestionModal } from '../components/questionBank/EditQuestionModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PracticeSection } from '../components/questionBank/PracticeSection';
+import { TrashRecycleBin } from '../components/questionBank/TrashRecycleBin';
+import { RotateCcw, X } from 'lucide-react';
 import { formatSequentialId, sanitizeExplanation } from '../lib/questionBankEngine';
 
 export const QuestionsList: React.FC = () => {
@@ -49,6 +53,10 @@ export const QuestionsList: React.FC = () => {
   const [deletingQuestionId, setDeletingQuestionId] = useState<string | number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Undo and Trash states
+  const [undoItem, setUndoItem] = useState<Question | null>(null);
+  const [trashCount, setTrashCount] = useState<number>(0);
+
   // Sync mode from search params on mount
   useEffect(() => {
     const mode = searchParams.get('mode');
@@ -64,6 +72,8 @@ export const QuestionsList: React.FC = () => {
     try {
       const { questions: data } = await fetchAllQuestions();
       setQuestions(data || []);
+      const trash = getTrashQuestions();
+      setTrashCount(trash.length);
     } catch (err) {
       console.warn('Error loading questions:', err);
     } finally {
@@ -74,6 +84,19 @@ export const QuestionsList: React.FC = () => {
   useEffect(() => {
     loadQuestions();
   }, [loadQuestions]);
+
+  // Listen for background updates to the trash bin
+  useEffect(() => {
+    const handleTrashUpdate = () => {
+      const trash = getTrashQuestions();
+      setTrashCount(trash.length);
+    };
+    handleTrashUpdate();
+    window.addEventListener('miniquiz_trash_updated', handleTrashUpdate);
+    return () => {
+      window.removeEventListener('miniquiz_trash_updated', handleTrashUpdate);
+    };
+  }, []);
 
   // Publish handler to batch insert into Supabase + local cache
   const handlePublishQuestions = async (
@@ -111,18 +134,40 @@ export const QuestionsList: React.FC = () => {
     await loadQuestions();
   };
 
-  // Delete question handler
+  // Delete question handler with automatic Trash move & Undo banner
   const handleConfirmDelete = async () => {
     if (!deletingQuestionId) return;
+    const itemToDelete = questions.find((q) => String(q.id) === String(deletingQuestionId)) || null;
     setIsDeleting(true);
     try {
       await deleteQuestion(deletingQuestionId);
       setQuestions((prev) => prev.filter((q) => String(q.id) !== String(deletingQuestionId)));
       setDeletingQuestionId(null);
+      if (itemToDelete) {
+        setUndoItem(itemToDelete);
+        const trash = getTrashQuestions();
+        setTrashCount(trash.length);
+        // Automatically hide undo banner after 8 seconds
+        setTimeout(() => {
+          setUndoItem((curr) => (curr && String(curr.id) === String(itemToDelete.id) ? null : curr));
+        }, 8000);
+      }
     } catch (err) {
       console.error('Delete question error:', err);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Undo delete: restore the last deleted item immediately
+  const handleUndoDelete = async () => {
+    if (!undoItem) return;
+    try {
+      await restoreQuestion(undoItem.id);
+      await loadQuestions();
+      setUndoItem(null);
+    } catch (err) {
+      console.error('Undo delete error:', err);
     }
   };
 
@@ -177,16 +222,20 @@ export const QuestionsList: React.FC = () => {
   };
 
   const handleClearAllQuestions = async () => {
-    if (window.confirm('আপনি কি নিশ্চিতভাবে সব প্রশ্ন মুছে ফেলতে চান?')) {
+    if (
+      window.confirm(
+        'আপনি কি নিশ্চিতভাবে সব প্রশ্ন মুছে ফেলতে চান? মনে রাখবেন, সব প্রশ্ন নিরাপদভাবে রিসাইকেল বিনে জমা থাকবে এবং আপনি যেকোনো সময় রিসাইকেল বিন থেকে ফিরিয়ে আনতে (Restore) পারবেন।'
+      )
+    ) {
       await clearAllQuestions();
-      setQuestions([]);
+      await loadQuestions();
     }
   };
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top View Selector Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3 flex-wrap">
         <button
           onClick={() => setCurrentView('dashboard')}
           className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
@@ -207,6 +256,28 @@ export const QuestionsList: React.FC = () => {
           }`}
         >
           <span>🎯 প্র্যাকটিস (বিষয়, টপিক ও সাব-টপিক)</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('trash')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            currentView === 'trash'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <span>🗑️ রিসাইকেল বিন</span>
+          {trashCount > 0 && (
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                currentView === 'trash'
+                  ? 'bg-slate-950 text-amber-300'
+                  : 'bg-amber-500 text-slate-950'
+              }`}
+            >
+              {trashCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -229,6 +300,8 @@ export const QuestionsList: React.FC = () => {
           onDeleteQuestion={(id) => setDeletingQuestionId(id)}
           onRefresh={loadQuestions}
           onClearAll={handleClearAllQuestions}
+          onOpenTrash={() => setCurrentView('trash')}
+          trashCount={trashCount}
         />
       )}
 
@@ -323,6 +396,14 @@ export const QuestionsList: React.FC = () => {
         />
       )}
 
+      {/* 8. Interface 08: Recycle Bin & Recovery */}
+      {currentView === 'trash' && (
+        <TrashRecycleBin
+          onBackToDashboard={() => setCurrentView('dashboard')}
+          onQuestionRestored={loadQuestions}
+        />
+      )}
+
       {/* Inline Edit Modal from Dashboard */}
       {editingFromDashboard && (
         <EditQuestionModal
@@ -337,14 +418,40 @@ export const QuestionsList: React.FC = () => {
       <ConfirmModal
         isOpen={Boolean(deletingQuestionId)}
         title="প্রশ্ন মুছে ফেলতে চান?"
-        message="এই প্রশ্নটি মুছে ফেললে তা ডাটাবেস ও সকল সংশ্লিষ্ট মডেল টেস্ট থেকে স্থায়ীভাবে অপসারিত হবে।"
-        confirmText="হ্যাঁ, মুছে ফেলুন"
+        message="প্রশ্নটি মুছে ফেললে তা রিসাইকেল বিনে চলে যাবে। ভুলবশত মুছে ফেললেও আপনি যেকোনো সময় রিসাইকেল বিন থেকে এটি ফিরিয়ে আনতে (Restore) পারবেন।"
+        confirmText="হ্যাঁ, রিসাইকেল বিনে পাঠান"
         cancelText="বাতিল"
         isDanger
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeletingQuestionId(null)}
       />
+
+      {/* Floating Undo Toast Notification */}
+      {undoItem && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#0c1322] border border-amber-500/60 shadow-2xl rounded-2xl p-4 flex items-center gap-3 text-xs max-w-md animate-in slide-in-from-bottom-5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <RotateCcw className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white">প্রশ্নটি রিসাইকেল বিনে পাঠানো হয়েছে</p>
+            <p className="text-[11px] text-slate-400 truncate">{undoItem.question}</p>
+          </div>
+          <button
+            onClick={handleUndoDelete}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>পূর্বাবস্থায় আনুন (Undo)</span>
+          </button>
+          <button
+            onClick={() => setUndoItem(null)}
+            className="p-1 rounded-lg text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -15,14 +15,21 @@ import {
   Check,
   Filter,
   Trash2,
+  Crown,
 } from 'lucide-react';
 import { StudentUser } from '../types';
-import { fetchAllRegisteredStudentsForAdmin, deleteStudentAdmin, deleteAllStudentsAdmin } from '../lib/studentAuth';
+import {
+  fetchAllRegisteredStudentsForAdmin,
+  deleteStudentAdmin,
+  deleteAllStudentsAdmin,
+  updateStudentPremiumAdmin,
+} from '../lib/studentAuth';
 
 export const StudentsManagement: React.FC = () => {
   const [students, setStudents] = useState<StudentUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'premium' | 'regular'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -46,6 +53,26 @@ export const StudentsManagement: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedId(text);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleTogglePremium = async (student: StudentUser) => {
+    const isCurrentlyPremium = student.premium === 'premium';
+    const nextVal = isCurrentlyPremium ? null : 'premium';
+    const msg = isCurrentlyPremium
+      ? `"${student.name}"-এর প্রিমিয়াম সুবিধা বাদ দেওয়া হয়েছে`
+      : `👑 "${student.name}"-কে প্রিমিয়াম স্ট্যাটাস দেওয়া হয়েছে (সুপাবেজে সংরক্ষিত)`;
+
+    setStudents((prev) =>
+      prev.map((s) => (s.id === student.id ? { ...s, premium: nextVal } : s))
+    );
+
+    const res = await updateStudentPremiumAdmin(student.id || student.phone, student.name, nextVal);
+    if (res.success) {
+      showToast(msg, 'success');
+    } else {
+      showToast('প্রিমিয়াম স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে', 'error');
+      loadStudents();
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -75,13 +102,19 @@ export const StudentsManagement: React.FC = () => {
 
   const filteredStudents = students.filter((s) => {
     const q = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       s.name.toLowerCase().includes(q) ||
       s.student_id_code.toLowerCase().includes(q) ||
       s.phone.toLowerCase().includes(q) ||
-      (s.email && s.email.toLowerCase().includes(q))
-    );
+      (s.email && s.email.toLowerCase().includes(q));
+
+    if (!matchesSearch) return false;
+    if (statusFilter === 'premium') return s.premium === 'premium';
+    if (statusFilter === 'regular') return s.premium !== 'premium';
+    return true;
   });
+
+  const premiumCount = students.filter((s) => s.premium === 'premium').length;
 
   return (
     <div className="space-y-6">
@@ -124,8 +157,8 @@ export const StudentsManagement: React.FC = () => {
       </div>
 
       {/* Search & Counter Filter */}
-      <div className="bg-slate-900/90 border border-slate-800/80 p-4 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-        <div className="relative w-full sm:w-80">
+      <div className="bg-slate-900/90 border border-slate-800/80 p-4 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-lg">
+        <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
             type="text"
@@ -136,11 +169,38 @@ export const StudentsManagement: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-extrabold text-slate-400">
-          <span>মোট শিক্ষার্থী:</span>
-          <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 font-mono">
-            {students.length} জন
-          </span>
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'all'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+            }`}
+          >
+            সকল শিক্ষার্থী ({students.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('premium')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+              statusFilter === 'premium'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'bg-slate-800 text-amber-400/80 hover:text-amber-300 border border-slate-700'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span>👑 প্রিমিয়াম ({premiumCount})</span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('regular')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'regular'
+                ? 'bg-slate-700 text-slate-100 border border-slate-600'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+            }`}
+          >
+            সাধারণ ({students.length - premiumCount})
+          </button>
         </div>
       </div>
 
@@ -189,7 +249,14 @@ export const StudentsManagement: React.FC = () => {
                         <div className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
                           {s.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-white">{s.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{s.name}</span>
+                          {s.premium === 'premium' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              👑 প্রিমিয়াম
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -233,10 +300,29 @@ export const StudentsManagement: React.FC = () => {
 
                     {/* Status & Actions */}
                     <td className="p-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          <UserCheck className="w-3 h-3" /> সক্রিয়
-                        </span>
+                      <div className="flex items-center justify-end gap-2">
+                        {s.premium === 'premium' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs">
+                            <Crown className="w-3 h-3" /> প্রিমিয়াম
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <UserCheck className="w-3 h-3" /> সক্রিয়
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => handleTogglePremium(s)}
+                          className={`p-1.5 rounded-lg text-xs font-bold transition-all border ${
+                            s.premium === 'premium'
+                              ? 'text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                              : 'text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 border-transparent hover:border-amber-500/20'
+                          }`}
+                          title={s.premium === 'premium' ? 'প্রিমিয়াম বাতিল করুন' : 'প্রিমিয়াম স্ট্যাটাস দিন'}
+                        >
+                          <Crown className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => handleDelete(s.id, s.name)}
                           className="p-1.5 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"

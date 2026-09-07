@@ -40,6 +40,10 @@ export interface Question {
   updated_at?: string;
 }
 
+export interface TrashQuestion extends Question {
+  deleted_at: string;
+}
+
 export type ExamBadgeType = 'free' | 'daily' | 'weekly' | 'live';
 export type ExamStatus = 'active' | 'draft' | 'upcoming';
 
@@ -346,6 +350,7 @@ export interface StudentUser {
   avg_score?: number;
   study_streak_days?: number;
   total_study_minutes?: number;
+  premium?: string | null; // e.g. 'premium' (সুপাবেজ প্রোফাইল টেবিলের প্রিমিয়াম স্ট্যাটাস)
 }
 
 export interface SubjectPerformance {
