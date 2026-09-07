@@ -62,7 +62,6 @@ export const QuestionsList: React.FC = () => {
   const loadQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      await autoAssignAndRepairQuestionTopics();
       const { questions: data } = await fetchAllQuestions();
       setQuestions(data || []);
     } catch (err) {

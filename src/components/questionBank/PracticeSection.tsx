@@ -79,41 +79,13 @@ export const PracticeSection: React.FC<PracticeSectionProps> = ({
     const seenNormTexts = new Set<string>();
 
     questions.forEach((q) => {
-      const qIdStr = String(q.id || '');
-      const cleanSub = (q.subject || '').trim();
-      const cleanTop = (q.topic || '').trim();
-      const cleanSubTop = (q.sub_topic || q.subtopic || '').trim();
-      const qText = (q.question || '').toLowerCase();
       const normText = (q.question || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
-      const isUsulOrFiqh =
-        cleanSub.includes('উসূল') ||
-        cleanSub.includes('ফিকহ') ||
-        cleanSub.includes('আরবি') ||
-        cleanSub.includes('ইসলাম') ||
-        cleanTop.includes('উসূল') ||
-        cleanTop.includes('ফিকহ') ||
-        cleanSubTop.includes('উসূল') ||
-        cleanSubTop.includes('ফিকহ') ||
-        qText.includes('উসূল') ||
-        qText.includes('ফিকহ') ||
-        qText.includes('কিতাবুল্লাহ') ||
-        qText.includes('শরীয়ত');
-
-      const isDummyDemo =
-        qIdStr.startsWith('Q-GK-') ||
-        qIdStr.startsWith('Q-MATH-') ||
-        qIdStr.startsWith('Q-MOCK-') ||
-        qText.includes('সাধারণ জ্ঞান টেস্ট প্রশ্ন') ||
-        qText.includes('গণিত টেস্ট প্রশ্ন') ||
-        qText.includes('বিসিএস পূর্ণাঙ্গ মক প্রশ্ন') ||
-        qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
-        qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
-
-      if (isUsulOrFiqh || isDummyDemo || !normText || seenNormTexts.has(normText)) {
+      if (!normText) return;
+      const qIdStr = String(q.id || '');
+      if (seenNormTexts.has(qIdStr)) {
         return;
       }
-      seenNormTexts.add(normText);
+      seenNormTexts.add(qIdStr);
       deduplicatedQuestions.push(q);
     });
 

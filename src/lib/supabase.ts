@@ -572,7 +572,8 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
     const { data, error } = await client
       .from('questions')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(5000);
 
     if (error) {
       console.warn('Supabase fetchAllQuestions error, returning local cache:', error);
@@ -585,50 +586,26 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
 
     const normalized = (data || []).map(normalizeQuestionRow);
 
-    // Merge & deduplicate by normalized question text, filtering out Usul/Fiqh & dummy questions
-    const candidatePool = [...localQuestions, ...normalized];
-    const cleanList: Question[] = [];
-    const seenTexts = new Set<string>();
+    // Merge Supabase questions with local cache by ID to preserve all questions
+    const questionMap = new Map<string, Question>();
 
-    for (const q of candidatePool) {
-      const qIdStr = String(q.id || '');
-      const cleanSub = (q.subject || '').trim();
-      const cleanTop = (q.topic || '').trim();
-      const cleanSubTop = (q.sub_topic || q.subtopic || '').trim();
-      const qText = (q.question || '').toLowerCase();
-      const normText = (q.question || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
-      const isUsulOrFiqh =
-        cleanSub.includes('উসূল') ||
-        cleanSub.includes('ফিকহ') ||
-        cleanSub.includes('আরবি') ||
-        cleanSub.includes('ইসলাম') ||
-        cleanTop.includes('উসূল') ||
-        cleanTop.includes('ফিকহ') ||
-        cleanSubTop.includes('উসূল') ||
-        cleanSubTop.includes('ফিকহ') ||
-        qText.includes('উসূল') ||
-        qText.includes('ফিকহ') ||
-        qText.includes('কিতাবুল্লাহ') ||
-        qText.includes('শরীয়ত');
-
-      const isDummyDemo =
-        qIdStr.startsWith('Q-GK-') ||
-        qIdStr.startsWith('Q-MATH-') ||
-        qIdStr.startsWith('Q-MOCK-') ||
-        qText.includes('সাধারণ জ্ঞান টেস্ট প্রশ্ন') ||
-        qText.includes('গণিত টেস্ট প্রশ্ন') ||
-        qText.includes('বিসিএস পূর্ণাঙ্গ মক প্রশ্ন') ||
-        qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
-        qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
-
-      if (isUsulOrFiqh || isDummyDemo || !normText || seenTexts.has(normText)) {
-        continue;
+    // 1. Add local questions first
+    for (const q of localQuestions) {
+      if (q && q.id) {
+        questionMap.set(String(q.id), q);
       }
-      seenTexts.add(normText);
-      cleanList.push(q);
     }
 
+    // 2. Supabase rows are authoritative; overwrite or append
+    for (const q of normalized) {
+      if (q && q.id) {
+        questionMap.set(String(q.id), q);
+      }
+    }
+
+    const cleanList = Array.from(questionMap.values());
+
+    // Save merged questions to local cache
     setLocalCachedQuestions(cleanList);
 
     return { questions: cleanList, error: null, isSynced: true };
@@ -1314,46 +1291,9 @@ export const autoAssignAndRepairQuestionTopics = async (
     const qText = (q.question || '').toLowerCase();
     const normText = (q.question || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-    // 1. Check if it's Usulul Fiqh / Fiqh / Arabic / Islamic question -> REMOVE
-    const isUsulOrFiqh =
-      cleanSub.includes('উসূল') ||
-      cleanSub.includes('ফিকহ') ||
-      cleanSub.includes('আরবি') ||
-      cleanSub.includes('ইসলাম') ||
-      cleanTop.includes('উসূল') ||
-      cleanTop.includes('ফিকহ') ||
-      cleanSubTop.includes('উসূল') ||
-      cleanSubTop.includes('ফিকহ') ||
-      qText.includes('উসূল') ||
-      qText.includes('ফিকহ') ||
-      qText.includes('কিতাবুল্লাহ') ||
-      qText.includes('শরীয়ত');
-
-    // 2. Check if it's a dummy demo question (GK, Math, Mock, etc.) -> REMOVE
-    const isDummyDemo =
-      qIdStr.startsWith('Q-GK-') ||
-      qIdStr.startsWith('Q-MATH-') ||
-      qIdStr.startsWith('Q-MOCK-') ||
-      qText.includes('সাধারণ জ্ঞান টেস্ট প্রশ্ন') ||
-      qText.includes('গণিত টেস্ট প্রশ্ন') ||
-      qText.includes('বিসিএস পূর্ণাঙ্গ মক প্রশ্ন') ||
-      qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
-      qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
-
-    if (isUsulOrFiqh || isDummyDemo) {
-      deletedDemoIds.push(qIdStr);
-      updatedCount++;
+    if (!normText) {
       continue;
     }
-
-    // 3. Deduplicate by question text
-    if (!normText || seenQuestionTexts.has(normText)) {
-      // Duplicate question -> mark for deletion
-      deletedDemoIds.push(qIdStr);
-      updatedCount++;
-      continue;
-    }
-    seenQuestionTexts.add(normText);
 
     const isEnglishPreposition =
       cleanSub === 'English' ||
@@ -1438,10 +1378,6 @@ export const autoAssignAndRepairQuestionTopics = async (
   const client = getSupabaseClient();
   if (client) {
     try {
-      if (deletedDemoIds.length > 0) {
-        await client.from('questions').delete().in('id', deletedDemoIds);
-      }
-
       for (const q of processedQuestions) {
         await client.from('questions').upsert({
           id: String(q.id),
@@ -4937,15 +4873,22 @@ export const fetchAllCourseApplications = async (): Promise<{
 
 export const updateCourseApplicationStatus = async (
   id: string,
-  status: ApplicationStatus
+  status: ApplicationStatus,
+  appData?: Partial<CourseApplication>
 ): Promise<{ success: boolean; data?: CourseApplication; error: string | null }> => {
   const current = getLocalApplicationsCache();
-  const idx = current.findIndex((a) => a.id === id);
-  let updatedApp: CourseApplication | undefined;
+  const trxMatch = appData?.transaction_id;
+  const idx = current.findIndex((a) => a.id === id || (trxMatch && a.transaction_id === trxMatch));
+  let targetApp: CourseApplication | undefined = idx !== -1 ? current[idx] : (appData as CourseApplication | undefined);
 
-  if (idx !== -1) {
-    updatedApp = { ...current[idx], status, updated_at: new Date().toISOString() };
-    current[idx] = updatedApp;
+  let updatedApp: CourseApplication | undefined;
+  if (targetApp) {
+    updatedApp = { ...targetApp, ...appData, status, updated_at: new Date().toISOString() };
+    if (idx !== -1) {
+      current[idx] = updatedApp;
+    } else {
+      current.unshift(updatedApp);
+    }
     setLocalApplicationsCache([...current]);
   }
 
@@ -4955,30 +4898,225 @@ export const updateCourseApplicationStatus = async (
   }
 
   try {
-    const { data, error } = await client
-      .from('course_applications')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    let updateSuccess = false;
+    let syncedData: any = null;
 
-    if (error) {
-      console.warn('Supabase updateCourseApplicationStatus warning:', error.message);
-      return { success: true, data: updatedApp, error: null };
+    // 1. Attempt update by ID with status & updated_at
+    try {
+      const { data, error } = await client
+        .from('course_applications')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select();
+
+      if (!error && data && data.length > 0) {
+        updateSuccess = true;
+        syncedData = data[0];
+      }
+    } catch (e1) {
+      console.warn('Attempt 1 (id + updated_at) warning:', e1);
     }
 
-    const norm = normalizeCourseApplicationRow(data);
-    return { success: true, data: norm, error: null };
+    // 2. Attempt update by ID with only status (in case updated_at column does not exist)
+    if (!updateSuccess) {
+      try {
+        const { data, error } = await client
+          .from('course_applications')
+          .update({ status })
+          .eq('id', id)
+          .select();
+
+        if (!error && data && data.length > 0) {
+          updateSuccess = true;
+          syncedData = data[0];
+        }
+      } catch (e2) {
+        console.warn('Attempt 2 (id only) warning:', e2);
+      }
+    }
+
+    // 3. Attempt update by transaction_id (if id is a local string like 'app-xxx' or UUID mismatch)
+    const activeTrx = targetApp?.transaction_id || trxMatch;
+    if (!updateSuccess && activeTrx) {
+      try {
+        const { data, error } = await client
+          .from('course_applications')
+          .update({ status })
+          .eq('transaction_id', activeTrx)
+          .select();
+
+        if (!error && data && data.length > 0) {
+          updateSuccess = true;
+          syncedData = data[0];
+        }
+      } catch (e3) {
+        console.warn('Attempt 3 (transaction_id) warning:', e3);
+      }
+    }
+
+    // 4. If record not yet in Supabase table, INSERT it directly with status
+    if (!updateSuccess && targetApp) {
+      try {
+        const { data, error } = await client
+          .from('course_applications')
+          .insert([
+            {
+              student_name: targetApp.student_name,
+              phone_number: targetApp.phone_number,
+              course_title: targetApp.course_title,
+              course_id: targetApp.course_id || null,
+              payment_method: targetApp.payment_method || 'bKash',
+              amount: targetApp.amount || 0,
+              transaction_id: targetApp.transaction_id,
+              status: status,
+              notes: targetApp.notes || '',
+            },
+          ])
+          .select();
+
+        if (!error && data && data.length > 0) {
+          updateSuccess = true;
+          syncedData = data[0];
+        }
+      } catch (e4) {
+        console.warn('Attempt 4 (insert) warning:', e4);
+      }
+    }
+
+    // 5. CRITICAL: When Approved, sync Student and Enrollment to Supabase!
+    if (status === 'approved' && targetApp) {
+      const studentPhone = (targetApp.phone_number || '').trim();
+      const studentName = (targetApp.student_name || '').trim();
+      const courseTitle = targetApp.course_title || '';
+
+      // 5A. Add / Update Student in Supabase 'students' table
+      try {
+        const { data: existingStudents } = await client
+          .from('students')
+          .select('id, name, phone, enrolled_courses')
+          .eq('phone', studentPhone)
+          .limit(1);
+
+        if (existingStudents && existingStudents.length > 0) {
+          const s = existingStudents[0];
+          let enrolledList = Array.isArray(s.enrolled_courses) ? s.enrolled_courses : [];
+          if (!enrolledList.includes(courseTitle)) {
+            enrolledList = [...enrolledList, courseTitle];
+          }
+          await client
+            .from('students')
+            .update({
+              enrolled_courses: enrolledList,
+              target_exam: courseTitle,
+            })
+            .eq('id', s.id);
+        } else {
+          const newStudentId = `stu-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const randomDigits = Math.floor(1000 + Math.random() * 9000);
+          await client.from('students').insert([
+            {
+              id: newStudentId,
+              student_id_code: `AT-2026-${randomDigits}`,
+              name: studentName,
+              phone: studentPhone,
+              target_exam: courseTitle,
+              enrolled_courses: [courseTitle],
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        }
+      } catch (stuErr) {
+        console.warn('Supabase student sync warning:', stuErr);
+      }
+
+      // 5B. Record enrollment in 'student_enrollments' or 'course_enrollments' if present
+      try {
+        await client.from('student_enrollments').insert([
+          {
+            student_name: studentName,
+            phone_number: studentPhone,
+            course_title: courseTitle,
+            course_id: targetApp.course_id || null,
+            payment_method: targetApp.payment_method || 'bKash',
+            amount: targetApp.amount || 0,
+            transaction_id: targetApp.transaction_id,
+            status: 'active',
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (enrErr) {
+        // Optional table, fallback silently
+      }
+
+      // 5C. Increment Course enrolled_count in 'courses' table
+      try {
+        const { data: matchedCourses } = await client
+          .from('courses')
+          .select('id, enrolled_count')
+          .or(`title.ilike.%${courseTitle}%`)
+          .limit(1);
+
+        if (matchedCourses && matchedCourses.length > 0) {
+          const currentCount = Number(matchedCourses[0].enrolled_count || 0);
+          await client
+            .from('courses')
+            .update({ enrolled_count: currentCount + 1 })
+            .eq('id', matchedCourses[0].id);
+        }
+      } catch (courseErr) {
+        console.warn('Courses enrolled_count update warning:', courseErr);
+      }
+
+      // 5D. Also unlock in local registered students list
+      try {
+        const localStudentsStr = localStorage.getItem('tamrin_registered_students_list');
+        if (localStudentsStr) {
+          const localStudents = JSON.parse(localStudentsStr);
+          if (Array.isArray(localStudents)) {
+            const stuIdx = localStudents.findIndex(
+              (s: any) => s.phone === studentPhone || s.name === studentName
+            );
+            if (stuIdx !== -1) {
+              const enrolled = Array.isArray(localStudents[stuIdx].enrolled_courses)
+                ? localStudents[stuIdx].enrolled_courses
+                : [];
+              if (!enrolled.includes(courseTitle)) {
+                localStudents[stuIdx].enrolled_courses = [...enrolled, courseTitle];
+                localStorage.setItem('tamrin_registered_students_list', JSON.stringify(localStudents));
+              }
+            }
+          }
+        }
+      } catch (localStuErr) {
+        console.warn('Local student sync warning:', localStuErr);
+      }
+    }
+
+    if (syncedData) {
+      const norm = normalizeCourseApplicationRow(syncedData);
+      // Update local cache with Supabase normalized row
+      const refreshedCache = getLocalApplicationsCache().map((a) =>
+        a.id === id || (activeTrx && a.transaction_id === activeTrx) ? norm : a
+      );
+      setLocalApplicationsCache(refreshedCache);
+      return { success: true, data: norm, error: null };
+    }
+
+    return { success: true, data: updatedApp, error: null };
   } catch (err: any) {
+    console.error('updateCourseApplicationStatus error:', err);
     return { success: true, data: updatedApp, error: null };
   }
 };
 
 export const deleteCourseApplication = async (
-  id: string
+  id: string,
+  transactionId?: string
 ): Promise<{ success: boolean; error: string | null }> => {
   const current = getLocalApplicationsCache();
-  const filtered = current.filter((a) => a.id !== id);
+  const filtered = current.filter(
+    (a) => a.id !== id && (!transactionId || a.transaction_id !== transactionId)
+  );
   setLocalApplicationsCache(filtered);
 
   const client = getSupabaseClient();
@@ -4987,9 +5125,9 @@ export const deleteCourseApplication = async (
   }
 
   try {
-    const { error } = await client.from('course_applications').delete().eq('id', id);
-    if (error) {
-      console.warn('Supabase deleteCourseApplication warning:', error.message);
+    let { error } = await client.from('course_applications').delete().eq('id', id);
+    if (error && transactionId) {
+      await client.from('course_applications').delete().eq('transaction_id', transactionId);
     }
     return { success: true, error: null };
   } catch (err) {
@@ -5040,6 +5178,9 @@ export const insertCourseApplication = async (
     }
 
     const norm = normalizeCourseApplicationRow(data);
+    // Replace local cache item with returned Supabase item with real ID
+    const updated = getLocalApplicationsCache().map((a) => (a.id === id ? norm : a));
+    setLocalApplicationsCache(updated);
     return { success: true, data: norm, error: null };
   } catch (err) {
     return { success: true, data: appObj, error: null };

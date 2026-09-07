@@ -39,6 +39,7 @@ export const EnrollmentsManagement: React.FC = () => {
 
   // Copying feedback states
   const [copiedTrxId, setCopiedTrxId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Modals state
   const [showSqlModal, setShowSqlModal] = useState(false);
@@ -102,29 +103,64 @@ export const EnrollmentsManagement: React.FC = () => {
   };
 
   // Quick Action Handlers
-  const handleApprove = async (id: string) => {
-    const result = await updateCourseApplicationStatus(id, 'approved');
-    if (result.success) {
-      showToast('Enrollment Approved & Course Unlocked for Student!', 'success');
-      loadApplications();
+  const handleApprove = async (app: CourseApplication) => {
+    setProcessingId(app.id);
+
+    // 1. Immediate optimistic UI update
+    setApplications((prev) =>
+      prev.map((a) => (a.id === app.id ? { ...a, status: 'approved', updated_at: new Date().toISOString() } : a))
+    );
+
+    try {
+      const result = await updateCourseApplicationStatus(app.id, 'approved', app);
+      if (result.success) {
+        showToast('✅ কোর্স অনুমোদন সফল হয়েছে এবং সুপাবেজে শিক্ষার্থী ও পেমেন্ট যুক্ত হয়েছে!', 'success');
+      } else {
+        showToast(`অনুমোদনে সমস্যা: ${result.error || 'সুপাবেজে আপডেট ব্যর্থ'}`, 'danger');
+      }
+      await loadApplications();
+    } catch (err: any) {
+      showToast(`ত্রুটি: ${err.message || 'অনুমোদন করা সম্ভব হয়নি'}`, 'danger');
+      await loadApplications();
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  const handleReject = async (id: string) => {
-    const result = await updateCourseApplicationStatus(id, 'rejected');
-    if (result.success) {
-      showToast('আবেদনটি বাতিল করা হয়েছে।', 'danger');
-      loadApplications();
+  const handleReject = async (app: CourseApplication) => {
+    setProcessingId(app.id);
+
+    // Immediate optimistic UI update
+    setApplications((prev) =>
+      prev.map((a) => (a.id === app.id ? { ...a, status: 'rejected', updated_at: new Date().toISOString() } : a))
+    );
+
+    try {
+      const result = await updateCourseApplicationStatus(app.id, 'rejected', app);
+      if (result.success) {
+        showToast('আবেদনটি বাতিল করা হয়েছে।', 'danger');
+      } else {
+        showToast(`বাতিল করতে সমস্যা: ${result.error || 'সুপাবেজে আপডেট ব্যর্থ'}`, 'danger');
+      }
+      await loadApplications();
+    } catch (err: any) {
+      showToast(`ত্রুটি: ${err.message || 'বাতিল করা সম্ভব হয়নি'}`, 'danger');
+      await loadApplications();
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`আপনি কি নিশ্চিতভাবে "${name}"-এর পেমেন্ট রেকর্ড মুছে ফেলতে চান?`)) {
-      const result = await deleteCourseApplication(id);
+  const handleDelete = async (app: CourseApplication) => {
+    if (confirm(`আপনি কি নিশ্চিতভাবে "${app.student_name}"-এর পেমেন্ট রেকর্ড মুছে ফেলতে চান?`)) {
+      setProcessingId(app.id);
+      setApplications((prev) => prev.filter((a) => a.id !== app.id));
+      const result = await deleteCourseApplication(app.id, app.transaction_id);
       if (result.success) {
         showToast('পেমেন্ট আবেদন রেকর্ড মুছে ফেলা হয়েছে।', 'info');
-        loadApplications();
       }
+      await loadApplications();
+      setProcessingId(null);
     }
   };
 
@@ -260,14 +296,56 @@ CREATE TABLE IF NOT EXISTS public.course_applications (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure all columns exist even if table was created previously
+ALTER TABLE public.course_applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.course_applications ADD COLUMN IF NOT EXISTS course_id TEXT DEFAULT NULL;
+ALTER TABLE public.course_applications ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.course_applications ENABLE ROW LEVEL SECURITY;
 
--- Add Public Access Policies
-CREATE POLICY "Allow public select course_applications" ON public.course_applications FOR SELECT USING (true);
-CREATE POLICY "Allow public insert course_applications" ON public.course_applications FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update course_applications" ON public.course_applications FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete course_applications" ON public.course_applications FOR DELETE USING (true);
+-- Add Universal Public Access Policies
+DROP POLICY IF EXISTS "Allow public all access on course_applications" ON public.course_applications;
+DROP POLICY IF EXISTS "Allow public select course_applications" ON public.course_applications;
+DROP POLICY IF EXISTS "Allow public insert course_applications" ON public.course_applications;
+DROP POLICY IF EXISTS "Allow public update course_applications" ON public.course_applications;
+DROP POLICY IF EXISTS "Allow public delete course_applications" ON public.course_applications;
+
+CREATE POLICY "Allow public all access on course_applications" ON public.course_applications 
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- Ensure Students table exists for enrollment sync
+CREATE TABLE IF NOT EXISTS public.students (
+  id TEXT PRIMARY KEY,
+  student_id_code TEXT,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT,
+  target_exam TEXT,
+  enrolled_courses JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS enrolled_courses JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on students" ON public.students;
+CREATE POLICY "Allow public all on students" ON public.students FOR ALL USING (true) WITH CHECK (true);
+
+-- Optional: Create student_enrollments audit table
+CREATE TABLE IF NOT EXISTS public.student_enrollments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_name TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  course_title TEXT NOT NULL,
+  course_id TEXT DEFAULT NULL,
+  payment_method TEXT DEFAULT 'bKash',
+  amount NUMERIC DEFAULT 0,
+  transaction_id TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.student_enrollments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on student_enrollments" ON public.student_enrollments;
+CREATE POLICY "Allow public all on student_enrollments" ON public.student_enrollments FOR ALL USING (true) WITH CHECK (true);
 
 -- Enable Supabase Realtime for instant payment notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;
@@ -669,29 +747,40 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;
                         <div className="flex items-center justify-end gap-1.5">
                           {app.status !== 'approved' && (
                             <button
-                              onClick={() => handleApprove(app.id)}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 font-bold text-xs transition-all border border-emerald-500/30 flex items-center gap-1 shadow-sm active:scale-95"
+                              onClick={() => handleApprove(app)}
+                              disabled={processingId === app.id}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 font-bold text-xs transition-all border border-emerald-500/30 flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="অনুমোদন করুন ও কোর্স আনলক করুন"
                             >
-                              <CheckCircle className="w-3.5 h-3.5" />
+                              {processingId === app.id ? (
+                                <div className="w-3.5 h-3.5 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              )}
                               অনুমোদন
                             </button>
                           )}
 
                           {app.status !== 'rejected' && (
                             <button
-                              onClick={() => handleReject(app.id)}
-                              className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-xs transition-all border border-amber-500/30 flex items-center gap-1 shadow-sm active:scale-95"
+                              onClick={() => handleReject(app)}
+                              disabled={processingId === app.id}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-xs transition-all border border-amber-500/30 flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="বাতিল করুন"
                             >
-                              <XCircle className="w-3.5 h-3.5" />
+                              {processingId === app.id ? (
+                                <div className="w-3.5 h-3.5 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <XCircle className="w-3.5 h-3.5" />
+                              )}
                               বাতিল
                             </button>
                           )}
 
                           <button
-                            onClick={() => handleDelete(app.id, app.student_name)}
-                            className="p-1.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all border border-rose-500/30"
+                            onClick={() => handleDelete(app)}
+                            disabled={processingId === app.id}
+                            className="p-1.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all border border-rose-500/30 disabled:opacity-50"
                             title="রেকর্ড মুছুন"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
