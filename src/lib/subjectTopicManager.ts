@@ -17,8 +17,8 @@ export interface TopicItem {
   created_at?: string;
 }
 
-const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v6';
-const TOPICS_CACHE_KEY = 'miniquiz_topics_v6';
+const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v7';
+const TOPICS_CACHE_KEY = 'miniquiz_topics_v7';
 
 /**
  * Standard Presets for Subjects (15 Official Examination Subjects)
@@ -32,7 +32,7 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'sub_eng_lang', name: 'English Language', code: 'ENG-LANG' },
   { id: 'sub_math', name: 'গাণিতিক যুক্তি', code: 'MATH' },
   { id: 'sub_science', name: 'সাধারণ বিজ্ঞান', code: 'SCIENCE' },
-  { id: 'sub_gk_bd', name: 'বাংলাদেশ বিষয়াবলি', code: 'GK-BD' },
+  { id: 'sub_gk_bd', name: 'বাংলাদেশ বিষয়াবলি', code: 'BD' },
   { id: 'sub_gk_int', name: 'আন্তর্জাতিক বিষয়াবলি', code: 'GK-INT' },
   { id: 'sub_geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', code: 'GEO' },
   { id: 'sub_ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', code: 'ETHICS' },
@@ -433,26 +433,109 @@ export const DEFAULT_TOPICS: TopicItem[] = [
   { id: 'subtop_science_04_03', subject_id: 'sub_science', parent_id: 'top_science_04', title: 'টিকাদান ও স্বাস্থ্য সচেতনতা', code: 'SCIENCE-04-03' },
 
   // ==========================================
-  // 8. বাংলাদেশ বিষয়াবলি (GK-BD)
+  // 8. বাংলাদেশ বিষয়াবলি (BD / GK-BD)
   // ==========================================
-  { id: 'top_gk_bd_01', subject_id: 'sub_gk_bd', parent_id: null, title: 'প্রাচীন কাল থেকে ১৯৭১ ও মুক্তিযুদ্ধ', code: 'GK-BD-01' },
-  { id: 'subtop_gk_bd_01_01', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_01', title: 'প্রাচীন বাংলার ইতিহাস ও রাজবংশ', code: 'GK-BD-01-01' },
-  { id: 'subtop_gk_bd_01_02', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_01', title: 'সুলতানি, মুঘল ও ব্রিটিশ ঔপনিবেশিক শাসন', code: 'GK-BD-01-02' },
-  { id: 'subtop_gk_bd_01_03', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_01', title: 'ভাষা আন্দোলন ও স্বাধিকার আন্দোলন', code: 'GK-BD-01-03' },
-  { id: 'subtop_gk_bd_01_04', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_01', title: 'মুক্তিযুদ্ধ, মুজিবনগর সরকার ও সেক্টরসমূহ', code: 'GK-BD-01-04' },
+  // 1. বাংলাদেশের জাতীয় বিষয়াবলি (BD-NAT)
+  { id: 'top_bd_nat', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের জাতীয় বিষয়াবলি', code: 'BD-NAT' },
+  { id: 'subtop_bd_nat_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'ড. মুহাম্মদ ইউনূস', code: 'BD-NAT-01' },
+  { id: 'subtop_bd_nat_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'বীরত্বসূচক খেতাব ও মুক্তিযুদ্ধের সাতজন বীরশ্রেষ্ঠ', code: 'BD-NAT-02' },
+  { id: 'subtop_bd_nat_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'মুজিবনগর সরকার', code: 'BD-NAT-03' },
+  { id: 'subtop_bd_nat_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'জুলাই অভ্যুত্থান -২০২৪', code: 'BD-NAT-04' },
+  { id: 'subtop_bd_nat_05', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'বাংলাদেশের ভৌগলিক পরিচয়', code: 'BD-NAT-05' },
+  { id: 'subtop_bd_nat_06', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'মুক্তিযুদ্ধ', code: 'BD-NAT-06' },
+  { id: 'subtop_bd_nat_07', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'ভাষা আন্দোলন', code: 'BD-NAT-07' },
+  { id: 'subtop_bd_nat_08', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'যুক্তফ্রন্ট নির্বাচন ও ১৯৫৬-এর শাসনতন্ত্র আন্দোলন', code: 'BD-NAT-08' },
+  { id: 'subtop_bd_nat_09', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: '৬ দফা ও ৬ দফা আন্দোলন', code: 'BD-NAT-09' },
+  { id: 'subtop_bd_nat_10', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'আগরতলা ষড়যন্ত্র মামলা ও ১৯৬৯-এর গণঅভ্যুত্থান', code: 'BD-NAT-10' },
+  { id: 'subtop_bd_nat_11', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'সত্তরের নির্বাচন ও একাত্তরের অসহযোগ আন্দোলন', code: 'BD-NAT-11' },
+  { id: 'subtop_bd_nat_12', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'ইউরোপীয়দের আগমন ও ব্রিটিশ শাসন', code: 'BD-NAT-12' },
+  { id: 'subtop_bd_nat_13', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'বাংলায় মুসলিম শাসন', code: 'BD-NAT-13' },
+  { id: 'subtop_bd_nat_14', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'মুঘল, সুলতান ও নবাবী আমল', code: 'BD-NAT-14' },
+  { id: 'subtop_bd_nat_15', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'প্রাচীন বাংলার ইতিহাস, জনপদ ও বিভিন্ন বংশানুক্রম', code: 'BD-NAT-15' },
+  { id: 'subtop_bd_nat_16', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'মুক্তিযুদ্ধ পরবর্তী সময়ের ইতিহাস', code: 'BD-NAT-16' },
+  { id: 'subtop_bd_nat_17', subject_id: 'sub_gk_bd', parent_id: 'top_bd_nat', title: 'মুক্তিযুদ্ধভিত্তিক গ্রন্থ, প্রবন্ধ ও চলচ্চিত্র', code: 'BD-NAT-17' },
 
-  { id: 'top_gk_bd_02', subject_id: 'sub_gk_bd', parent_id: null, title: 'সংবিধান, সরকার ও প্রশাসনিক ব্যবস্থা', code: 'GK-BD-02' },
-  { id: 'subtop_gk_bd_02_01', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_02', title: 'বাংলাদেশ সংবিধানের মূলনীতি ও অনুচ্ছেদসমূহ', code: 'GK-BD-02-01' },
-  { id: 'subtop_gk_bd_02_02', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_02', title: 'সংবিধানের সংশোধনীসমূহ', code: 'GK-BD-02-02' },
-  { id: 'subtop_gk_bd_02_03', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_02', title: 'জাতীয় সংসদ, নির্বাচন ও বিচার বিভাগ', code: 'GK-BD-02-03' },
+  // 2. বাংলাদেশের কৃষিজ সম্পদ (BD-AGR)
+  { id: 'top_bd_agr', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের কৃষিজ সম্পদ', code: 'BD-AGR' },
+  { id: 'subtop_bd_agr_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_agr', title: 'মৎস্য সম্পদ ও প্রাণী সম্পদ', code: 'BD-AGR-01' },
+  { id: 'subtop_bd_agr_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_agr', title: 'ফসলের জাত সংক্রান্ত', code: 'BD-AGR-02' },
+  { id: 'subtop_bd_agr_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_agr', title: 'কৃষি সংক্রান্ত বিষয়াবলী', code: 'BD-AGR-03' },
+  { id: 'subtop_bd_agr_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_agr', title: 'ফসল উৎপাদন', code: 'BD-AGR-04' },
 
-  { id: 'top_gk_bd_03', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের অর্থনীতি ও জাতীয় অর্জন', code: 'GK-BD-03' },
-  { id: 'subtop_gk_bd_03_01', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_03', title: 'বাজেট, পঞ্চবার্ষিক পরিকল্পনা ও মেগাপ্রকল্প', code: 'GK-BD-03-01' },
-  { id: 'subtop_gk_bd_03_02', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_03', title: 'কৃষি, শিল্প, রপ্তানি ও জিডিপি', code: 'GK-BD-03-02' },
+  // 3. বাংলাদেশের সংস্কৃতি ও প্রত্নস্থল (BD-CUL)
+  { id: 'top_bd_cul', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের সংস্কৃতি ও প্রত্নস্থল', code: 'BD-CUL' },
+  { id: 'subtop_bd_cul_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_cul', title: 'বাঙালির সংস্কৃতি ও শিল্পকলা', code: 'BD-CUL-01' },
+  { id: 'subtop_bd_cul_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_cul', title: 'বাংলাদেশের প্রত্নস্থল', code: 'BD-CUL-02' },
 
-  { id: 'top_gk_bd_04', subject_id: 'sub_gk_bd', parent_id: null, title: 'ভূগোল, পরিবেশ ও ক্ষুদ্র নৃগোষ্ঠী', code: 'GK-BD-04' },
-  { id: 'subtop_gk_bd_04_01', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_04', title: 'ভৌগোলিক অবস্থান, নদ-নদী ও প্রাকৃতিক সম্পদ', code: 'GK-BD-04-01' },
-  { id: 'subtop_gk_bd_04_02', subject_id: 'sub_gk_bd', parent_id: 'top_gk_bd_04', title: 'ক্ষুদ্র নৃগোষ্ঠী, সংস্কৃতি ও প্রত্নতাত্ত্বিক স্থান', code: 'GK-BD-04-02' },
+  // 4. বাংলাদেশের বৈদেশিক সম্পর্ক (BD-FOR)
+  { id: 'top_bd_for', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের বৈদেশিক সম্পর্ক', code: 'BD-FOR' },
+  { id: 'subtop_bd_for_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_for', title: 'আন্তর্জাতিক অঙ্গনে বাংলাদেশ', code: 'BD-FOR-01' },
+  { id: 'subtop_bd_for_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_for', title: 'দ্বিপাক্ষিক ও আঞ্চলিক সম্পর্ক', code: 'BD-FOR-02' },
+
+  // 5. বাংলাদেশ: ভূ-প্রকৃতি, পরিবেশ ও দুর্যোগ ব্যবস্থা (BD-GEO)
+  { id: 'top_bd_geo', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশ: ভূ-প্রকৃতি, পরিবেশ ও দুর্যোগ ব্যবস্থা', code: 'BD-GEO' },
+  { id: 'subtop_bd_geo_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_geo', title: 'বাংলাদেশের ভূ-প্রকৃতি', code: 'BD-GEO-01' },
+  { id: 'subtop_bd_geo_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_geo', title: 'বন ও পরিবেশ', code: 'BD-GEO-02' },
+  { id: 'subtop_bd_geo_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_geo', title: 'বাংলাদেশের জলবায়ু এবং দুর্যোগ', code: 'BD-GEO-03' },
+
+  // 6. বাংলাদেশের অর্থনীতি (BD-ECO)
+  { id: 'top_bd_eco', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের অর্থনীতি', code: 'BD-ECO' },
+  { id: 'subtop_bd_eco_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_eco', title: 'দারিদ্র্য বিমোচন', code: 'BD-ECO-01' },
+  { id: 'subtop_bd_eco_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_eco', title: 'প্রাকৃতিক সম্পদসমূহ', code: 'BD-ECO-02' },
+  { id: 'subtop_bd_eco_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_eco', title: 'অর্থনীতির খাতসমূহ', code: 'BD-ECO-03' },
+  { id: 'subtop_bd_eco_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_eco', title: 'অর্থনীতির জন্য গুরুত্বপূর্ণ অঞ্চল', code: 'BD-ECO-04' },
+  { id: 'subtop_bd_eco_05', subject_id: 'sub_gk_bd', parent_id: 'top_bd_eco', title: 'অন্যান্য আর্থিক প্রতিষ্ঠান', code: 'BD-ECO-05' },
+
+  // 7. বাংলাদেশের শিল্প ও বাণিজ্য (BD-IND)
+  { id: 'top_bd_ind', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের শিল্প ও বাণিজ্য', code: 'BD-IND' },
+  { id: 'subtop_bd_ind_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ind', title: 'শিল্প ও বাণিজ্য মন্ত্রণালয়', code: 'BD-IND-01' },
+  { id: 'subtop_bd_ind_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ind', title: 'শিল্প উৎপাদন সম্পর্কিত', code: 'BD-IND-02' },
+  { id: 'subtop_bd_ind_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ind', title: 'আমদানি-রপ্তানি', code: 'BD-IND-03' },
+
+  // 8. বাংলাদেশের যোগাযোগ, শিক্ষা, স্বাস্থ্য ও তথ্যপ্রযুক্তি (BD-COM)
+  { id: 'top_bd_com', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের যোগাযোগ, শিক্ষা, স্বাস্থ্য ও তথ্যপ্রযুক্তি', code: 'BD-COM' },
+  { id: 'subtop_bd_com_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_com', title: 'বাংলাদেশের যোগাযোগ ব্যবস্থা', code: 'BD-COM-01' },
+  { id: 'subtop_bd_com_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_com', title: 'বিজ্ঞান ও যোগাযোগ প্রযুক্তি', code: 'BD-COM-02' },
+  { id: 'subtop_bd_com_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_com', title: 'বাংলাদেশের শিক্ষাব্যবস্থা', code: 'BD-COM-03' },
+  { id: 'subtop_bd_com_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_com', title: 'বাংলাদেশের স্বাস্থ্যসেবা', code: 'BD-COM-04' },
+
+  // 9. বাংলাদেশের জনগোষ্ঠী ও জনসংখ্যা (BD-POP)
+  { id: 'top_bd_pop', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের জনগোষ্ঠী ও জনসংখ্যা', code: 'BD-POP' },
+  { id: 'subtop_bd_pop_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_pop', title: 'আদম শুমারি ও জনসংখ্যা সংক্রান্ত', code: 'BD-POP-01' },
+  { id: 'subtop_bd_pop_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_pop', title: 'জনগোষ্ঠী, ক্ষুদ্র নৃগোষ্ঠী ও অন্যান্য', code: 'BD-POP-02' },
+
+  // 10. বাংলাদেশের সংবিধান (BD-CONST)
+  { id: 'top_bd_const', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের সংবিধান', code: 'BD-CONST' },
+  { id: 'subtop_bd_const_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_const', title: 'সাংবিধানিক পদ, প্রতিষ্ঠান ও পদবি', code: 'BD-CONST-01' },
+  { id: 'subtop_bd_const_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_const', title: 'সংবিধান এর ইতিহাস', code: 'BD-CONST-02' },
+  { id: 'subtop_bd_const_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_const', title: 'অনুচ্ছেদ ও তফসিল', code: 'BD-CONST-03' },
+  { id: 'subtop_bd_const_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_const', title: 'সংবিধানের তফসিল ও সংশোধনীসমূহ', code: 'BD-CONST-04' },
+
+  // 11. বাংলাদেশের রাজনৈতিক ব্যবস্থা (BD-POL)
+  { id: 'top_bd_pol', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের রাজনৈতিক ব্যবস্থা', code: 'BD-POL' },
+  { id: 'subtop_bd_pol_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_pol', title: 'নির্বাচন কমিশন', code: 'BD-POL-01' },
+  { id: 'subtop_bd_pol_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_pol', title: 'উপমহাদেশের রাজনৈতিক ব্যক্তিত্ব ও সমাজ সংস্কারক', code: 'BD-POL-02' },
+  { id: 'subtop_bd_pol_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_pol', title: 'রাজনৈতিক দল', code: 'BD-POL-03' },
+
+  // 12. বাংলাদেশের সরকার ব্যবস্থা (BD-GOV)
+  { id: 'top_bd_gov', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের সরকার ব্যবস্থা', code: 'BD-GOV' },
+  { id: 'subtop_bd_gov_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_gov', title: 'বাংলাদেশের প্রশাসনিক কাঠামো', code: 'BD-GOV-01' },
+  { id: 'subtop_bd_gov_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_gov', title: 'জাতীয় সংসদ ও আইন বিভাগ', code: 'BD-GOV-02' },
+  { id: 'subtop_bd_gov_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_gov', title: 'নির্বাহী বিভাগ', code: 'BD-GOV-03' },
+  { id: 'subtop_bd_gov_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_gov', title: 'সুপ্রিমকোর্ট ও বিচার বিভাগ', code: 'BD-GOV-04' },
+
+  // 13. বাংলাদেশের জাতীয় অর্জন ও অন্যান্য (BD-ACH)
+  { id: 'top_bd_ach', subject_id: 'sub_gk_bd', parent_id: null, title: 'বাংলাদেশের জাতীয় অর্জন ও অন্যান্য', code: 'BD-ACH' },
+  { id: 'subtop_bd_ach_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ach', title: 'বাংলাদেশের খেলাধুলা ও চলচ্চিত্র', code: 'BD-ACH-01' },
+  { id: 'subtop_bd_ach_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ach', title: 'জাতীয় পুরস্কার ও পদকসমূহ', code: 'BD-ACH-02' },
+  { id: 'subtop_bd_ach_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ach', title: 'জাতীয় অর্জন ও গুরুত্বপূর্ণ ব্যক্তিগত অর্জন', code: 'BD-ACH-03' },
+  { id: 'subtop_bd_ach_04', subject_id: 'sub_gk_bd', parent_id: 'top_bd_ach', title: 'গুরুত্বপূর্ণ জাতীয় স্থাপনা সমূহ', code: 'BD-ACH-04' },
+
+  // 14. অর্থনৈতিক সমীক্ষা, বাজেট ও অন্যান্য (BD-BUD)
+  { id: 'top_bd_bud', subject_id: 'sub_gk_bd', parent_id: null, title: 'অর্থনৈতিক সমীক্ষা, বাজেট ও অন্যান্য', code: 'BD-BUD' },
+  { id: 'subtop_bd_bud_01', subject_id: 'sub_gk_bd', parent_id: 'top_bd_bud', title: 'অন্যান্য সমীক্ষা', code: 'BD-BUD-01' },
+  { id: 'subtop_bd_bud_02', subject_id: 'sub_gk_bd', parent_id: 'top_bd_bud', title: 'বাজেট', code: 'BD-BUD-02' },
+  { id: 'subtop_bd_bud_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_bud', title: 'অর্থনৈতিক সমীক্ষা', code: 'BD-BUD-03' },
 
   // ==========================================
   // 9. আন্তর্জাতিক বিষয়াবলি (GK-INT)
@@ -788,6 +871,26 @@ export const filterTopicsForSubject = (topics: TopicItem[], subjectId?: string):
       targetCodes.push('MATH-ARITH');
       targetCodes.push('MATH-ALG');
       targetCodes.push('MATH-GEO');
+    }
+    if (matchedSub.code === 'BD' || matchedSub.code === 'GK-BD' || cleanId.includes('gk_bd') || cleanId.includes('bangladesh') || cleanId.includes('বাংলাদেশ')) {
+      targetIds.add('sub_gk_bd');
+      targetIds.add('bangladesh_affairs');
+      targetCodes.push('BD');
+      targetCodes.push('GK-BD');
+      targetCodes.push('BD-NAT');
+      targetCodes.push('BD-AGR');
+      targetCodes.push('BD-CUL');
+      targetCodes.push('BD-FOR');
+      targetCodes.push('BD-GEO');
+      targetCodes.push('BD-ECO');
+      targetCodes.push('BD-IND');
+      targetCodes.push('BD-COM');
+      targetCodes.push('BD-POP');
+      targetCodes.push('BD-CONST');
+      targetCodes.push('BD-POL');
+      targetCodes.push('BD-GOV');
+      targetCodes.push('BD-ACH');
+      targetCodes.push('BD-BUD');
     }
   }
 
