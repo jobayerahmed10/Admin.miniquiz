@@ -17,11 +17,11 @@ export interface TopicItem {
   created_at?: string;
 }
 
-const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v10';
-const TOPICS_CACHE_KEY = 'miniquiz_topics_v10';
+const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v11';
+const TOPICS_CACHE_KEY = 'miniquiz_topics_v11';
 
 /**
- * Standard Presets for Subjects (15 Official Examination Subjects)
+ * Standard Presets for Subjects (Official Examination Subjects)
  */
 export const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'sub_ca', name: 'কারেন্ট অ্যাফেয়ার্স', code: 'CA' },
@@ -29,7 +29,6 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'sub_bangla_lang', name: 'বাংলা ভাষা ও ব্যাকরণ', code: 'BNG-LNG' },
   { id: 'sub_eng_grm', name: 'English Grammar', code: 'ENG-GRM' },
   { id: 'sub_eng_lit', name: 'English Literature', code: 'ENG-LIT' },
-  { id: 'sub_eng_lang', name: 'English Language', code: 'ENG-LANG' },
   { id: 'sub_math', name: 'গাণিতিক যুক্তি', code: 'MATH' },
   { id: 'sub_science', name: 'সাধারণ বিজ্ঞান', code: 'SCIENCE' },
   { id: 'sub_gk_bd', name: 'বাংলাদেশ বিষয়াবলি', code: 'BD' },
@@ -38,8 +37,6 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'sub_ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', code: 'ETHICS' },
   { id: 'sub_cs_it', name: 'কম্পিউটার ও তথ্যপ্রযুক্তি', code: 'CS-IT' },
   { id: 'sub_mental', name: 'মানসিক দক্ষতা', code: 'MENTAL' },
-  { id: 'sub_arabic', name: 'আরবি ভাষা ও সাহিত্য', code: 'ARABIC' },
-  { id: 'sub_islam', name: 'ইসলাম শিক্ষা ও সংস্কৃতি', code: 'ISLAM' },
 ];
 
 /**
@@ -658,32 +655,6 @@ export const DEFAULT_TOPICS: TopicItem[] = [
   { id: 'top_mental_sr', subject_id: 'sub_mental', parent_id: null, title: 'স্থানাঙ্ক সম্পর্ক', code: 'MENTAL-SR' },
   { id: 'top_mental_na', subject_id: 'sub_mental', parent_id: null, title: 'সংখ্যাগত ক্ষমতা', code: 'MENTAL-NA' },
   { id: 'top_mental_abr', subject_id: 'sub_mental', parent_id: null, title: 'বিমূর্ত যুক্তি', code: 'MENTAL-ABR' },
-
-  // ==========================================
-  // 14. আরবি ভাষা ও সাহিত্য (ARABIC)
-  // ==========================================
-  { id: 'top_arabic_01', subject_id: 'sub_arabic', parent_id: null, title: 'আরবি ব্যাকরণ (নাহু ও সরফ)', code: 'ARABIC-01' },
-  { id: 'subtop_arabic_01_01', subject_id: 'sub_arabic', parent_id: 'top_arabic_01', title: 'কালিমার প্রকারভেদ ও এরাব', code: 'ARABIC-01-01' },
-  { id: 'subtop_arabic_01_02', subject_id: 'sub_arabic', parent_id: 'top_arabic_01', title: 'সরফ ও রূপান্তর (মিজানুস সরফ)', code: 'ARABIC-01-02' },
-
-  { id: 'top_arabic_02', subject_id: 'sub_arabic', parent_id: null, title: 'আরবি সাহিত্য ও বালাগাত', code: 'ARABIC-02' },
-  { id: 'subtop_arabic_02_01', subject_id: 'sub_arabic', parent_id: 'top_arabic_02', title: 'জাহেলি ও ইসলামি যুগের আরবি সাহিত্য', code: 'ARABIC-02-01' },
-  { id: 'subtop_arabic_02_02', subject_id: 'sub_arabic', parent_id: 'top_arabic_02', title: 'ইলমুল বালাগাত (বায়ান ও মাআনী)', code: 'ARABIC-02-02' },
-
-  // ==========================================
-  // 15. ইসলাম শিক্ষা ও সংস্কৃতি (ISLAM)
-  // ==========================================
-  { id: 'top_islam_01', subject_id: 'sub_islam', parent_id: null, title: 'আল কুরআন ও উলুমুল কুরআন', code: 'ISLAM-01' },
-  { id: 'subtop_islam_01_01', subject_id: 'sub_islam', parent_id: 'top_islam_01', title: 'কুরআন সংকলন ও নির্বাচিত সূরার তাফসীর', code: 'ISLAM-01-01' },
-  { id: 'subtop_islam_01_02', subject_id: 'sub_islam', parent_id: 'top_islam_01', title: 'তাজবীদ ও উলুমুল কুরআন', code: 'ISLAM-01-02' },
-
-  { id: 'top_islam_02', subject_id: 'sub_islam', parent_id: null, title: 'হাদিস ও উলুমুল হাদিস', code: 'ISLAM-02' },
-  { id: 'subtop_islam_02_01', subject_id: 'sub_islam', parent_id: 'top_islam_02', title: 'সিহাহ সিত্তা ও হাদিস সংকলনের ইতিহাস', code: 'ISLAM-02-01' },
-  { id: 'subtop_islam_02_02', subject_id: 'sub_islam', parent_id: 'top_islam_02', title: 'নির্বাচিত হাদিসের শিক্ষা ও ব্যাখ্যা', code: 'ISLAM-02-02' },
-
-  { id: 'top_islam_03', subject_id: 'sub_islam', parent_id: null, title: 'আকাইদ, ফিকহ ও সিরাত', code: 'ISLAM-03' },
-  { id: 'subtop_islam_03_01', subject_id: 'sub_islam', parent_id: 'top_islam_03', title: 'ইসলামি আকাইদ ও ইবাদতের বিধান', code: 'ISLAM-03-01' },
-  { id: 'subtop_islam_03_02', subject_id: 'sub_islam', parent_id: 'top_islam_03', title: 'রাসুলুল্লাহ (সা.)-এর সিরাত ও খোলাফায়ে রাশেদীন', code: 'ISLAM-03-02' },
 ];
 
 /**
@@ -896,14 +867,10 @@ export const filterTopicsForSubject = (topics: TopicItem[], subjectId?: string):
       targetCodes.push('BAN-LIT');
       targetCodes.push('BANGLA-LIT');
     }
-    if (matchedSub.code === 'ENG-GRM' || cleanId.includes('eng_grm') || cleanId.includes('english_grammar') || cleanId.includes('english grammar')) {
+    if (matchedSub.code === 'ENG-GRM' || matchedSub.code === 'ENG-LANG' || cleanId.includes('eng_grm') || cleanId.includes('eng_lang') || cleanId.includes('english_grammar') || cleanId.includes('english grammar') || cleanId.includes('english language')) {
       targetIds.add('sub_eng_grm');
       targetIds.add('english_grammar');
       targetCodes.push('ENG-GRM');
-    }
-    if (matchedSub.code === 'ENG-LANG' || cleanId.includes('eng_lang') || cleanId.includes('english_language') || cleanId.includes('english language')) {
-      targetIds.add('sub_eng_lang');
-      targetIds.add('english_language');
       targetCodes.push('ENG-LANG');
     }
     if (matchedSub.code === 'ENG-LIT' || cleanId.includes('eng_lit') || cleanId.includes('english_literature') || cleanId.includes('english literature')) {

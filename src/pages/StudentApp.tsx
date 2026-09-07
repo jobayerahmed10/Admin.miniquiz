@@ -46,15 +46,17 @@ import {
 import { Exam, Course, Question, StudentUser, StudentDashboardGrowthData } from '../types';
 import { CourseDetailsModal } from '../components/course/CourseDetailsModal';
 import { AddAiQuestionsModal } from '../components/AddAiQuestionsModal';
+import { PracticeSection } from '../components/questionBank/PracticeSection';
 
 export const StudentApp: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<'exams' | 'courses' | 'ai' | 'dashboard' | 'profile'>('exams');
+  const [currentTab, setCurrentTab] = useState<'exams' | 'courses' | 'practice' | 'ai' | 'dashboard' | 'profile'>('exams');
   const [student, setStudent] = useState<StudentUser | null>(null);
   const [growthData, setGrowthData] = useState<StudentDashboardGrowthData | null>(null);
 
   // Exams & Courses Data
   const [exams, setExams] = useState<Exam[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Active Exam Taking Mode
@@ -90,6 +92,10 @@ export const StudentApp: React.FC = () => {
     // Fetch Courses
     const coursesRes = await fetchPublishedCoursesForStudent();
     setCourses(coursesRes.courses || []);
+
+    // Fetch Questions for Practice tab
+    const questionsRes = await fetchAllQuestions();
+    setAllQuestions(questionsRes.questions || []);
 
     setLoading(false);
   };
@@ -621,6 +627,11 @@ export const StudentApp: React.FC = () => {
           </div>
         )}
 
+        {/* TAB: PRACTICE (প্র্যাকটিস - বিষয়, টপিক ও সাব-টপিক) */}
+        {currentTab === 'practice' && (
+          <PracticeSection questions={allQuestions} />
+        )}
+
         {/* TAB 3: TAMRIN AI (তামরীন এআই) */}
         {currentTab === 'ai' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 text-center space-y-5 shadow-2xl">
@@ -900,7 +911,7 @@ export const StudentApp: React.FC = () => {
 
       {/* MOBILE BOTTOM NAVIGATION - Visible ONLY in Student App */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-2 py-2">
-        <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
+        <div className="max-w-md mx-auto grid grid-cols-6 gap-1">
           <button
             type="button"
             onClick={() => {
@@ -914,7 +925,7 @@ export const StudentApp: React.FC = () => {
             }`}
           >
             <HelpCircle className="w-5 h-5" />
-            <span className="text-[10px] mt-1 tracking-tight">পরীক্ষা দিন</span>
+            <span className="text-[10px] mt-1 tracking-tight">পরীক্ষা</span>
           </button>
 
           <button
@@ -937,6 +948,22 @@ export const StudentApp: React.FC = () => {
             type="button"
             onClick={() => {
               setActiveTakingExam(null);
+              setCurrentTab('practice');
+            }}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all ${
+              currentTab === 'practice'
+                ? 'bg-emerald-600/20 text-emerald-400 font-black'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Target className="w-5 h-5 text-emerald-400" />
+            <span className="text-[10px] mt-1 tracking-tight">প্র্যাকটিস</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTakingExam(null);
               setCurrentTab('ai');
             }}
             className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all ${
@@ -946,7 +973,7 @@ export const StudentApp: React.FC = () => {
             }`}
           >
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <span className="text-[10px] mt-1 tracking-tight">তামরীন এআই</span>
+            <span className="text-[10px] mt-1 tracking-tight">এআই</span>
           </button>
 
           <button

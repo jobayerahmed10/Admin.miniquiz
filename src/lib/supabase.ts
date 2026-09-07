@@ -1235,63 +1235,144 @@ export const autoAssignAndRepairQuestionTopics = async (
   const current = getLocalCachedQuestions();
   let updatedCount = 0;
 
-  const updatedCache = current.map((q) => {
+  // Extract initial seed questions if local cache is empty or only has stale dummy questions
+  const seedQuestions: Question[] = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+
+  const sourcePool = current.length > 0 ? current : seedQuestions;
+
+  let engSeq = 1;
+  let bngSeq = 1;
+  const processedQuestions: Question[] = [];
+  const deletedDemoIds: string[] = [];
+
+  for (const q of sourcePool) {
+    const qIdStr = String(q.id || '');
     const cleanSub = (q.subject || '').trim();
     const cleanTop = (q.topic || '').trim();
     const qText = (q.question || '').toLowerCase();
-    let newTopic = cleanTop;
 
-    const isTopicGeneric = !cleanTop || cleanTop === 'সাধারণ টপিক' || cleanTop === 'সাধারণ' || cleanTop === 'সাধারণ জ্ঞান ও সাহিত্য' || cleanTop === 'عام' || cleanTop === 'সাহিত্য';
+    // Check if it's a dummy demo question (GK, Math, Mock, etc.)
+    const isDummyDemo =
+      qIdStr.startsWith('Q-GK-') ||
+      qIdStr.startsWith('Q-MATH-') ||
+      qIdStr.startsWith('Q-MOCK-') ||
+      qText.includes('সাধারণ জ্ঞান টেস্ট প্রশ্ন') ||
+      qText.includes('গণিত টেস্ট প্রশ্ন') ||
+      qText.includes('বিসিএস পূর্ণাঙ্গ মক প্রশ্ন') ||
+      qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
+      qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
 
-    if (isTopicGeneric) {
-      if (cleanSub === 'বাংলা' || qText.includes('বিপরীত') || qText.includes('বিপরীতার্থক')) {
-        newTopic = 'বিপরীত শব্দ';
-      } else if (cleanSub === 'ইংরেজি' || cleanSub.toLowerCase() === 'english' || qText.includes('preposition') || qText.includes('appropriate')) {
-        newTopic = 'Appropriate Preposition';
-      } else if (cleanSub.includes('উসূলুল') || cleanSub.includes('ফিকহ') || cleanSub.includes('আরবি') || cleanSub.includes('ইসলাম') || qText.includes('কিতাব') || cleanSub === 'ফিকহ') {
-        newTopic = 'কিতাবুল্লাহ';
-      } else if (cleanSub === 'গণিত') {
-        newTopic = 'পাটিগণিত ও বীজগণিত';
-      } else if (cleanSub === 'বিজ্ঞান') {
-        newTopic = 'দৈনন্দিন বিজ্ঞান';
-      } else {
-        newTopic = cleanTop || 'সাধারণ জ্ঞান';
-      }
-    }
-
-    if (newTopic !== cleanTop) {
+    if (isDummyDemo) {
+      deletedDemoIds.push(qIdStr);
       updatedCount++;
-      return {
-        ...q,
-        topic: newTopic,
-        updated_at: new Date().toISOString(),
-      };
+      continue;
     }
-    return q;
-  });
 
-  setLocalCachedQuestions(updatedCache);
+    const isEnglishPreposition =
+      cleanSub === 'English' ||
+      cleanSub === 'English Language' ||
+      cleanSub === 'English Grammar' ||
+      cleanTop.includes('Preposition') ||
+      qText.includes('preposition') ||
+      qText.includes('senior') ||
+      qText.includes('good at') ||
+      qText.includes('preferred') ||
+      qText.includes('died') ||
+      qText.includes('candid') ||
+      qText.includes('bureaucracy') ||
+      qText.includes('white elephant') ||
+      qText.includes('neither');
 
-  const client = getSupabaseClient();
-  if (client && updatedCount > 0) {
-    try {
-      const topicGroups: Record<string, string[]> = {};
-      updatedCache.forEach((q) => {
-        const top = q.topic || '';
-        if (top) {
-          if (!topicGroups[top]) topicGroups[top] = [];
-          topicGroups[top].push(String(q.id));
-        }
+    const isBanglaAntonym =
+      cleanSub.includes('বাংলা') ||
+      cleanSub === 'Bangla' ||
+      cleanTop.includes('বিপরীত') ||
+      qText.includes('বিপরীত') ||
+      qText.includes('সৌম্য') ||
+      qText.includes('অনুরাগ') ||
+      qText.includes('জঙ্গম') ||
+      qText.includes('উদ্ধত') ||
+      qText.includes('প্রাচ্য');
+
+    if (isEnglishPreposition) {
+      const newCode = 'ENG-GRM-06-02';
+      const newId = `Q-ENG-GRM-06-02-${String(engSeq++).padStart(5, '0')}`;
+      processedQuestions.push({
+        ...q,
+        id: newId,
+        question_code: newCode,
+        code: newCode,
+        subject: 'English Grammar',
+        topic: 'Parts of Speech',
+        sub_topic: 'Preposition',
+        subtopic: 'Preposition',
+        subject_id: 'sub_eng_grm',
+        topic_id: 'top_eng_grm_06',
+        sub_topic_id: 'subtop_eng_grm_06_02',
+        status: 'published',
+        updated_at: new Date().toISOString(),
       });
+      updatedCount++;
+    } else if (isBanglaAntonym) {
+      const newCode = 'BNG-LNG-01-04';
+      const newId = `Q-BNG-LNG-01-04-${String(bngSeq++).padStart(5, '0')}`;
+      processedQuestions.push({
+        ...q,
+        id: newId,
+        question_code: newCode,
+        code: newCode,
+        subject: 'বাংলা ভাষা ও ব্যাকরণ',
+        topic: 'শব্দ ও পদ',
+        sub_topic: 'বিপরীতার্থক শব্দ',
+        subtopic: 'বিপরীতার্থক শব্দ',
+        subject_id: 'sub_bangla_lang',
+        topic_id: 'top_bangla_lang_01',
+        sub_topic_id: 'subtop_bangla_lang_01_04',
+        status: 'published',
+        updated_at: new Date().toISOString(),
+      });
+      updatedCount++;
+    } else {
+      // Keep valid non-demo questions
+      processedQuestions.push(q);
+    }
+  }
 
-      for (const [topName, qIds] of Object.entries(topicGroups)) {
-        await client
-          .from('questions')
-          .update({ topic: topName })
-          .in('id', qIds);
+  // If after processing no questions remain, inject seed questions from INITIAL_SEED_EXAMS
+  if (processedQuestions.length === 0) {
+    processedQuestions.push(...seedQuestions);
+  }
+
+  setLocalCachedQuestions(processedQuestions);
+
+  // Sync with Supabase database if client is connected
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      if (deletedDemoIds.length > 0) {
+        await client.from('questions').delete().in('id', deletedDemoIds);
+      }
+
+      for (const q of processedQuestions) {
+        await client.from('questions').upsert({
+          id: String(q.id),
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          subject: q.subject,
+          topic: q.topic,
+          sub_topic: q.sub_topic || q.subtopic || '',
+          code: q.code || q.question_code || '',
+          status: q.status || 'published',
+          updated_at: new Date().toISOString(),
+        });
       }
     } catch (err) {
-      console.warn('autoAssignAndRepairQuestionTopics background update error:', err);
+      console.warn('autoAssignAndRepairQuestionTopics database sync error:', err);
     }
   }
 

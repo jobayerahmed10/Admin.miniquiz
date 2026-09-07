@@ -17,6 +17,7 @@ import { QuestionReportsManagement } from './pages/QuestionReportsManagement';
 import { QuestionExplanationsManagement } from './pages/QuestionExplanationsManagement';
 import { CreateBlog } from './pages/CreateBlog';
 import { BlogsManagement } from './pages/BlogsManagement';
+import { PracticePage } from './pages/PracticePage';
 import { StudentApp } from './pages/StudentApp';
 import { getSupabaseClient, fetchDashboardStats } from './lib/supabase';
 
@@ -264,6 +265,7 @@ export default function App() {
           <Route path="/admin/enrollments" element={<EnrollmentsManagement />} />
           <Route path="/admin/students" element={<StudentsManagement />} />
           <Route path="/admin/questions" element={<QuestionsList />} />
+          <Route path="/admin/practice" element={<PracticePage />} />
           <Route path="/admin/reports" element={<QuestionReportsManagement />} />
           <Route path="/admin/explanations" element={<QuestionExplanationsManagement />} />
           <Route path="/admin/create-blog" element={<BlogsManagement />} />

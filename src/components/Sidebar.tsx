@@ -16,6 +16,7 @@ import {
   AlertCircle,
   FileText,
   HelpCircle,
+  Target,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -80,6 +81,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Database,
       badge: questionsCount,
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    },
+    {
+      id: 'practice',
+      path: '/admin/practice',
+      title: 'প্র্যাকটিস',
+      subTitle: 'PRACTICE HIERARCHY',
+      icon: Target,
+      badge: 'নতুন',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold',
     },
     {
       id: 'reports',

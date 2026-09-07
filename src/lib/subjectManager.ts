@@ -8,7 +8,7 @@ export const BASE_SUBJECTS = [
   'বাংলা সাহিত্য',
   'বাংলা ভাষা ও ব্যাকরণ',
   'English Literature',
-  'English Language',
+  'English Grammar',
   'গাণিতিক যুক্তি',
   'সাধারণ বিজ্ঞান',
   'বাংলাদেশ বিষয়াবলি',
@@ -24,13 +24,13 @@ export const BASE_SUBJECTS = [
  * to their standard canonical representations.
  */
 export const SUBJECT_ALIAS_MAP: Record<string, string> = {
-  'english': 'English Language',
+  'english': 'English Grammar',
   'english literature': 'English Literature',
-  'english language': 'English Language',
-  'english grammar': 'English Language',
-  'ইংরেজি': 'English Language',
+  'english language': 'English Grammar',
+  'english grammar': 'English Grammar',
+  'ইংরেজি': 'English Grammar',
   'ইংরেজি সাহিত্য': 'English Literature',
-  'ইংরেজি ব্যাকরণ': 'English Language',
+  'ইংরেজি ব্যাকরণ': 'English Grammar',
   'bangla': 'বাংলা ভাষা ও ব্যাকরণ',
   'bengali': 'বাংলা ভাষা ও ব্যাকরণ',
   'bangla literature': 'বাংলা সাহিত্য',

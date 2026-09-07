@@ -16,6 +16,7 @@ export interface QuestionExplanation {
 export interface Question {
   id: string | number;
   question_code?: string; // নির্দিষ্ট Question Code / ইউনিক প্রিফিক্স কোড
+  code?: string | null;
   custom_question_id?: string | null;
   question: string;
   option_a: string;
@@ -29,6 +30,7 @@ export interface Question {
   subject?: string | null; // বিষয় (যেমন: বাংলা, ইংরেজি, ইত্যাদি)
   topic?: string | null; // মূল টপিক
   sub_topic?: string | null; // সাব-টপিক
+  subtopic?: string | null;
   subject_id?: string | null; // Subject foreign key / id
   topic_id?: string | null; // Main topic foreign key / id
   sub_topic_id?: string | null; // Sub-topic foreign key / id

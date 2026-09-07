@@ -20,6 +20,7 @@ import { Interface06AiAutoGenerate } from '../components/questionBank/Interface0
 import { Interface07AiGeneratedPreview } from '../components/questionBank/Interface07AiGeneratedPreview';
 import { EditQuestionModal } from '../components/questionBank/EditQuestionModal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { PracticeSection } from '../components/questionBank/PracticeSection';
 import { formatSequentialId, sanitizeExplanation } from '../lib/questionBankEngine';
 
 export const QuestionsList: React.FC = () => {
@@ -185,6 +186,39 @@ export const QuestionsList: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top View Selector Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
+        <button
+          onClick={() => setCurrentView('dashboard')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            currentView === 'dashboard'
+              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <span>📊 মাস্টার প্রশ্ন ব্যাংক</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('practice' as any)}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            (currentView as string) === 'practice'
+              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <span>🎯 প্র্যাকটিস (বিষয়, টপিক ও সাব-টপিক)</span>
+        </button>
+      </div>
+
+      {/* 0. Practice View */}
+      {(currentView as string) === 'practice' && (
+        <PracticeSection
+          questions={questions}
+          onBackToDashboard={() => setCurrentView('dashboard')}
+        />
+      )}
+
       {/* 1. Interface 01: Master Question Bank Dashboard */}
       {currentView === 'dashboard' && (
         <Interface01Dashboard
