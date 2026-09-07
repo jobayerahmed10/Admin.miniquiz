@@ -17,8 +17,8 @@ export interface TopicItem {
   created_at?: string;
 }
 
-const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v7';
-const TOPICS_CACHE_KEY = 'miniquiz_topics_v7';
+const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v8';
+const TOPICS_CACHE_KEY = 'miniquiz_topics_v8';
 
 /**
  * Standard Presets for Subjects (15 Official Examination Subjects)
@@ -33,7 +33,7 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
   { id: 'sub_math', name: 'গাণিতিক যুক্তি', code: 'MATH' },
   { id: 'sub_science', name: 'সাধারণ বিজ্ঞান', code: 'SCIENCE' },
   { id: 'sub_gk_bd', name: 'বাংলাদেশ বিষয়াবলি', code: 'BD' },
-  { id: 'sub_gk_int', name: 'আন্তর্জাতিক বিষয়াবলি', code: 'GK-INT' },
+  { id: 'sub_gk_int', name: 'আন্তর্জাতিক বিষয়াবলি', code: 'INT' },
   { id: 'sub_geo', name: 'ভূগোল ও দুর্যোগ ব্যবস্থাপনা', code: 'GEO' },
   { id: 'sub_ethics', name: 'নৈতিকতা, মূল্যবোধ ও সুশাসন', code: 'ETHICS' },
   { id: 'sub_cs_it', name: 'কম্পিউটার ও তথ্যপ্রযুক্তি', code: 'CS-IT' },
@@ -538,24 +538,56 @@ export const DEFAULT_TOPICS: TopicItem[] = [
   { id: 'subtop_bd_bud_03', subject_id: 'sub_gk_bd', parent_id: 'top_bd_bud', title: 'অর্থনৈতিক সমীক্ষা', code: 'BD-BUD-03' },
 
   // ==========================================
-  // 9. আন্তর্জাতিক বিষয়াবলি (GK-INT)
+  // 9. আন্তর্জাতিক বিষয়াবলি (INT / GK-INT)
   // ==========================================
-  { id: 'top_gk_int_01', subject_id: 'sub_gk_int', parent_id: null, title: 'বৈশ্বিক ইতিহাস, আঞ্চলিক ও আন্তর্জাতিক ব্যবস্থা', code: 'GK-INT-01' },
-  { id: 'subtop_gk_int_01_01', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_01', title: 'বৈশ্বিক ইতিহাস ও সভ্যতা', code: 'GK-INT-01-01' },
-  { id: 'subtop_gk_int_01_02', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_01', title: 'প্রথম ও দ্বিতীয় বিশ্বযুদ্ধ', code: 'GK-INT-01-02' },
-  { id: 'subtop_gk_int_01_03', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_01', title: 'স্নায়ুযুদ্ধ ও বর্তমান বিশ্বব্যবস্থা', code: 'GK-INT-01-03' },
+  // 1. বৈশ্বিক ইতিহাস, আঞ্চলিক ও আন্তর্জাতিক ব্যবস্থা (INT-HIS)
+  { id: 'top_int_his', subject_id: 'sub_gk_int', parent_id: null, title: 'বৈশ্বিক ইতিহাস, আঞ্চলিক ও আন্তর্জাতিক ব্যবস্থা', code: 'INT-HIS' },
+  { id: 'subtop_int_his_01', subject_id: 'sub_gk_int', parent_id: 'top_int_his', title: 'বৈশ্বিক ইতিহাস', code: 'INT-HIS-01' },
+  { id: 'subtop_int_his_02', subject_id: 'sub_gk_int', parent_id: 'top_int_his', title: 'আঞ্চলিক ও আন্তর্জাতিক ব্যবস্থা', code: 'INT-HIS-02' },
+  { id: 'subtop_int_his_03', subject_id: 'sub_gk_int', parent_id: 'top_int_his', title: 'গুরুত্বপূর্ণ মহাদেশ, দেশ (রাজধানী, মুদ্রা)', code: 'INT-HIS-03' },
+  { id: 'subtop_int_his_04', subject_id: 'sub_gk_int', parent_id: 'top_int_his', title: 'যুদ্ধ ও বিপ্লবসমূহ', code: 'INT-HIS-04' },
+  { id: 'subtop_int_his_05', subject_id: 'sub_gk_int', parent_id: 'top_int_his', title: 'ইতিহাসের গুরুত্বপূর্ণ ব্যক্তি, ধর্মের ইতিহাস', code: 'INT-HIS-05' },
 
-  { id: 'top_gk_int_02', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক নিরাপত্তা ও আন্তঃরাষ্ট্রীয় ক্ষমতা সম্পর্ক', code: 'GK-INT-02' },
-  { id: 'subtop_gk_int_02_01', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_02', title: 'সামরিক জোট ও চুক্তি (NATO, ইত্যাদি)', code: 'GK-INT-02-01' },
-  { id: 'subtop_gk_int_02_02', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_02', title: 'বিশ্বের বিরোধপূর্ণ অঞ্চল ও সীমান্ত সংঘাত', code: 'GK-INT-02-02' },
+  // 2. আন্তর্জাতিক নিরাপত্তা ও আন্তঃরাষ্ট্রীয় ক্ষমতা সম্পর্ক (INT-SEC)
+  { id: 'top_int_sec', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক নিরাপত্তা ও আন্তঃরাষ্ট্রীয় ক্ষমতা সম্পর্ক', code: 'INT-SEC' },
+  { id: 'subtop_int_sec_01', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'NATO', code: 'INT-SEC-01' },
+  { id: 'subtop_int_sec_02', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'আন্তর্জাতিক গুরুত্বপূর্ণ অঞ্চল, সীমারেখা', code: 'INT-SEC-02' },
+  { id: 'subtop_int_sec_03', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'অন্যান্য নিরাপত্তা জোট ও বাহিনী', code: 'INT-SEC-03' },
+  { id: 'subtop_int_sec_04', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'আন্তর্জাতিক বিভিন্ন গেরিলা, বিদ্রোহী ও অন্যান্য দল', code: 'INT-SEC-04' },
+  { id: 'subtop_int_sec_05', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'আন্তর্জাতিক চুক্তি সংক্রান্ত সনদ', code: 'INT-SEC-05' },
+  { id: 'subtop_int_sec_06', subject_id: 'sub_gk_int', parent_id: 'top_int_sec', title: 'রাষ্ট্র ও সরকার', code: 'INT-SEC-06' },
 
-  { id: 'top_gk_int_03', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক পরিবেশগত ইস্যু ও কূটনীতি', code: 'GK-INT-03' },
-  { id: 'subtop_gk_int_03_01', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_03', title: 'জলবায়ু পরিবর্তন সম্মেলন (COP ও চুক্তি)', code: 'GK-INT-03-01' },
-  { id: 'subtop_gk_int_03_02', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_03', title: 'পরিবেশ দূষণ ও টেকসই প্রোটোকল', code: 'GK-INT-03-02' },
+  // 3. আন্তর্জাতিক পরিবেশগত ইস্যু ও কূটনীতি (INT-ENV)
+  { id: 'top_int_env', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক পরিবেশগত ইস্যু ও কূটনীতি', code: 'INT-ENV' },
+  { id: 'subtop_int_env_01', subject_id: 'sub_gk_int', parent_id: 'top_int_env', title: 'পরিবেশগত বিভিন্ন ইস্যু', code: 'INT-ENV-01' },
+  { id: 'subtop_int_env_02', subject_id: 'sub_gk_int', parent_id: 'top_int_env', title: 'পরিবেশ বিষয়ক সংস্থা ও জোট', code: 'INT-ENV-02' },
+  { id: 'subtop_int_env_03', subject_id: 'sub_gk_int', parent_id: 'top_int_env', title: 'পরিবেশ বিষয়ক চুক্তি ও সম্মেলন', code: 'INT-ENV-03' },
+  { id: 'subtop_int_env_04', subject_id: 'sub_gk_int', parent_id: 'top_int_env', title: 'আইন', code: 'INT-ENV-04' },
 
-  { id: 'top_gk_int_04', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক সংস্থা ও বিশ্বরাজনীতি', code: 'GK-INT-04' },
-  { id: 'subtop_gk_int_04_01', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_04', title: 'জাতিসংঘ ও এর অঙ্গসংস্থাসমূহ', code: 'GK-INT-04-01' },
-  { id: 'subtop_gk_int_04_02', subject_id: 'sub_gk_int', parent_id: 'top_gk_int_04', title: 'আঞ্চলিক সংস্থাসমূহ (SAARC, ASEAN, EU, BRICS)', code: 'GK-INT-04-02' },
+  // 4. আন্তর্জাতিক সংগঠন এবং বৈশ্বিক অর্থনৈতিক প্রতিষ্ঠান (INT-ORG)
+  { id: 'top_int_org', subject_id: 'sub_gk_int', parent_id: null, title: 'আন্তর্জাতিক সংগঠন এবং বৈশ্বিক অর্থনৈতিক প্রতিষ্ঠান', code: 'INT-ORG' },
+  { id: 'subtop_int_org_01', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'আন্তর্জাতিক বিভিন্ন সংস্থাসমূহ', code: 'INT-ORG-01' },
+  { id: 'subtop_int_org_02', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'আন্তর্জাতিক রাজনৈতিক সংগঠন ও জোট', code: 'INT-ORG-02' },
+  { id: 'subtop_int_org_03', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'জাতিসংঘ', code: 'INT-ORG-03' },
+  { id: 'subtop_int_org_04', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'আন্তর্জাতিক সেবা, মানবাধিকার ও দুর্নীতি বিষয়ক সংস্থা', code: 'INT-ORG-04' },
+  { id: 'subtop_int_org_05', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'আঞ্চলিক সহযোগিতা সংগঠন ও জোট', code: 'INT-ORG-05' },
+  { id: 'subtop_int_org_06', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'বিশ্বব্যাংক ও IMF', code: 'INT-ORG-06' },
+  { id: 'subtop_int_org_07', subject_id: 'sub_gk_int', parent_id: 'top_int_org', title: 'আন্তর্জাতিক বিভিন্ন অর্থনৈতিক সংস্থাসমূহ', code: 'INT-ORG-07' },
+
+  // 5. বিশ্বের সাম্প্রতিক ও চলমান ঘটনা প্রবাহ (INT-CUR)
+  { id: 'top_int_cur', subject_id: 'sub_gk_int', parent_id: null, title: 'বিশ্বের সাম্প্রতিক ও চলমান ঘটনা প্রবাহ', code: 'INT-CUR' },
+  { id: 'subtop_int_cur_01', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'নোবেল এবং অন্যান্য আন্তর্জাতিক পুরস্কার', code: 'INT-CUR-01' },
+  { id: 'subtop_int_cur_02', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'আন্তর্জাতিক খেলাধুলা সম্পর্কিত', code: 'INT-CUR-02' },
+  { id: 'subtop_int_cur_03', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'আন্তর্জাতিক গুরুত্বপূর্ণ জরিপ ও সমীক্ষা', code: 'INT-CUR-03' },
+  { id: 'subtop_int_cur_04', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'সাম্প্রতিক সম্মেলন', code: 'INT-CUR-04' },
+  { id: 'subtop_int_cur_05', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'সাম্প্রতিক বৈশ্বিক সংকট ও যুদ্ধ', code: 'INT-CUR-05' },
+  { id: 'subtop_int_cur_06', subject_id: 'sub_gk_int', parent_id: 'top_int_cur', title: 'সাম্প্রতিক বিশ্ব', code: 'INT-CUR-06' },
+
+  // 6. গুরুত্বপূর্ণ আন্তর্জাতিক বিষয়সমূহ (INT-MISC)
+  { id: 'top_int_misc', subject_id: 'sub_gk_int', parent_id: null, title: 'গুরুত্বপূর্ণ আন্তর্জাতিক বিষয়সমূহ', code: 'INT-MISC' },
+  { id: 'subtop_int_misc_01', subject_id: 'sub_gk_int', parent_id: 'top_int_misc', title: 'মহাবিশ্ব', code: 'INT-MISC-01' },
+  { id: 'subtop_int_misc_02', subject_id: 'sub_gk_int', parent_id: 'top_int_misc', title: 'সংস্কৃতি ও শিল্পকলা', code: 'INT-MISC-02' },
+  { id: 'subtop_int_misc_03', subject_id: 'sub_gk_int', parent_id: 'top_int_misc', title: 'আন্তর্জাতিক দিবসসমূহ', code: 'INT-MISC-03' },
 
   // ==========================================
   // 10. ভূগোল ও দুর্যোগ ব্যবস্থাপনা (GEO)
