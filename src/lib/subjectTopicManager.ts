@@ -17,8 +17,8 @@ export interface TopicItem {
   created_at?: string;
 }
 
-const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v8';
-const TOPICS_CACHE_KEY = 'miniquiz_topics_v8';
+const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v10';
+const TOPICS_CACHE_KEY = 'miniquiz_topics_v10';
 
 /**
  * Standard Presets for Subjects (15 Official Examination Subjects)
@@ -620,29 +620,44 @@ export const DEFAULT_TOPICS: TopicItem[] = [
   // ==========================================
   // 12. কম্পিউটার ও তথ্যপ্রযুক্তি (CS-IT)
   // ==========================================
-  { id: 'top_cs_it_01', subject_id: 'sub_cs_it', parent_id: null, title: 'কম্পিউটার সংগঠন ও হার্ডওয়্যার', code: 'CS-IT-01' },
-  { id: 'subtop_cs_it_01_01', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_01', title: 'CPU, বাস ও মেমোরি সংগঠন', code: 'CS-IT-01-01' },
-  { id: 'subtop_cs_it_01_02', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_01', title: 'ইনপুট ও আউটপুট ডিভাইস', code: 'CS-IT-01-02' },
+  // 1. কম্পিউটার (CS-IT-CMP)
+  { id: 'top_cs_it_cmp', subject_id: 'sub_cs_it', parent_id: null, title: 'কম্পিউটার', code: 'CS-IT-CMP' },
+  { id: 'subtop_cs_it_cmp_01', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের অঙ্গসংগঠন ও হার্ডওয়্যার', code: 'CS-IT-CMP-01' },
+  { id: 'subtop_cs_it_cmp_02', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের অঙ্গসংগঠন (ইনপুট ও আউটপুট ডিভাইস)', code: 'CS-IT-CMP-02' },
+  { id: 'subtop_cs_it_cmp_03', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'দৈনন্দিন জীবনে কম্পিউটার', code: 'CS-IT-CMP-03' },
+  { id: 'subtop_cs_it_cmp_04', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটার অপারেটিং সিস্টেম', code: 'CS-IT-CMP-04' },
+  { id: 'subtop_cs_it_cmp_05', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের ইতিহাস', code: 'CS-IT-CMP-05' },
+  { id: 'subtop_cs_it_cmp_06', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের প্রকারভেদ', code: 'CS-IT-CMP-06' },
+  { id: 'subtop_cs_it_cmp_07', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটার নম্বর সিস্টেম ও লজিক গেট', code: 'CS-IT-CMP-07' },
+  { id: 'subtop_cs_it_cmp_08', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'ডাটাবেজ সিস্টেম', code: 'CS-IT-CMP-08' },
+  { id: 'subtop_cs_it_cmp_09', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের শর্টকাট কমান্ড', code: 'CS-IT-CMP-09' },
+  { id: 'subtop_cs_it_cmp_10', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_cmp', title: 'কম্পিউটারের পারঙ্গমতা', code: 'CS-IT-CMP-10' },
 
-  { id: 'top_cs_it_02', subject_id: 'sub_cs_it', parent_id: null, title: 'সফটওয়্যার, অপারেটিং সিস্টেম ও ডাটাবেজ', code: 'CS-IT-02' },
-  { id: 'subtop_cs_it_02_01', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_02', title: 'অপারেটিং সিস্টেম ও অ্যাপ্লিকেশন সফটওয়্যার', code: 'CS-IT-02-01' },
-  { id: 'subtop_cs_it_02_02', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_02', title: 'ডাটাবেজ ও সংখ্যা পদ্ধতি', code: 'CS-IT-02-02' },
-
-  { id: 'top_cs_it_03', subject_id: 'sub_cs_it', parent_id: null, title: 'নেটওয়ার্কিং, ইন্টারনেট ও সাইবার নিরাপত্তা', code: 'CS-IT-03' },
-  { id: 'subtop_cs_it_03_01', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_03', title: 'OSI মডেল ও IP অ্যাড্রেসিং', code: 'CS-IT-03-01' },
-  { id: 'subtop_cs_it_03_02', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_03', title: 'ক্লাউড কম্পিউটিং ও সাইবার থ্রেট/নিরাপত্তা', code: 'CS-IT-03-02' },
+  // 2. তথ্য ও যোগাযোগ প্রযুক্তি (CS-IT-ICT)
+  { id: 'top_cs_it_ict', subject_id: 'sub_cs_it', parent_id: null, title: 'তথ্য ও যোগাযোগ প্রযুক্তি', code: 'CS-IT-ICT' },
+  { id: 'subtop_cs_it_ict_01', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'ই-কমার্স', code: 'CS-IT-ICT-01' },
+  { id: 'subtop_cs_it_ict_02', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'তথ্য প্রযুক্তির বড় প্রতিষ্ঠান ও তাদের সেবা', code: 'CS-IT-ICT-02' },
+  { id: 'subtop_cs_it_ict_03', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'সাইবার অপরাধ', code: 'CS-IT-ICT-03' },
+  { id: 'subtop_cs_it_ict_04', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'ইন্টারনেট ও ইন্টারনেট সংক্রান্ত বিষয়', code: 'CS-IT-ICT-04' },
+  { id: 'subtop_cs_it_ict_05', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'কম্পিউটার নেটওয়ার্কিং ও সেলুলার ডাটা', code: 'CS-IT-ICT-05' },
+  { id: 'subtop_cs_it_ict_06', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'দৈনন্দিন জীবনে তথ্য-প্রযুক্তি', code: 'CS-IT-ICT-06' },
+  { id: 'subtop_cs_it_ict_07', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'ক্লায়েন্ট সার্ভার ম্যানেজমেন্ট ও ক্লাউড কম্পিউটিং', code: 'CS-IT-ICT-07' },
+  { id: 'subtop_cs_it_ict_08', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'স্মার্টফোন ও এর বৈশিষ্ট্য', code: 'CS-IT-ICT-08' },
+  { id: 'subtop_cs_it_ict_09', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'সোশ্যাল নেটওয়ার্কিং', code: 'CS-IT-ICT-09' },
+  { id: 'subtop_cs_it_ict_10', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'রোবটিক্স', code: 'CS-IT-ICT-10' },
+  { id: 'subtop_cs_it_ict_11', subject_id: 'sub_cs_it', parent_id: 'top_cs_it_ict', title: 'তথ্য-প্রযুক্তি সংক্রান্ত বিবিধ বিষয়', code: 'CS-IT-ICT-11' },
 
   // ==========================================
   // 13. মানসিক দক্ষতা (MENTAL)
   // ==========================================
-  { id: 'top_mental_01', subject_id: 'sub_mental', parent_id: null, title: 'ভাষাগত ও গাণিতিক যৌক্তিক বিচার', code: 'MENTAL-01' },
-  { id: 'subtop_mental_01_01', subject_id: 'sub_mental', parent_id: 'top_mental_01', title: 'সংখ্যার ধারা ও প্যাটার্ন সমাধান', code: 'MENTAL-01-01' },
-  { id: 'subtop_mental_01_02', subject_id: 'sub_mental', parent_id: 'top_mental_01', title: 'শব্দ সম্পর্ক ও সাদৃশ্য নির্ণয়', code: 'MENTAL-01-02' },
-
-  { id: 'top_mental_02', subject_id: 'sub_mental', parent_id: null, title: 'স্থানিক সম্পর্ক ও স্থানাঙ্ক নির্ণয়', code: 'MENTAL-02' },
-  { id: 'subtop_mental_02_01', subject_id: 'sub_mental', parent_id: 'top_mental_02', title: 'সম্পর্ক নির্ণয় ও দিক নির্ণয়', code: 'MENTAL-02-01' },
-  { id: 'subtop_mental_02_02', subject_id: 'sub_mental', parent_id: 'top_mental_02', title: 'ঘড়ির কাঁটা ও ক্যালেন্ডারের হিসাব', code: 'MENTAL-02-02' },
-  { id: 'subtop_mental_02_03', subject_id: 'sub_mental', parent_id: 'top_mental_02', title: 'জ্যামিতিক চিত্র গণনা ও প্রতিবিম্ব', code: 'MENTAL-02-03' },
+  { id: 'top_mental_ar', subject_id: 'sub_mental', parent_id: null, title: 'ভাবমূলক যুক্তিবিন্যাস', code: 'MENTAL-AR' },
+  { id: 'top_mental_vr', subject_id: 'sub_mental', parent_id: null, title: 'ভাষাগত যৌক্তিক বিচার', code: 'MENTAL-VR' },
+  { id: 'top_mental_ps', subject_id: 'sub_mental', parent_id: null, title: 'সমস্যা সমাধান', code: 'MENTAL-PS' },
+  { id: 'top_mental_sl', subject_id: 'sub_mental', parent_id: null, title: 'বানান ও ভাষা', code: 'MENTAL-SL' },
+  { id: 'top_mental_mr', subject_id: 'sub_mental', parent_id: null, title: 'যান্ত্রিক দক্ষতা', code: 'MENTAL-MR' },
+  { id: 'top_mental_sr', subject_id: 'sub_mental', parent_id: null, title: 'স্থানাঙ্ক সম্পর্ক', code: 'MENTAL-SR' },
+  { id: 'top_mental_na', subject_id: 'sub_mental', parent_id: null, title: 'সংখ্যাগত ক্ষমতা', code: 'MENTAL-NA' },
+  { id: 'top_mental_abr', subject_id: 'sub_mental', parent_id: null, title: 'বিমূর্ত যুক্তি', code: 'MENTAL-ABR' },
 
   // ==========================================
   // 14. আরবি ভাষা ও সাহিত্য (ARABIC)
@@ -935,6 +950,26 @@ export const filterTopicsForSubject = (topics: TopicItem[], subjectId?: string):
       targetCodes.push('INT-ORG');
       targetCodes.push('INT-CUR');
       targetCodes.push('INT-MISC');
+    }
+    if (matchedSub.code === 'CS-IT' || cleanId.includes('cs_it') || cleanId.includes('computer') || cleanId.includes('কম্পিউটার')) {
+      targetIds.add('sub_cs_it');
+      targetIds.add('computer_it');
+      targetCodes.push('CS-IT');
+      targetCodes.push('CS-IT-CMP');
+      targetCodes.push('CS-IT-ICT');
+    }
+    if (matchedSub.code === 'MENTAL' || cleanId.includes('mental') || cleanId.includes('মানসিক')) {
+      targetIds.add('sub_mental');
+      targetIds.add('mental_ability');
+      targetCodes.push('MENTAL');
+      targetCodes.push('MENTAL-AR');
+      targetCodes.push('MENTAL-VR');
+      targetCodes.push('MENTAL-PS');
+      targetCodes.push('MENTAL-SL');
+      targetCodes.push('MENTAL-MR');
+      targetCodes.push('MENTAL-SR');
+      targetCodes.push('MENTAL-NA');
+      targetCodes.push('MENTAL-ABR');
     }
   }
 

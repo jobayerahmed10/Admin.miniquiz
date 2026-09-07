@@ -368,10 +368,8 @@ export const INITIAL_SUBJECT_POSTS: SubjectPost[] = [
     order_index: 12,
     created_at: new Date().toISOString(),
     topics: [
-      { id: 'top-ict-1', name: 'কম্পিউটার হার্ডওয়্যার ও অঙ্গসংস্থান', description: 'ইনপুট/আউটপুট ডিভাইস, সিপিইউ, মেমোরি ও বাস', order_index: 1 },
-      { id: 'top-ict-2', name: 'সফটওয়্যার, ওএস ও ডাটাবেজ', description: 'অপারেটিং সিস্টেম, প্রোগ্রামিং ভাষা, সংখ্যা পদ্ধতি ও SQL', order_index: 2 },
-      { id: 'top-ict-3', name: 'ইন্টারনেট, নেটওয়ার্ক ও ক্লাউড', description: 'IP ঠিকানা, রাউটার, আইওটি, ক্লাউড কম্পিউটিং ও সোশ্যাল মিডিয়া', order_index: 3 },
-      { id: 'top-ict-4', name: 'সাইবার নিরাপত্তা ও ই-কমার্স', description: 'ফায়ারওয়াল, ম্যালওয়্যার, ক্রিপ্টোকারেন্সি ও ডিজিটাল নিরাপত্তা', order_index: 4 },
+      { id: 'top-ict-1', name: 'কম্পিউটার', description: 'হার্ডওয়্যার, ইনপুট/আউটপুট, ওএস, ইতিহাস, নম্বর সিস্টেম, ডাটাবেজ ও শর্টকাট', order_index: 1 },
+      { id: 'top-ict-2', name: 'তথ্য ও যোগাযোগ প্রযুক্তি', description: 'ই-কমার্স, বড় আইটি প্রতিষ্ঠান, সাইবার অপরাধ, ইন্টারনেট, নেটওয়ার্কিং, ক্লাউড ও রোবটিক্স', order_index: 2 },
     ],
   },
   {
