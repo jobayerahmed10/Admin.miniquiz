@@ -28,11 +28,17 @@ import {
   CheckSquare,
   Square,
   FolderSync,
+  Code,
 } from 'lucide-react';
 import { Question } from '../../types';
 import { QuestionBankHeader } from './Header';
 import { isArabicText, getQuestionBankDirectionality } from '../../lib/questionBankEngine';
-import { transferQuestionsSubjectTopic } from '../../lib/supabase';
+import {
+  transferQuestionsSubjectTopic,
+  syncAllQuestionsToSupabase,
+  generateQuestionsSqlScript,
+  isSupabaseConfigured,
+} from '../../lib/supabase';
 import {
   sanitizeSubjectName,
   isSameSubject,
@@ -80,6 +86,50 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const [transferTargetSubject, setTransferTargetSubject] = useState<string>('বাংলা ভাষা ও ব্যাকরণ');
   const [transferTargetTopic, setTransferTargetTopic] = useState<string>('');
   const [isTransferring, setIsTransferring] = useState(false);
+
+  // Supabase sync states
+  const [isSyncingToSupabase, setIsSyncingToSupabase] = useState(false);
+  const [syncProgressMessage, setSyncProgressMessage] = useState('');
+  const [syncStatusAlert, setSyncStatusAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const handleSyncToSupabase = async () => {
+    setIsSyncingToSupabase(true);
+    setSyncProgressMessage('সুপাবেসে প্রশ্ন সিঙ্ক করার প্রস্তুতি চলছে...');
+    setSyncStatusAlert(null);
+
+    try {
+      const res = await syncAllQuestionsToSupabase((msg) => {
+        setSyncProgressMessage(msg);
+      });
+
+      if (res.success) {
+        setSyncStatusAlert({
+          type: 'success',
+          message: `সফলভাবে ${res.syncedCount}টি প্রশ্ন সুপাবেস (public.questions) ডাটাবেসে সিঙ্ক করা হয়েছে!`,
+        });
+        onRefresh();
+      } else {
+        setSyncStatusAlert({
+          type: 'error',
+          message: res.error || 'সুপাবেসে প্রশ্ন সিঙ্ক করতে ব্যর্থ হয়েছে।',
+        });
+      }
+    } catch (err: any) {
+      setSyncStatusAlert({
+        type: 'error',
+        message: err?.message || 'প্রশ্ন সিঙ্ক করার সময় ত্রুটি ঘটেছে।',
+      });
+    } finally {
+      setIsSyncingToSupabase(false);
+      setSyncProgressMessage('');
+    }
+  };
+
+  const generatedSqlScript = useMemo(() => {
+    return generateQuestionsSqlScript(questions);
+  }, [questions]);
 
   // Dynamic calculations based on real questions
   const stats = useMemo(() => {
@@ -301,6 +351,74 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Header */}
       <QuestionBankHeader title="মাস্টার প্রশ্ন ব্যাংক" subTitle="QUESTION BANK" />
+
+      {/* Supabase Sync Banner */}
+      <div className="bg-gradient-to-r from-cyan-950/60 via-blue-950/50 to-indigo-950/60 border border-cyan-500/30 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 flex items-center justify-center shrink-0">
+              <FolderSync className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-white">
+                  সুপাবেস ডাটাবেস প্রশ্ন সিঙ্ক
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-bold">
+                  {isSupabaseConfigured() ? 'কানেক্টেড' : 'অফলাইন / লোকাল'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                এডমিন প্যানেলে জমা থাকা সকল প্রশ্ন ({questions.length} টি) সুপাবেস (Supabase) এর <code className="bg-slate-900 px-1.5 py-0.5 rounded text-cyan-300 font-mono">public.questions</code> টেবিলে ১-ক্লিকে সিঙ্ক বা আপলোড করুন।
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+            <button
+              onClick={handleSyncToSupabase}
+              disabled={isSyncingToSupabase}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 active:scale-95 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingToSupabase ? 'animate-spin' : ''}`} />
+              <span>{isSyncingToSupabase ? 'সিঙ্ক হচ্ছে...' : '⚡ সুপাবেজে সিঙ্ক করুন'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowSqlModal(true)}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm transition-all active:scale-95 cursor-pointer"
+            >
+              <Code className="w-4 h-4 text-cyan-400" />
+              <span>SQL কোড</span>
+            </button>
+          </div>
+        </div>
+
+        {syncProgressMessage && (
+          <div className="mt-3 p-3 rounded-2xl bg-cyan-950/80 border border-cyan-500/40 text-cyan-200 text-xs font-medium flex items-center gap-2 animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-cyan-400" />
+            <span>{syncProgressMessage}</span>
+          </div>
+        )}
+
+        {syncStatusAlert && (
+          <div className={`mt-3 p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-between gap-2 ${
+            syncStatusAlert.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+              : syncStatusAlert.type === 'error'
+              ? 'bg-rose-950/80 border-rose-500/40 text-rose-200'
+              : 'bg-indigo-950/80 border-indigo-500/40 text-indigo-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {syncStatusAlert.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <X className="w-4 h-4 text-rose-400" />}
+              <span>{syncStatusAlert.message}</span>
+            </div>
+            <button onClick={() => setSyncStatusAlert(null)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* 2. Three Creation Method Cards */}
       <div className="space-y-3">
@@ -1147,6 +1265,61 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SQL Export Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e1626] border border-cyan-500/30 rounded-3xl p-6 max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Code className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-black text-white">
+                  Supabase public.questions SQL কোড
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSqlModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              এই SQL কোডটি কপি করে আপনার Supabase প্রজেক্টের <b className="text-cyan-300">SQL Editor</b> এ রান করলে <code className="text-cyan-300">public.questions</code> টেবিল তৈরি হবে এবং সকল প্রশ্ন ইনস্ট্যান্টলি ইনসার্ট/আপডেট হবে।
+            </p>
+
+            <div className="relative flex-1 min-h-[300px] bg-slate-950 border border-slate-800 rounded-2xl p-4 overflow-auto font-mono text-xs text-emerald-300">
+              <pre className="whitespace-pre-wrap break-all">{generatedSqlScript}</pre>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <span className="text-xs text-slate-400 font-mono">
+                মোট প্রশ্ন: {questions.length}টি
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedSqlScript);
+                    setCopiedSql(true);
+                    setTimeout(() => setCopiedSql(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-cyan-500/20 cursor-pointer"
+                >
+                  {copiedSql ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedSql ? 'কপি হয়েছে!' : 'SQL কোড কপি করুন'}</span>
+                </button>
+                <button
+                  onClick={() => setShowSqlModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
             </div>
           </div>
         </div>

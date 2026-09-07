@@ -38,6 +38,7 @@ import {
   FolderTree,
   Zap,
   Code,
+  Download,
 } from 'lucide-react';
 import { SubjectPost, SyllabusTopic, Question, SyllabusSubTopic } from '../types';
 import {
@@ -61,6 +62,7 @@ import {
   SUBTOPICS_SQL_SCHEMA,
   SubTopicItem,
   suggestSubTopicCode,
+  downloadSubTopicsCsvFile,
 } from '../lib/subjectTopicManager';
 import { fetchAllQuestions, getSupabaseClient } from '../lib/supabase';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -789,7 +791,15 @@ export const SubjectPostsManagement: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+          <button
+            onClick={() => downloadSubTopicsCsvFile()}
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow"
+            title="CSV ফাইল ডাউনলোড করে Supabase এ Import data from CSV তে আপলোড করুন"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>CSV ফাইল ডাউনলোড</span>
+          </button>
           <button
             onClick={() => setIsSqlModalOpen(true)}
             className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow"
@@ -1684,26 +1694,37 @@ export const SubjectPostsManagement: React.FC = () => {
             </div>
 
             {/* Tab Selection */}
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSqlTab('full')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    sqlTab === 'full'
+                      ? 'bg-cyan-600 text-white shadow'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ ১. সম্পূর্ণ SQL (টেবিল তৈরি + সকল ১৮০+ সাব-টপিক ডেটা)
+                </button>
+                <button
+                  onClick={() => setSqlTab('subtopics_only')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    sqlTab === 'subtopics_only'
+                      ? 'bg-cyan-600 text-white shadow'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📥 ২. শুধু সাব-টপিক ডেটা (INSERT INTO sub_topics)
+                </button>
+              </div>
+
               <button
-                onClick={() => setSqlTab('full')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  sqlTab === 'full'
-                    ? 'bg-cyan-600 text-white shadow'
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
-                }`}
+                onClick={() => downloadSubTopicsCsvFile()}
+                className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer ml-auto"
+                title="CSV ডাউনলোড করে Supabase এ Import data from CSV বাটনে ক্লিক করে আপলোড করতে পারেন"
               >
-                ⚡ ১. সম্পূর্ণ SQL (টেবিল তৈরি + সকল ১৮০+ সাব-টপিক ডেটা)
-              </button>
-              <button
-                onClick={() => setSqlTab('subtopics_only')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  sqlTab === 'subtopics_only'
-                    ? 'bg-cyan-600 text-white shadow'
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                📥 ২. শুধু সাব-টপিক ডেটা (INSERT INTO sub_topics)
+                <Download className="w-3.5 h-3.5" />
+                <span>CSV ফাইল ডাউনলোড</span>
               </button>
             </div>
 

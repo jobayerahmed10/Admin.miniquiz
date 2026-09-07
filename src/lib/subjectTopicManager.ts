@@ -1882,3 +1882,42 @@ export const formatLiveQuestionId = (prefix: string, sequenceNum: number): strin
   const padded = String(sequenceNum).padStart(5, '0');
   return `${cleanPrefix}${padded}`;
 };
+
+/**
+ * Export all sub_topics as CSV string for direct upload to Supabase Table Editor
+ */
+export const getSubTopicsCsvContent = (): string => {
+  const subTopics = DEFAULT_TOPICS.filter((t) => t.parent_id !== null && Boolean(t.parent_id));
+  const headers = ['id', 'topic_id', 'subject_id', 'title', 'name', 'code', 'description', 'order_index'];
+  const rows = subTopics.map((st, idx) => {
+    const escapeCsv = (val: string = '') => `"${val.replace(/"/g, '""')}"`;
+    return [
+      escapeCsv(st.id),
+      escapeCsv(st.parent_id || ''),
+      escapeCsv(st.subject_id || ''),
+      escapeCsv(st.title || ''),
+      escapeCsv(st.title || ''),
+      escapeCsv(st.code || ''),
+      escapeCsv(''),
+      idx + 1,
+    ].join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\n');
+};
+
+/**
+ * Trigger CSV file download in browser
+ */
+export const downloadSubTopicsCsvFile = () => {
+  const csvContent = getSubTopicsCsvContent();
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'sub_topics_data.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+

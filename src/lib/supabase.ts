@@ -6659,3 +6659,165 @@ export const uploadBlogThumbnail = async (
   }
 };
 
+/**
+ * Bulk Sync All Questions from Local Cache / Seed Data to Supabase Database
+ */
+export const syncAllQuestionsToSupabase = async (
+  onProgress?: (progressText: string) => void
+): Promise<{ success: boolean; syncedCount: number; error: string | null }> => {
+  const localQuestions = getLocalCachedQuestions();
+  const seedQuestions = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+
+  // Merge seed questions and local cached questions so no question is left out
+  const map = new Map<string, Question>();
+  seedQuestions.forEach((q) => { if (q && q.id) map.set(String(q.id), q); });
+  localQuestions.forEach((q) => { if (q && q.id) map.set(String(q.id), q); });
+
+  const allQuestionsToSync = Array.from(map.values());
+
+  if (allQuestionsToSync.length === 0) {
+    return { success: true, syncedCount: 0, error: 'সিঙ্ক করার মতো কোনো প্রশ্ন পাওয়া যায়নি।' };
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      syncedCount: 0,
+      error: 'সুপাবেস কানেকশন সেট করা নেই। দয়া করে সুপাবেস URL এবং Anon Key চেক করুন।',
+    };
+  }
+
+  try {
+    let syncedCount = 0;
+    const batchSize = 50;
+
+    for (let i = 0; i < allQuestionsToSync.length; i += batchSize) {
+      const chunk = allQuestionsToSync.slice(i, i + batchSize);
+
+      if (onProgress) {
+        onProgress(`মোট ${allQuestionsToSync.length}টি প্রশ্নের মধ্যে ${Math.min(i + batchSize, allQuestionsToSync.length)}টি সুপাবেসে আপলোড হচ্ছে...`);
+      }
+
+      const payload = chunk.map((q) => {
+        const cleanSub = sanitizeSubjectName(q.subject);
+        const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
+        const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+        const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
+
+        return {
+          id: String(q.id),
+          question: q.question || '',
+          option_a: q.option_a || '',
+          option_b: q.option_b || '',
+          option_c: q.option_c || '',
+          option_d: q.option_d || '',
+          correct_answer: q.correct_answer || 'option_a',
+          explanation: sanitizeExplanation(q.explanation, q) || '',
+          subject: cleanSub,
+          topic: cleanTop,
+          sub_topic: cleanSubTop,
+          post: cleanPost,
+          code: q.code || q.question_code || '',
+          status: q.status || 'published',
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      let { error } = await client
+        .from('questions')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('Sync chunk error, trying fallback:', error);
+        // Fallback: strip optional sub_topic, post if error
+        const fallbackPayload = payload.map((p) => ({
+          id: p.id,
+          question: p.question,
+          option_a: p.option_a,
+          option_b: p.option_b,
+          option_c: p.option_c,
+          option_d: p.option_d,
+          correct_answer: p.correct_answer,
+          explanation: p.explanation,
+          subject: p.subject,
+          status: p.status,
+        }));
+        const retryRes = await client.from('questions').upsert(fallbackPayload, { onConflict: 'id' });
+        if (retryRes.error) {
+          console.error('Batch sync retry failed:', retryRes.error);
+        } else {
+          syncedCount += chunk.length;
+        }
+      } else {
+        syncedCount += chunk.length;
+      }
+    }
+
+    // Refresh local cache with latest full list
+    setLocalCachedQuestions(allQuestionsToSync);
+    saveQuestionsBackup(allQuestionsToSync);
+
+    return { success: true, syncedCount, error: null };
+  } catch (err: any) {
+    console.error('syncAllQuestionsToSupabase exception:', err);
+    return {
+      success: false,
+      syncedCount: 0,
+      error: err?.message || 'সুপাবেসে প্রশ্ন সিঙ্ক করার সময় ত্রুটি ঘটেছে।',
+    };
+  }
+};
+
+/**
+ * Generate Raw SQL Script for public.questions Table
+ */
+export const generateQuestionsSqlScript = (questionsToExport?: Question[]): string => {
+  const questions = questionsToExport && questionsToExport.length > 0
+    ? questionsToExport
+    : getLocalCachedQuestions();
+
+  const escapeSql = (str: any) => {
+    if (!str) return "''";
+    return "'" + String(str).replace(/'/g, "''") + "'";
+  };
+
+  let sql = `-- ========================================================\n-- Supabase public.questions Table Schema & Data Seed\n-- ========================================================\n\nCREATE TABLE IF NOT EXISTS public.questions (\n  id TEXT PRIMARY KEY,\n  question TEXT NOT NULL,\n  option_a TEXT,\n  option_b TEXT,\n  option_c TEXT,\n  option_d TEXT,\n  correct_answer TEXT DEFAULT 'option_a',\n  explanation TEXT,\n  subject TEXT,\n  topic TEXT,\n  sub_topic TEXT,\n  post TEXT,\n  code TEXT,\n  slug TEXT,\n  status TEXT DEFAULT 'published',\n  exam_id TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\n-- Enable RLS & Public Policies\nALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;\n\nDROP POLICY IF EXISTS "Public Read Questions" ON public.questions;\nCREATE POLICY "Public Read Questions" ON public.questions FOR SELECT USING (true);\n\nDROP POLICY IF EXISTS "Public Insert Questions" ON public.questions;\nCREATE POLICY "Public Insert Questions" ON public.questions FOR INSERT WITH CHECK (true);\n\nDROP POLICY IF EXISTS "Public Update Questions" ON public.questions;\nCREATE POLICY "Public Update Questions" ON public.questions FOR UPDATE USING (true);\n\nDROP POLICY IF EXISTS "Public Delete Questions" ON public.questions;\nCREATE POLICY "Public Delete Questions" ON public.questions FOR DELETE USING (true);\n\n`;
+
+  if (questions.length === 0) {
+    sql += `-- (No questions found to seed)\n`;
+    return sql;
+  }
+
+  sql += `-- Insert / Upsert All ${questions.length} Questions\n`;
+  sql += `INSERT INTO public.questions (id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, post, code, status)\nVALUES\n`;
+
+  const rows = questions.map((q) => {
+    const cleanSub = sanitizeSubjectName(q.subject);
+    const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
+    const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+    const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
+
+    return `(${escapeSql(q.id)}, ${escapeSql(q.question)}, ${escapeSql(q.option_a)}, ${escapeSql(q.option_b)}, ${escapeSql(q.option_c)}, ${escapeSql(q.option_d)}, ${escapeSql(q.correct_answer || 'option_a')}, ${escapeSql(q.explanation)}, ${escapeSql(cleanSub)}, ${escapeSql(cleanTop)}, ${escapeSql(cleanSubTop)}, ${escapeSql(cleanPost)}, ${escapeSql(q.code || q.question_code)}, ${escapeSql(q.status || 'published')})`;
+  });
+
+  sql += rows.join(',\n') + '\nON CONFLICT (id) DO UPDATE SET\n';
+  sql += `  question = EXCLUDED.question,\n`;
+  sql += `  option_a = EXCLUDED.option_a,\n`;
+  sql += `  option_b = EXCLUDED.option_b,\n`;
+  sql += `  option_c = EXCLUDED.option_c,\n`;
+  sql += `  option_d = EXCLUDED.option_d,\n`;
+  sql += `  correct_answer = EXCLUDED.correct_answer,\n`;
+  sql += `  explanation = EXCLUDED.explanation,\n`;
+  sql += `  subject = EXCLUDED.subject,\n`;
+  sql += `  topic = EXCLUDED.topic,\n`;
+  sql += `  sub_topic = EXCLUDED.sub_topic,\n`;
+  sql += `  post = EXCLUDED.post,\n`;
+  sql += `  code = EXCLUDED.code,\n`;
+  sql += `  status = EXCLUDED.status,\n`;
+  sql += `  updated_at = NOW();\n`;
+
+  return sql;
+};
+
+
