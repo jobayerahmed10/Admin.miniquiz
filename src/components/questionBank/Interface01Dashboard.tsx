@@ -72,7 +72,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferSourceSubject, setTransferSourceSubject] = useState<string>('all');
   const [transferSourceTopic, setTransferSourceTopic] = useState<string>('all');
-  const [transferTargetSubject, setTransferTargetSubject] = useState<string>('উসূলুল ফিকহ');
+  const [transferTargetSubject, setTransferTargetSubject] = useState<string>('বাংলা ভাষা ও ব্যাকরণ');
   const [transferTargetTopic, setTransferTargetTopic] = useState<string>('');
   const [isTransferring, setIsTransferring] = useState(false);
 
@@ -136,7 +136,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
     ];
 
     // Priority default subjects to guarantee visual completeness
-    const defaultPrioritySubs = ['বাংলা', 'ইংরেজি', 'গণিত', 'সাধারণ জ্ঞান', 'বিজ্ঞান', 'কম্পিউটার ও তথ্যপ্রযুক্তি', 'আল কুরআন ও হাদিস', 'আরবি', 'ফিকহ', 'উসূলুল ফিকহ'];
+    const defaultPrioritySubs = ['বাংলা ভাষা ও ব্যাকরণ', 'English Grammar', 'গণিত', 'সাধারণ জ্ঞান', 'বিজ্ঞান', 'কম্পিউটার ও তথ্যপ্রযুক্তি', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি'];
     
     // Merge existing question subjects first, then standard priority subjects
     const uniqueSubjectsList = Array.from(
@@ -895,7 +895,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
         {/* 2. Filter Questions */}
         <div
-          onClick={() => setSelectedSubject(selectedSubject === 'all' ? 'উসূলুল ফিকহ' : 'all')}
+          onClick={() => setSelectedSubject(selectedSubject === 'all' ? 'বাংলা ভাষা ও ব্যাকরণ' : 'all')}
           className="cursor-pointer bg-[#0b1322] hover:bg-[#101b30] border border-slate-800 hover:border-slate-700 rounded-3xl p-4 transition-all group flex flex-col justify-between"
         >
           <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
@@ -1011,7 +1011,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
               {/* Quick Presets */}
               <div className="flex flex-wrap gap-1.5 pb-1">
-                {['উসূলুল ফিকহ', 'ফিকহ', 'আরবি', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি', 'বাংলা', 'English', 'গণিত', 'সাধারণ জ্ঞান'].map((preset) => (
+                {['বাংলা ভাষা ও ব্যাকরণ', 'English Grammar', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি', 'গণিত', 'সাধারণ জ্ঞান'].map((preset) => (
                   <button
                     key={preset}
                     type="button"
@@ -1031,7 +1031,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                 type="text"
                 value={transferTargetSubject}
                 onChange={(e) => setTransferTargetSubject(e.target.value)}
-                placeholder="বিষয়ের নাম লিখুন (যেমন: উসূলুল ফিকহ)"
+                placeholder="বিষয়ের নাম লিখুন (যেমন: বাংলা ভাষা ও ব্যাকরণ)"
                 className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
 
@@ -1042,7 +1042,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                 type="text"
                 value={transferTargetTopic}
                 onChange={(e) => setTransferTargetTopic(e.target.value)}
-                placeholder="টপিকের নাম লিখুন (যেমন: ফিকহ ও উসুলুল ফিকহ)"
+                placeholder="টপিকের নাম লিখুন (যেমন: বিপরীতার্থক শব্দ)"
                 className="w-full bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
             </div>

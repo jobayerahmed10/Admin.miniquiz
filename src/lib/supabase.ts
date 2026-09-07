@@ -96,15 +96,24 @@ export const clearCustomCredentials = () => {
   supabaseInstance = null;
 };
 
+import { INITIAL_SEED_EXAMS } from './examSeedData';
+
 const LOCAL_QUESTIONS_KEY = 'miniquiz_cached_questions';
 const LOCAL_EXAMS_KEY = 'miniquiz_cached_exams';
 
 export const getLocalCachedQuestions = (): Question[] => {
   try {
     const raw = localStorage.getItem(LOCAL_QUESTIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    const seedQs = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+    return seedQs;
   } catch (e) {
-    return [];
+    return INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
   }
 };
 
@@ -115,8 +124,6 @@ export const setLocalCachedQuestions = (questions: Question[]) => {
     console.warn('Failed to save questions to localStorage:', e);
   }
 };
-
-import { INITIAL_SEED_EXAMS } from './examSeedData';
 
 export const getLocalCachedExams = (): Exam[] => {
   try {
@@ -425,6 +432,7 @@ function normalizeQuestionRow(row: any): Question {
   const rawSub = row.subject || row.category || row.subject_name || 'বাংলা';
   const cleanSubject = sanitizeSubjectName(rawSub);
   const cleanTopic = (row.topic || row.topic_name || '').replace(/\s+/g, ' ').trim();
+  const cleanSubTopic = (row.sub_topic || row.subtopic || row.sub_topic_name || '').replace(/\s+/g, ' ').trim();
   const cleanPost = (row.post || row.post_name || row.designation || row.position || '').replace(/\s+/g, ' ').trim();
   const qId = row.id || row.question_code || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const qCode = row.question_code || (typeof qId === 'string' ? qId : undefined);
@@ -432,6 +440,8 @@ function normalizeQuestionRow(row: any): Question {
   return {
     id: qId,
     question_code: qCode,
+    code: row.code || qCode,
+    custom_question_id: row.custom_question_id || null,
     question: qText,
     option_a: row.option_a || (Array.isArray(row.options) ? row.options[0] : '') || '',
     option_b: row.option_b || (Array.isArray(row.options) ? row.options[1] : '') || '',
@@ -443,6 +453,11 @@ function normalizeQuestionRow(row: any): Question {
     status: row.status === 'published' ? 'published' : 'draft',
     subject: cleanSubject,
     topic: cleanTopic,
+    sub_topic: cleanSubTopic || undefined,
+    subtopic: cleanSubTopic || undefined,
+    subject_id: row.subject_id ? String(row.subject_id) : undefined,
+    topic_id: row.topic_id ? String(row.topic_id) : undefined,
+    sub_topic_id: row.sub_topic_id ? String(row.sub_topic_id) : undefined,
     post: cleanPost,
     exam_id: row.exam_id || null,
     created_at: row.created_at || new Date().toISOString(),
@@ -570,15 +585,53 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
 
     const normalized = (data || []).map(normalizeQuestionRow);
 
-    // Merge Supabase questions with any local-only questions
-    const mergedMap = new Map<string | number, Question>();
-    localQuestions.forEach((q) => mergedMap.set(String(q.id), q));
-    normalized.forEach((q) => mergedMap.set(String(q.id), q));
+    // Merge & deduplicate by normalized question text, filtering out Usul/Fiqh & dummy questions
+    const candidatePool = [...localQuestions, ...normalized];
+    const cleanList: Question[] = [];
+    const seenTexts = new Set<string>();
 
-    const finalQuestions = Array.from(mergedMap.values());
-    setLocalCachedQuestions(finalQuestions);
+    for (const q of candidatePool) {
+      const qIdStr = String(q.id || '');
+      const cleanSub = (q.subject || '').trim();
+      const cleanTop = (q.topic || '').trim();
+      const cleanSubTop = (q.sub_topic || q.subtopic || '').trim();
+      const qText = (q.question || '').toLowerCase();
+      const normText = (q.question || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-    return { questions: finalQuestions, error: null, isSynced: true };
+      const isUsulOrFiqh =
+        cleanSub.includes('উসূল') ||
+        cleanSub.includes('ফিকহ') ||
+        cleanSub.includes('আরবি') ||
+        cleanSub.includes('ইসলাম') ||
+        cleanTop.includes('উসূল') ||
+        cleanTop.includes('ফিকহ') ||
+        cleanSubTop.includes('উসূল') ||
+        cleanSubTop.includes('ফিকহ') ||
+        qText.includes('উসূল') ||
+        qText.includes('ফিকহ') ||
+        qText.includes('কিতাবুল্লাহ') ||
+        qText.includes('শরীয়ত');
+
+      const isDummyDemo =
+        qIdStr.startsWith('Q-GK-') ||
+        qIdStr.startsWith('Q-MATH-') ||
+        qIdStr.startsWith('Q-MOCK-') ||
+        qText.includes('সাধারণ জ্ঞান টেস্ট প্রশ্ন') ||
+        qText.includes('গণিত টেস্ট প্রশ্ন') ||
+        qText.includes('বিসিএস পূর্ণাঙ্গ মক প্রশ্ন') ||
+        qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
+        qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
+
+      if (isUsulOrFiqh || isDummyDemo || !normText || seenTexts.has(normText)) {
+        continue;
+      }
+      seenTexts.add(normText);
+      cleanList.push(q);
+    }
+
+    setLocalCachedQuestions(cleanList);
+
+    return { questions: cleanList, error: null, isSynced: true };
   } catch (err: any) {
     return {
       questions: localQuestions,
@@ -672,6 +725,7 @@ export const insertQuestion = async (
   }
 
   try {
+    const cleanSubTopic = (newQuestion.sub_topic || newQuestion.subtopic || '').trim();
     const payload: any = {
       id: String(finalId),
       question: newQuestion.question,
@@ -685,6 +739,7 @@ export const insertQuestion = async (
       status: newQuestion.status || 'published',
       subject: cleanSubject,
       topic: cleanTopic,
+      ...(cleanSubTopic ? { sub_topic: cleanSubTopic } : {}),
       post: cleanPost,
       ...(newQuestion.exam_id !== undefined && newQuestion.exam_id !== null ? { exam_id: String(newQuestion.exam_id) } : {}),
     };
@@ -882,6 +937,9 @@ export const insertBatchQuestions = async (
         topic: (q.topic || '').replace(/\s+/g, ' ').trim(),
         post: (q.post || '').replace(/\s+/g, ' ').trim(),
       };
+      if (q.sub_topic || q.subtopic) {
+        item.sub_topic = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+      }
       if (q.slug) {
         item.slug = q.slug;
       }
@@ -1076,6 +1134,9 @@ export const updateQuestion = async (
     if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;
     if (sanitizedUpdatedSubject !== undefined) payload.subject = sanitizedUpdatedSubject;
     if (updatedFields.topic !== undefined) payload.topic = (updatedFields.topic || '').replace(/\s+/g, ' ').trim();
+    if (updatedFields.sub_topic !== undefined || updatedFields.subtopic !== undefined) {
+      payload.sub_topic = (updatedFields.sub_topic || updatedFields.subtopic || '').replace(/\s+/g, ' ').trim();
+    }
     if (updatedFields.post !== undefined) payload.post = (updatedFields.post || '').replace(/\s+/g, ' ').trim();
     if (updatedFields.exam_id !== undefined) payload.exam_id = String(updatedFields.exam_id);
 
@@ -1228,30 +1289,47 @@ export const transferQuestionsSubjectTopic = async (
   }
 };
 
-// Auto-repair and assign proper topics based on question content and subject
+// Auto-repair, deduplicate and assign proper topics based on question content and subject
 export const autoAssignAndRepairQuestionTopics = async (
   customRules?: { subjectMatch: string; targetTopic: string }[]
 ): Promise<{ success: boolean; updatedCount: number; error: string | null }> => {
   const current = getLocalCachedQuestions();
   let updatedCount = 0;
 
-  // Extract initial seed questions if local cache is empty or only has stale dummy questions
+  // Extract initial seed questions if local cache is empty
   const seedQuestions: Question[] = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
-
   const sourcePool = current.length > 0 ? current : seedQuestions;
 
   let engSeq = 1;
   let bngSeq = 1;
   const processedQuestions: Question[] = [];
   const deletedDemoIds: string[] = [];
+  const seenQuestionTexts = new Set<string>();
 
   for (const q of sourcePool) {
     const qIdStr = String(q.id || '');
     const cleanSub = (q.subject || '').trim();
     const cleanTop = (q.topic || '').trim();
+    const cleanSubTop = (q.sub_topic || q.subtopic || '').trim();
     const qText = (q.question || '').toLowerCase();
+    const normText = (q.question || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-    // Check if it's a dummy demo question (GK, Math, Mock, etc.)
+    // 1. Check if it's Usulul Fiqh / Fiqh / Arabic / Islamic question -> REMOVE
+    const isUsulOrFiqh =
+      cleanSub.includes('উসূল') ||
+      cleanSub.includes('ফিকহ') ||
+      cleanSub.includes('আরবি') ||
+      cleanSub.includes('ইসলাম') ||
+      cleanTop.includes('উসূল') ||
+      cleanTop.includes('ফিকহ') ||
+      cleanSubTop.includes('উসূল') ||
+      cleanSubTop.includes('ফিকহ') ||
+      qText.includes('উসূল') ||
+      qText.includes('ফিকহ') ||
+      qText.includes('কিতাবুল্লাহ') ||
+      qText.includes('শরীয়ত');
+
+    // 2. Check if it's a dummy demo question (GK, Math, Mock, etc.) -> REMOVE
     const isDummyDemo =
       qIdStr.startsWith('Q-GK-') ||
       qIdStr.startsWith('Q-MATH-') ||
@@ -1262,17 +1340,27 @@ export const autoAssignAndRepairQuestionTopics = async (
       qText.includes('বাংলাদেশের জাতীয় ফুল কোনটি') ||
       qText.includes('ভাষা আন্দোলনের শহীদ বরকত');
 
-    if (isDummyDemo) {
+    if (isUsulOrFiqh || isDummyDemo) {
       deletedDemoIds.push(qIdStr);
       updatedCount++;
       continue;
     }
+
+    // 3. Deduplicate by question text
+    if (!normText || seenQuestionTexts.has(normText)) {
+      // Duplicate question -> mark for deletion
+      deletedDemoIds.push(qIdStr);
+      updatedCount++;
+      continue;
+    }
+    seenQuestionTexts.add(normText);
 
     const isEnglishPreposition =
       cleanSub === 'English' ||
       cleanSub === 'English Language' ||
       cleanSub === 'English Grammar' ||
       cleanTop.includes('Preposition') ||
+      cleanSubTop.includes('Preposition') ||
       qText.includes('preposition') ||
       qText.includes('senior') ||
       qText.includes('good at') ||
@@ -1287,6 +1375,7 @@ export const autoAssignAndRepairQuestionTopics = async (
       cleanSub.includes('বাংলা') ||
       cleanSub === 'Bangla' ||
       cleanTop.includes('বিপরীত') ||
+      cleanSubTop.includes('বিপরীত') ||
       qText.includes('বিপরীত') ||
       qText.includes('সৌম্য') ||
       qText.includes('অনুরাগ') ||
@@ -1322,7 +1411,7 @@ export const autoAssignAndRepairQuestionTopics = async (
         question_code: newCode,
         code: newCode,
         subject: 'বাংলা ভাষা ও ব্যাকরণ',
-        topic: 'শব্দ ও পদ',
+        topic: 'অর্থ তত্ত্ব',
         sub_topic: 'বিপরীতার্থক শব্দ',
         subtopic: 'বিপরীতার্থক শব্দ',
         subject_id: 'sub_bangla_lang',
