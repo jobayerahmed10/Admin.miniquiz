@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Zap,
   Filter,
+  Crown,
 } from 'lucide-react';
 import { CourseApplication, ApplicationStatus } from '../types';
 import {
@@ -28,11 +29,14 @@ import {
   deleteCourseApplication,
   insertCourseApplication,
   subscribeToCourseApplications,
+  syncSupabaseProfilePremium,
+  syncAllApprovedEnrollmentsToSupabase,
 } from '../lib/supabase';
 
 export const EnrollmentsManagement: React.FC = () => {
   const [applications, setApplications] = useState<CourseApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncingAll, setSyncingAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | ApplicationStatus>('all');
   const [isTableMissing, setIsTableMissing] = useState(false);
@@ -160,6 +164,40 @@ export const EnrollmentsManagement: React.FC = () => {
         showToast('পেমেন্ট আবেদন রেকর্ড মুছে ফেলা হয়েছে।', 'info');
       }
       await loadApplications();
+      setProcessingId(null);
+    }
+  };
+
+  // Re-sync all approved students to Supabase 'profiles' table with 'premium'
+  const handleSyncAllApproved = async () => {
+    setSyncingAll(true);
+    try {
+      const res = await syncAllApprovedEnrollmentsToSupabase();
+      if (res.approvedCount === 0) {
+        showToast('কোনো অনুমোদিত শিক্ষার্থী নেই।', 'info');
+      } else {
+        showToast(`👑 ${res.totalSynced} জন অনুমোদিত শিক্ষার্থীর সুপাবেজ প্রোফাইল টেবিলে 'premium' সফলভাবে আপডেট করা হয়েছে!`, 'success');
+      }
+    } catch (err: any) {
+      showToast(`সিঙ্ক করতে সমস্যা: ${err.message || 'ত্রুটি'}`, 'danger');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
+  // Single student manual Supabase sync
+  const handleSingleStudentSync = async (app: CourseApplication) => {
+    setProcessingId(app.id);
+    try {
+      const res = await syncSupabaseProfilePremium(app.phone_number, app.student_name, 'premium');
+      if (res.success) {
+        showToast(`👑 "${app.student_name}" (${app.phone_number})-এর সুপাবেজ প্রোফাইল 'premium' হিসেবে আপডেট হয়েছে!`, 'success');
+      } else {
+        showToast(`সুপাবেজ আপডেটে সমস্যা: ${res.error}`, 'danger');
+      }
+    } catch (err: any) {
+      showToast(`ত্রুটি: ${err.message}`, 'danger');
+    } finally {
       setProcessingId(null);
     }
   };
@@ -425,6 +463,16 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;
 
           <div className="flex flex-wrap items-center gap-3">
             <button
+              onClick={handleSyncAllApproved}
+              disabled={syncingAll}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs hover:from-amber-400 hover:to-amber-500 transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50"
+              title="সকল অনুমোদিত শিক্ষার্থীকে সুপাবেজ profiles টেবিলে 'premium' হিসেবে সিঙ্ক করুন"
+            >
+              <Crown className={`w-4 h-4 ${syncingAll ? 'animate-spin' : ''}`} />
+              <span>{syncingAll ? 'সুপাবেজে সিঙ্ক হচ্ছে...' : '⚡ সকল অনুমোদিত শিক্ষার্থী সুপাবেজে সিঙ্ক'}</span>
+            </button>
+
+            <button
               onClick={() => setShowSqlModal(true)}
               className="px-4 py-2.5 rounded-xl bg-slate-800/90 text-slate-200 border border-slate-700 text-xs font-bold hover:bg-slate-700 hover:text-white transition-all flex items-center gap-2 shadow-lg"
             >
@@ -434,7 +482,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;
 
             <button
               onClick={() => setShowNewModal(true)}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 font-black text-xs hover:from-amber-400 hover:to-emerald-400 transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs hover:from-emerald-400 hover:to-teal-400 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               নতুন পেমেন্ট আবেদন যুক্ত করুন
@@ -750,6 +798,18 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;
                       {/* 3. QUICK ACTION BUTTONS */}
                       <td className="p-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          {app.status === 'approved' && (
+                            <button
+                              onClick={() => handleSingleStudentSync(app)}
+                              disabled={processingId === app.id}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-black text-xs transition-all border border-amber-500/40 flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                              title="সুপাবেজ profiles টেবিলে 'premium' স্ট্যাটাস নিশ্চিত/সিঙ্ক করুন"
+                            >
+                              <Crown className="w-3.5 h-3.5" />
+                              <span>👑 সুপাবেজে সিঙ্ক</span>
+                            </button>
+                          )}
+
                           {app.status !== 'approved' && (
                             <button
                               onClick={() => handleApprove(app)}

@@ -1,5 +1,5 @@
 import { StudentUser, StudentDashboardGrowthData, ExamAttemptRecord, SubjectPerformance } from '../types';
-import { getSupabaseClient } from './supabase';
+import { getSupabaseClient, syncSupabaseProfilePremium } from './supabase';
 
 const STORAGE_ACTIVE_STUDENT = 'tamrin_active_student_session';
 const STORAGE_REGISTERED_STUDENTS = 'tamrin_registered_students_list';
@@ -300,22 +300,8 @@ export const updateStudentPremiumAdmin = async (
   studentName?: string,
   premiumValue: 'premium' | null = 'premium'
 ): Promise<{ success: boolean; error?: string }> => {
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      const val = premiumValue === 'premium' ? 'premium' : null;
-      // Update profiles
-      await client.from('profiles').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
-      // Update profile singular
-      try {
-        await client.from('profile').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
-      } catch (e) {}
-      // Update students
-      await client.from('students').update({ premium: val }).or(`id.eq.${studentIdOrPhone},phone.eq.${studentIdOrPhone}`);
-    } catch (e: any) {
-      console.warn('updateStudentPremiumAdmin note:', e);
-    }
-  }
+  const val = premiumValue === 'premium' ? 'premium' : '';
+  await syncSupabaseProfilePremium(studentIdOrPhone, studentName, val);
 
   // Update local list
   const list = getLocalRegisteredStudents();

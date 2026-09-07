@@ -5172,14 +5172,14 @@ export const syncSupabaseProfilePremium = async (
   phoneOrId: string,
   studentName?: string,
   premiumValue: string = 'premium'
-): Promise<{ success: boolean; error: string | null }> => {
+): Promise<{ success: boolean; updatedCount: number; error: string | null; details?: string }> => {
   const client = getSupabaseClient();
   if (!client) {
-    return { success: false, error: 'Supabase client not initialized' };
+    return { success: false, updatedCount: 0, error: 'সুপাবেজ ক্লায়েন্ট ইনিশিয়ালাইজ করা যায়নি' };
   }
 
-  const rawPhone = (phoneOrId || '').trim();
-  const cleanDigits = rawPhone.replace(/\D/g, '');
+  const raw = (phoneOrId || '').trim();
+  const cleanDigits = raw.replace(/\D/g, '');
   let national = cleanDigits;
   if (cleanDigits.startsWith('880')) {
     national = '0' + cleanDigits.slice(3);
@@ -5188,112 +5188,115 @@ export const syncSupabaseProfilePremium = async (
   }
   const intl880 = national.startsWith('0') ? '88' + national : '880' + national;
   const intlPlus880 = national.startsWith('0') ? '+88' + national : '+880' + national;
+  const withoutZero = national.startsWith('0') ? national.substring(1) : national;
 
   const phoneVariants = Array.from(
-    new Set([rawPhone, cleanDigits, national, intl880, intlPlus880].filter((p) => p && p.length >= 6))
+    new Set([raw, cleanDigits, national, intl880, intlPlus880, withoutZero].filter((p) => p && p.length >= 6))
   );
 
   let updatedCount = 0;
+  const matchedIds = new Set<string>();
 
-  // 1. Check & update Supabase 'profiles' table
-  try {
-    // A. By explicit UUID / ID if provided
-    if (rawPhone.length >= 20 && rawPhone.includes('-')) {
+  const targetTables = ['profiles', 'profile', 'students', 'users'];
+  const phoneCols = ['phone', 'mobile', 'phone_number', 'contact_number', 'user_phone'];
+  const nameCols = ['name', 'full_name', 'username', 'display_name'];
+
+  for (const table of targetTables) {
+    // 1. Check direct UUID/ID
+    if (raw.length >= 10) {
       try {
-        const { data } = await client
-          .from('profiles')
+        const { data, error } = await client
+          .from(table)
           .update({ premium: premiumValue })
-          .eq('id', rawPhone)
+          .eq('id', raw)
           .select('id');
-        if (data && data.length > 0) updatedCount += data.length;
+        if (!error && data && data.length > 0) {
+          data.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+          updatedCount += data.length;
+        }
       } catch (e) {}
     }
 
-    // B. Search matching profile records by phone
+    // 2. Safely find and update by phone columns
     for (const p of phoneVariants) {
-      try {
-        const { data, error } = await client
-          .from('profiles')
-          .update({ premium: premiumValue })
-          .or(`phone.eq.${p},mobile.eq.${p},phone_number.eq.${p}`)
-          .select('id');
-        if (!error && data && data.length > 0) {
-          updatedCount += data.length;
-        }
-      } catch (e) {
-        // Fallback to updating specific columns individually
+      for (const col of phoneCols) {
         try {
-          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('phone', p).select('id');
-          if (data && data.length > 0) updatedCount += data.length;
-        } catch (e1) {}
+          // Select matching row first to guarantee safe ID-based update
+          const { data: matchedRows } = await client.from(table).select('id').eq(col, p).limit(10);
+          if (matchedRows && matchedRows.length > 0) {
+            for (const r of matchedRows) {
+              const { error: upErr } = await client.from(table).update({ premium: premiumValue }).eq('id', r.id);
+              if (!upErr) {
+                matchedIds.add(`${table}:${r.id}`);
+                updatedCount++;
+              }
+            }
+          }
+        } catch (e) {}
+
+        // Direct column update attempt
         try {
-          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('mobile', p).select('id');
-          if (data && data.length > 0) updatedCount += data.length;
-        } catch (e2) {}
-        try {
-          const { data } = await client.from('profiles').update({ premium: premiumValue }).eq('phone_number', p).select('id');
-          if (data && data.length > 0) updatedCount += data.length;
-        } catch (e3) {}
+          const { data: updatedRows, error: directErr } = await client
+            .from(table)
+            .update({ premium: premiumValue })
+            .eq(col, p)
+            .select('id');
+          if (!directErr && updatedRows && updatedRows.length > 0) {
+            updatedRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+            updatedCount += updatedRows.length;
+          }
+        } catch (e) {}
       }
     }
 
-    // C. By name if provided
-    if (studentName) {
+    // 3. Find and update by Name if provided
+    if (studentName && studentName.trim().length > 1) {
+      const cleanName = studentName.trim();
+      for (const col of nameCols) {
+        try {
+          const { data: matchedNameRows } = await client.from(table).select('id').eq(col, cleanName).limit(10);
+          if (matchedNameRows && matchedNameRows.length > 0) {
+            for (const r of matchedNameRows) {
+              const { error: upErr } = await client.from(table).update({ premium: premiumValue }).eq('id', r.id);
+              if (!upErr) {
+                matchedIds.add(`${table}:${r.id}`);
+                updatedCount++;
+              }
+            }
+          }
+        } catch (e) {}
+
+        try {
+          const { data: updatedRows, error: nameErr } = await client
+            .from(table)
+            .update({ premium: premiumValue })
+            .eq(col, cleanName)
+            .select('id');
+          if (!nameErr && updatedRows && updatedRows.length > 0) {
+            updatedRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+            updatedCount += updatedRows.length;
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 4. If input has email format
+    if (raw.includes('@')) {
       try {
-        const { data } = await client
-          .from('profiles')
+        const { data: emailRows, error: emErr } = await client
+          .from(table)
           .update({ premium: premiumValue })
-          .or(`name.eq.${studentName},full_name.eq.${studentName}`)
+          .eq('email', raw)
           .select('id');
-        if (data && data.length > 0) updatedCount += data.length;
+        if (!emErr && emailRows && emailRows.length > 0) {
+          emailRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+          updatedCount += emailRows.length;
+        }
       } catch (e) {}
     }
-  } catch (profErr) {
-    console.warn('profiles table premium sync note:', profErr);
   }
 
-  // 2. Also attempt 'profile' (singular) table in case user named the table 'profile'
-  try {
-    for (const p of phoneVariants) {
-      try {
-        await client.from('profile').update({ premium: premiumValue }).eq('phone', p);
-      } catch (e) {}
-      try {
-        await client.from('profile').update({ premium: premiumValue }).eq('mobile', p);
-      } catch (e) {}
-      try {
-        await client.from('profile').update({ premium: premiumValue }).eq('phone_number', p);
-      } catch (e) {}
-    }
-    if (studentName) {
-      try {
-        await client
-          .from('profile')
-          .update({ premium: premiumValue })
-          .or(`name.eq.${studentName},full_name.eq.${studentName}`);
-      } catch (e) {}
-    }
-  } catch (singularErr) {
-    // Ignore if table 'profile' does not exist
-  }
-
-  // 3. Also update 'students' table with premium
-  try {
-    for (const p of phoneVariants) {
-      try {
-        await client.from('students').update({ premium: premiumValue }).eq('phone', p);
-      } catch (e) {}
-    }
-    if (studentName) {
-      try {
-        await client.from('students').update({ premium: premiumValue }).eq('name', studentName);
-      } catch (e) {}
-    }
-  } catch (stuErr) {
-    console.warn('students table premium sync note:', stuErr);
-  }
-
-  // 4. Update local registered students cache
+  // 5. Update local cache
   try {
     const localStudentsStr = localStorage.getItem('tamrin_registered_students_list');
     if (localStudentsStr) {
@@ -5314,8 +5317,53 @@ export const syncSupabaseProfilePremium = async (
     }
   } catch (e) {}
 
-  console.log(`Supabase Profile sync completed. Target: ${studentPhoneOrName(rawPhone, studentName)}, Premium: ${premiumValue}`);
-  return { success: true, error: null };
+  console.log(`Supabase Premium Sync completed for ${studentPhoneOrName(raw, studentName)}. Matched: ${matchedIds.size} records.`);
+  return {
+    success: true,
+    updatedCount,
+    error: null,
+    details: `${matchedIds.size} টি রেকর্ডে 'premium' সফলভাবে সংরক্ষিত হয়েছে`,
+  };
+};
+
+/**
+ * One-click batch sync all approved course enrollments to Supabase 'profiles' and 'students' table
+ */
+export const syncAllApprovedEnrollmentsToSupabase = async (): Promise<{
+  success: boolean;
+  totalSynced: number;
+  approvedCount: number;
+  error: string | null;
+}> => {
+  const client = getSupabaseClient();
+  let applicationsList = getLocalApplicationsCache();
+
+  if (client) {
+    try {
+      const { data } = await client.from('course_applications').select('*');
+      if (data && data.length > 0) {
+        applicationsList = data.map(normalizeCourseApplicationRow);
+        setLocalApplicationsCache(applicationsList);
+      }
+    } catch (e) {}
+  }
+
+  const approved = applicationsList.filter((a) => a.status === 'approved');
+  if (approved.length === 0) {
+    return { success: true, totalSynced: 0, approvedCount: 0, error: null };
+  }
+
+  let totalSynced = 0;
+  for (const app of approved) {
+    try {
+      await syncSupabaseProfilePremium(app.phone_number, app.student_name, 'premium');
+      totalSynced++;
+    } catch (e) {
+      console.warn('Batch sync error for', app.student_name, e);
+    }
+  }
+
+  return { success: true, totalSynced, approvedCount: approved.length, error: null };
 };
 
 const studentPhoneOrName = (phone: string, name?: string) => {
