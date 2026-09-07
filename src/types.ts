@@ -388,13 +388,30 @@ export interface StudentDashboardGrowthData {
   weaknesses: string[];
 }
 
+export interface SyllabusSubTopic {
+  id: string;
+  topic_id?: string;
+  name: string;
+  title?: string;
+  code?: string;
+  description?: string;
+  order_index?: number;
+  subject_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface SyllabusTopic {
   id: string;
   name: string;
+  title?: string;
+  code?: string;
   description?: string;
   order_index: number;
   estimated_questions?: number;
   subject_id?: string;
+  sub_topics?: SyllabusSubTopic[];
+  subtopics?: SyllabusSubTopic[];
 }
 
 export interface SubjectPost {

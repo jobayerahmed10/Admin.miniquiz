@@ -30,11 +30,16 @@ import {
   FolderPlus,
   HelpCircle,
   ChevronRight,
+  ChevronDown,
   ListOrdered,
   Database,
   Hash,
+  Copy,
+  FolderTree,
+  Zap,
+  Code,
 } from 'lucide-react';
-import { SubjectPost, SyllabusTopic, Question } from '../types';
+import { SubjectPost, SyllabusTopic, Question, SyllabusSubTopic } from '../types';
 import {
   fetchSubjectPosts,
   createSubjectPost,
@@ -47,6 +52,16 @@ import {
   THEME_COLOR_MAP,
   generateSlugId,
 } from '../lib/subjectPostManager';
+import {
+  fetchSubTopics,
+  addSubTopic,
+  deleteSubTopic,
+  syncAllSubjectsTopicsAndSubTopicsToSupabase,
+  generateFullSupabaseSeedSql,
+  SUBTOPICS_SQL_SCHEMA,
+  SubTopicItem,
+  suggestSubTopicCode,
+} from '../lib/subjectTopicManager';
 import { fetchAllQuestions, getSupabaseClient } from '../lib/supabase';
 import { ConfirmModal } from '../components/ConfirmModal';
 
@@ -161,6 +176,20 @@ export const SubjectPostsManagement: React.FC = () => {
     postId: '',
     title: '',
   });
+
+  // Subtopics state
+  const [subTopicsList, setSubTopicsList] = useState<SubTopicItem[]>([]);
+  const [expandedTopicIds, setExpandedTopicIds] = useState<Record<string, boolean>>({});
+  const [isAddingSubTopicForTopicId, setIsAddingSubTopicForTopicId] = useState<string | null>(null);
+  const [newSubTopicTitle, setNewSubTopicTitle] = useState('');
+  const [newSubTopicCode, setNewSubTopicCode] = useState('');
+  const [newSubTopicDesc, setNewSubTopicDesc] = useState('');
+  const [savingSubTopic, setSavingSubTopic] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncProgressText, setSyncProgressText] = useState<string>('');
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
+  const [sqlTab, setSqlTab] = useState<'full' | 'subtopics_only'>('full');
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Post Form State (Matching Supabase Schema)
   const [formId, setFormId] = useState('');
@@ -467,6 +496,105 @@ export const SubjectPostsManagement: React.FC = () => {
     }
   };
 
+  // Load subtopics when modal opens or activeTopicsPost changes
+  const loadSubTopicsForPost = async (postId?: string) => {
+    try {
+      const list = await fetchSubTopics(undefined, postId);
+      setSubTopicsList(list);
+    } catch (e) {
+      console.warn('Error loading subtopics:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTopicsPost) {
+      loadSubTopicsForPost(activeTopicsPost.id);
+    }
+  }, [activeTopicsPost?.id]);
+
+  const toggleTopicExpand = (topicId: string) => {
+    setExpandedTopicIds((prev) => ({ ...prev, [topicId]: !prev[topicId] }));
+  };
+
+  const handleStartAddSubTopic = (topic: SyllabusTopic) => {
+    setIsAddingSubTopicForTopicId(topic.id);
+    setNewSubTopicTitle('');
+    const suggested = suggestSubTopicCode(topic.code || topic.id || 'TOPIC', subTopicsList.length + 1);
+    setNewSubTopicCode(suggested);
+    setNewSubTopicDesc('');
+    setExpandedTopicIds((prev) => ({ ...prev, [topic.id]: true }));
+  };
+
+  const handleSaveNewSubTopic = async (topicId: string) => {
+    if (!newSubTopicTitle.trim()) {
+      showToast('সাব-টপিকের নাম লিখুন।', 'error');
+      return;
+    }
+    setSavingSubTopic(true);
+    try {
+      const res = await addSubTopic(
+        topicId,
+        newSubTopicTitle.trim(),
+        newSubTopicCode.trim(),
+        activeTopicsPost?.id,
+        newSubTopicDesc.trim()
+      );
+      if (res.success) {
+        showToast('সাব-টপিক সফলভাবে যুক্ত হয়েছে!', 'success');
+        setIsAddingSubTopicForTopicId(null);
+        setNewSubTopicTitle('');
+        setNewSubTopicCode('');
+        setNewSubTopicDesc('');
+        await loadSubTopicsForPost(activeTopicsPost?.id);
+      } else {
+        showToast(res.error || 'সাব-টপিক যোগ করতে সমস্যা হয়েছে', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'ব্যর্থ হয়েছে', 'error');
+    } finally {
+      setSavingSubTopic(false);
+    }
+  };
+
+  const handleDeleteSubTopicAction = async (subTopicId: string) => {
+    try {
+      const res = await deleteSubTopic(subTopicId);
+      if (res.success) {
+        showToast('সাব-টপিক মুছে ফেলা হয়েছে।', 'success');
+        await loadSubTopicsForPost(activeTopicsPost?.id);
+      }
+    } catch (e: any) {
+      showToast(e.message || 'মুছে ফেলতে সমস্যা হয়েছে', 'error');
+    }
+  };
+
+  const handleSyncAllToSupabase = async () => {
+    setIsSyncingAll(true);
+    setSyncProgressText('সুপাবেজ সংযোগ যাচাই করা হচ্ছে...');
+    try {
+      const res = await syncAllSubjectsTopicsAndSubTopicsToSupabase((progress) => {
+        setSyncProgressText(progress);
+      });
+      if (res.success) {
+        showToast(
+          `সুপাবেজে সিঙ্ক সম্পন্ন! বিষয়: ${res.subjectsSynced}টি, মূল টপিক: ${res.topicsSynced}টি, সাব-টপিক: ${res.subTopicsSynced}টি ডাটাবেসে সেভ হয়েছে!`,
+          'success'
+        );
+        await loadAllData();
+        if (activeTopicsPost) {
+          await loadSubTopicsForPost(activeTopicsPost.id);
+        }
+      } else {
+        showToast(res.error || 'সুপাবেজ সিঙ্ক ব্যর্থ হয়েছে। অনুগ্রহ করে SQL স্ক্রিপ্ট রান করুন।', 'error');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'সিঙ্ক করার সময় ত্রুটি ঘটেছে', 'error');
+    } finally {
+      setIsSyncingAll(false);
+      setSyncProgressText('');
+    }
+  };
+
   // Helper: calculate total questions count for a post
   const getQuestionCountForPost = (post: SubjectPost) => {
     return questions.filter((q) => {
@@ -551,11 +679,30 @@ export const SubjectPostsManagement: React.FC = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => setIsSqlModalOpen(true)}
+            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 rounded-2xl border border-cyan-500/30 transition-all cursor-pointer shadow flex items-center gap-2 text-xs font-bold"
+            title="সুপাবেজ টেবিল তৈরির SQL স্কিমা দেখুন"
+          >
+            <Code className="w-4 h-4" />
+            <span>SQL স্কিমা</span>
+          </button>
+
+          <button
+            onClick={handleSyncAllToSupabase}
+            disabled={isSyncingAll}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-2xl font-black text-xs shadow-lg flex items-center gap-2 transition-all cursor-pointer"
+            title="সুপাবেজে সকল বিষয়, মূল টপিক এবং সাব-টপিক ডাটাবেস টেবিলে পাঠাতে ক্লিক করুন"
+          >
+            <Zap className={`w-4 h-4 ${isSyncingAll ? 'animate-spin' : 'fill-current'}`} />
+            <span>{isSyncingAll ? 'সুপাবেজে সিঙ্ক হচ্ছে...' : '⚡ সুপাবেজ ডাটাবেসে সিঙ্ক'}</span>
+          </button>
+
           <button
             onClick={loadAllData}
             disabled={loading}
-            className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl border border-slate-700 transition-all cursor-pointer shadow flex items-center gap-2 text-xs font-bold"
+            className="p-2.5 sm:px-3.5 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl border border-slate-700 transition-all cursor-pointer shadow flex items-center gap-2 text-xs font-bold"
             title="রিফ্রেশ করুন"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
@@ -564,7 +711,7 @@ export const SubjectPostsManagement: React.FC = () => {
 
           <button
             onClick={handleOpenCreatePost}
-            className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-2xl font-black text-xs shadow-lg shadow-emerald-950 flex items-center gap-2 transition-all cursor-pointer"
+            className="px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-2xl font-black text-xs shadow-lg shadow-emerald-950 flex items-center gap-2 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>নতুন বিষয় যুক্ত করুন</span>
@@ -620,6 +767,44 @@ export const SubjectPostsManagement: React.FC = () => {
               ড্রাফট ({posts.length - activePostsCount})
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Subtopic Database Sync Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 p-4 rounded-2xl border border-indigo-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+            <FolderTree className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-white">সুপাবেজ সাব-টপিক ডাটাবেস টেবিল সিঙ্ক</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                ১৮০+ সাব-টপিক প্রস্তুত
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              সুপাবেজে sub_topics টেবিলে সকল বিষয় ও অধ্যায়ের ১৮০+ সাব-টপিক সেভ করতে নিচের বাটনে ক্লিক করুন অথবা SQL রান করুন।
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+          <button
+            onClick={() => setIsSqlModalOpen(true)}
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow"
+          >
+            <Code className="w-3.5 h-3.5" />
+            <span>SQL কোড দেখুন</span>
+          </button>
+          <button
+            onClick={handleSyncAllToSupabase}
+            disabled={isSyncingAll}
+            className="flex-1 sm:flex-initial px-4 py-2 bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Zap className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin' : 'fill-current'}`} />
+            <span>{isSyncingAll ? (syncProgressText || 'সিঙ্ক হচ্ছে...') : '⚡ সকল সাব-টপিক ডাটাবেসে সেভ করুন'}</span>
+          </button>
         </div>
       </div>
 
@@ -1200,78 +1385,247 @@ export const SubjectPostsManagement: React.FC = () => {
                         );
                       }
 
+                      const topicSubTopics = subTopicsList.filter(
+                        (st) =>
+                          st.topic_id === topic.id ||
+                          st.topic_id === topic.name ||
+                          (topic.code && st.code.startsWith(topic.code))
+                      );
+                      const isExpanded = Boolean(expandedTopicIds[topic.id]);
+                      const isAddingSub = isAddingSubTopicForTopicId === topic.id;
+
                       return (
                         <div
                           key={topic.id}
-                          className="bg-slate-800/90 border border-slate-700/70 hover:border-slate-600 rounded-2xl p-3.5 flex items-center justify-between gap-3 transition-all"
+                          className="bg-slate-800/90 border border-slate-700/70 hover:border-slate-600 rounded-2xl overflow-hidden transition-all shadow-sm"
                         >
-                          <div className="flex items-start gap-2.5">
-                            <span className="w-6 h-6 rounded-lg bg-slate-700 text-slate-300 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
-                              {index + 1}
-                            </span>
-                            <div>
-                              <h5 className="text-xs font-extrabold text-white leading-snug">
-                                {topic.name}
-                              </h5>
-                              {topic.description && (
-                                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                                  {topic.description}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2 mt-1 text-[10px] text-emerald-400 font-bold">
-                                <span>{qTopicCount} টি যুক্ত প্রশ্ন</span>
+                          <div className="p-3.5 flex items-center justify-between gap-3">
+                            <div className="flex items-start gap-2.5">
+                              <span className="w-6 h-6 rounded-lg bg-slate-700 text-slate-300 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h5 className="text-xs font-extrabold text-white leading-snug">
+                                    {topic.name}
+                                  </h5>
+                                  {topic.code && (
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-emerald-400 border border-slate-700">
+                                      {topic.code}
+                                    </span>
+                                  )}
+                                </div>
+                                {topic.description && (
+                                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                                    {topic.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-3 mt-1.5 text-[10px] font-bold">
+                                  <span className="text-emerald-400">{qTopicCount} টি যুক্ত প্রশ্ন</span>
+                                  <span className="text-slate-500">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTopicExpand(topic.id)}
+                                    className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <FolderTree className="w-3 h-3" />
+                                    <span>{topicSubTopics.length} টি সাব-টপিক</span>
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-3 h-3" />
+                                    ) : (
+                                      <ChevronRight className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
+                            </div>
+
+                            {/* Reorder and Action buttons */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleStartAddSubTopic(topic)}
+                                className="px-2 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+                                title="সাব-টপিক যোগ করুন"
+                              >
+                                <Plus className="w-3 h-3 stroke-[3]" />
+                                <span className="hidden sm:inline">সাব-টপিক</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={index === 0}
+                                onClick={() => handleMoveTopic(topic.id, 'up')}
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
+                                title="উপরে নিন"
+                              >
+                                <MoveUp className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={index === (activeTopicsPost.topics?.length || 0) - 1}
+                                onClick={() => handleMoveTopic(topic.id, 'down')}
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors cursor-pointer"
+                                title="নিচে নিন"
+                              >
+                                <MoveDown className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setEditingTopic(topic)}
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors cursor-pointer"
+                                title="টপিক এডিট করুন"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setConfirmDeleteModal({
+                                    isOpen: true,
+                                    type: 'topic',
+                                    postId: activeTopicsPost.id,
+                                    topicId: topic.id,
+                                    title: `"${topic.name}" টপিকটি মুছে ফেলতে চান?`,
+                                  })
+                                }
+                                className="p-1.5 rounded-lg bg-slate-700 hover:bg-rose-900 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                title="টপিক ডিলিট করুন"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
 
-                          {/* Reorder and Action buttons */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              disabled={index === 0}
-                              onClick={() => handleMoveTopic(topic.id, 'up')}
-                              className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors"
-                              title="উপরে নিন"
-                            >
-                              <MoveUp className="w-3.5 h-3.5" />
-                            </button>
+                          {/* Expandable Sub-Topics Panel */}
+                          {isExpanded && (
+                            <div className="bg-slate-950/60 border-t border-slate-800 p-3 sm:p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black text-slate-300 flex items-center gap-1.5">
+                                  <FolderTree className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>সাব-টপিক তালিকা ({topicSubTopics.length} টি)</span>
+                                </span>
 
-                            <button
-                              type="button"
-                              disabled={index === (activeTopicsPost.topics?.length || 0) - 1}
-                              onClick={() => handleMoveTopic(topic.id, 'down')}
-                              className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors"
-                              title="নিচে নিন"
-                            >
-                              <MoveDown className="w-3.5 h-3.5" />
-                            </button>
+                                {!isAddingSub && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartAddSubTopic(topic)}
+                                    className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>নতুন সাব-টপিক যোগ করুন</span>
+                                  </button>
+                                )}
+                              </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setEditingTopic(topic)}
-                              className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-                              title="টপিক এডিট করুন"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Inline Add Sub-Topic Form */}
+                              {isAddingSub && (
+                                <div className="p-3 bg-slate-900 border border-cyan-500/50 rounded-xl space-y-2.5 animate-fadeIn">
+                                  <div className="flex items-center justify-between text-xs font-black text-cyan-400">
+                                    <span>নতুন সাব-টপিক তৈরি (Supabase `sub_topics` টেবিলে সংরক্ষিত হবে)</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsAddingSubTopicForTopicId(null)}
+                                      className="text-slate-400 hover:text-white text-[10px]"
+                                    >
+                                      বাতিল
+                                    </button>
+                                  </div>
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setConfirmDeleteModal({
-                                  isOpen: true,
-                                  type: 'topic',
-                                  postId: activeTopicsPost.id,
-                                  topicId: topic.id,
-                                  title: `"${topic.name}" টপিকটি মুছে ফেলতে চান?`,
-                                })
-                              }
-                              className="p-1.5 rounded-lg bg-slate-700 hover:bg-rose-900 text-slate-400 hover:text-rose-300 transition-colors"
-                              title="টপিক ডিলিট করুন"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <input
+                                      type="text"
+                                      value={newSubTopicTitle}
+                                      onChange={(e) => setNewSubTopicTitle(e.target.value)}
+                                      placeholder="সাব-টপিকের নাম (যেমন: বাক্য ও পদ)..."
+                                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                                      required
+                                    />
+                                    <input
+                                      type="text"
+                                      value={newSubTopicCode}
+                                      onChange={(e) => setNewSubTopicCode(e.target.value)}
+                                      placeholder="সাব-টপিক কোড (যেমন: BANGLA-01-01)..."
+                                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                                    />
+                                  </div>
+
+                                  <input
+                                    type="text"
+                                    value={newSubTopicDesc}
+                                    onChange={(e) => setNewSubTopicDesc(e.target.value)}
+                                    placeholder="সাব-টপিক বিবরণ বা সিলেবাস নোট (ঐচ্ছিক)..."
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 placeholder-slate-500"
+                                  />
+
+                                  <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsAddingSubTopicForTopicId(null)}
+                                      className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold"
+                                    >
+                                      বাতিল
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={savingSubTopic || !newSubTopicTitle.trim()}
+                                      onClick={() => handleSaveNewSubTopic(topic.id)}
+                                      className="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white rounded-lg text-xs font-black shadow flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                      <span>{savingSubTopic ? 'সেভ হচ্ছে...' : 'সাব-টপিক সেভ করুন'}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Sub-Topics List */}
+                              {topicSubTopics.length === 0 ? (
+                                <div className="p-3 text-center bg-slate-900/50 border border-slate-800 rounded-xl text-slate-400 text-xs">
+                                  এই টপিকে কোনো সাব-টপিক নেই। উপরের বোতাম দিয়ে সাব-টপিক যোগ করুন।
+                                </div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {topicSubTopics.map((st, sIdx) => {
+                                    return (
+                                      <div
+                                        key={st.id}
+                                        className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+                                      >
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700 shrink-0">
+                                            {st.code || `${sIdx + 1}`}
+                                          </span>
+                                          <div className="truncate">
+                                            <span className="text-xs font-bold text-slate-200">
+                                              {st.title || st.name}
+                                            </span>
+                                            {st.description && (
+                                              <span className="text-[10px] text-slate-400 ml-2">
+                                                - {st.description}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteSubTopicAction(st.id)}
+                                          className="p-1 text-slate-500 hover:text-rose-400 rounded-md hover:bg-slate-800 shrink-0 transition-colors cursor-pointer"
+                                          title="সাব-টপিক ডিলিট করুন"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1304,6 +1658,104 @@ export const SubjectPostsManagement: React.FC = () => {
         onConfirm={handleConfirmDelete}
         onCancel={() => setConfirmDeleteModal({ isOpen: false, type: 'post', postId: '', title: '' })}
       />
+
+      {/* SQL Schema Modal */}
+      {isSqlModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+                  <Code className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">সুপাবেজ SQL স্ক্রিপ্ট ও সাব-টপিক ডেটা সিড</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Supabase SQL Editor-এ রান করে এক ক্লিকেই সমস্ত সাব-টপিক ডাটাবেসে যুক্ত করুন।
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSqlModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tab Selection */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+              <button
+                onClick={() => setSqlTab('full')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  sqlTab === 'full'
+                    ? 'bg-cyan-600 text-white shadow'
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                ⚡ ১. সম্পূর্ণ SQL (টেবিল তৈরি + সকল ১৮০+ সাব-টপিক ডেটা)
+              </button>
+              <button
+                onClick={() => setSqlTab('subtopics_only')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  sqlTab === 'subtopics_only'
+                    ? 'bg-cyan-600 text-white shadow'
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                📥 ২. শুধু সাব-টপিক ডেটা (INSERT INTO sub_topics)
+              </button>
+            </div>
+
+            <div className="relative flex-1 bg-slate-950 rounded-2xl border border-slate-800 p-3 overflow-y-auto font-mono text-xs text-slate-300">
+              <button
+                onClick={() => {
+                  const sqlContent =
+                    sqlTab === 'full'
+                      ? SUBTOPICS_SQL_SCHEMA
+                      : generateFullSupabaseSeedSql({ onlySubTopicsInsert: true });
+                  navigator.clipboard.writeText(sqlContent);
+                  setCopiedSql(true);
+                  setTimeout(() => setCopiedSql(false), 2500);
+                }}
+                className="sticky top-2 right-2 ml-auto px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 cursor-pointer z-10"
+              >
+                {copiedSql ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedSql ? 'কপি সম্পন্ন হয়েছে!' : 'SQL কপি করুন'}</span>
+              </button>
+              <pre className="whitespace-pre-wrap text-[11px] text-emerald-400/90 leading-relaxed pt-2 select-all">
+                {sqlTab === 'full'
+                  ? SUBTOPICS_SQL_SCHEMA
+                  : generateFullSupabaseSeedSql({ onlySubTopicsInsert: true })}
+              </pre>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleSyncAllToSupabase();
+                  }}
+                  disabled={isSyncingAll}
+                  className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Zap className={`w-3.5 h-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingAll ? (syncProgressText || 'সিঙ্ক হচ্ছে...') : '⚡ এখনই ব্রাউজার থেকে সিঙ্ক করুন'}</span>
+                </button>
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  (অথবা উপরের SQL কপি করে Supabase SQL Editor-এ Run করুন)
+                </span>
+              </div>
+              <button
+                onClick={() => setIsSqlModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl cursor-pointer ml-auto"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

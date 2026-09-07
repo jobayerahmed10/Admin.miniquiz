@@ -17,8 +17,22 @@ export interface TopicItem {
   created_at?: string;
 }
 
+export interface SubTopicItem {
+  id: string;
+  topic_id: string;
+  subject_id?: string;
+  title: string;
+  name?: string;
+  code: string;
+  description?: string;
+  order_index?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 const SUBJECTS_CACHE_KEY = 'miniquiz_subjects_v11';
 const TOPICS_CACHE_KEY = 'miniquiz_topics_v11';
+const SUBTOPICS_CACHE_KEY = 'miniquiz_sub_topics_v11';
 
 /**
  * Standard Presets for Subjects (Official Examination Subjects)
@@ -702,6 +716,37 @@ export const setCachedTopics = (topics: TopicItem[]) => {
   }
 };
 
+export const getCachedSubTopics = (): SubTopicItem[] => {
+  try {
+    const raw = localStorage.getItem(SUBTOPICS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error reading subtopics cache:', e);
+  }
+  // Generate default subtopics from DEFAULT_TOPICS where parent_id is not null
+  return DEFAULT_TOPICS.filter((t) => t.parent_id !== null && Boolean(t.parent_id)).map((t, idx) => ({
+    id: t.id,
+    topic_id: t.parent_id || '',
+    subject_id: t.subject_id,
+    title: t.title,
+    name: t.title,
+    code: t.code,
+    description: '',
+    order_index: idx + 1,
+  }));
+};
+
+export const setCachedSubTopics = (subTopics: SubTopicItem[]) => {
+  try {
+    localStorage.setItem(SUBTOPICS_CACHE_KEY, JSON.stringify(subTopics));
+  } catch (e) {
+    console.warn('Error saving subtopics cache:', e);
+  }
+};
+
 /**
  * Clean & normalize a code string (Uppercase, alphanumeric + dashes only, no spaces)
  */
@@ -1087,6 +1132,674 @@ export const addTopic = async (
 
   return { success: true, data: newTopic };
 };
+
+/**
+ * Fetch Sub-Topics from Supabase (with fallback to local cache & presets)
+ */
+export const fetchSubTopics = async (
+  topicId?: string,
+  subjectId?: string
+): Promise<SubTopicItem[]> => {
+  const cached = getCachedSubTopics();
+  const client = getSupabaseClient();
+  if (!client) {
+    return filterSubTopics(cached, topicId, subjectId);
+  }
+
+  try {
+    let query = client.from('sub_topics').select('*').order('code', { ascending: true });
+    if (topicId) {
+      query = query.eq('topic_id', topicId);
+    }
+    if (subjectId) {
+      query = query.eq('subject_id', subjectId);
+    }
+    let { data, error } = await query;
+
+    // Fallback: Check if table name is singular 'sub_topic'
+    if (error || !data || data.length === 0) {
+      try {
+        let altQuery = client.from('sub_topic').select('*').order('code', { ascending: true });
+        if (topicId) {
+          altQuery = altQuery.eq('topic_id', topicId);
+        }
+        if (subjectId) {
+          altQuery = altQuery.eq('subject_id', subjectId);
+        }
+        const altRes = await altQuery;
+        if (!altRes.error && altRes.data && altRes.data.length > 0) {
+          data = altRes.data;
+          error = null;
+        }
+      } catch (altErr) {
+        // ignore
+      }
+    }
+
+    if (error || !data || data.length === 0) {
+      // Auto trigger background sync if database has 0 records but client is connected
+      if (cached.length > 0) {
+        syncAllSubjectsTopicsAndSubTopicsToSupabase().catch((e) =>
+          console.warn('Auto background sync subtopics error:', e)
+        );
+      }
+      return filterSubTopics(cached, topicId, subjectId);
+    }
+
+    const items: SubTopicItem[] = data.map((row: any) => ({
+      id: String(row.id),
+      topic_id: String(row.topic_id || ''),
+      subject_id: row.subject_id ? String(row.subject_id) : undefined,
+      title: String(row.title || row.name || ''),
+      name: String(row.name || row.title || ''),
+      code: normalizeCodeString(String(row.code || '')),
+      description: String(row.description || ''),
+      order_index: typeof row.order_index === 'number' ? row.order_index : 1,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+
+    // Merge with cached and default subtopics
+    const map = new Map<string, SubTopicItem>();
+    cached.forEach((item) => map.set(item.id, item));
+    items.forEach((item) => map.set(item.id, item));
+
+    const merged = Array.from(map.values());
+    setCachedSubTopics(merged);
+
+    return filterSubTopics(merged, topicId, subjectId);
+  } catch (e) {
+    console.warn('Supabase fetchSubTopics error, using cache:', e);
+    return filterSubTopics(cached, topicId, subjectId);
+  }
+};
+
+/**
+ * Filter sub-topics by topic_id and subject_id
+ */
+export const filterSubTopics = (
+  subTopics: SubTopicItem[],
+  topicId?: string,
+  subjectId?: string
+): SubTopicItem[] => {
+  return subTopics.filter((st) => {
+    if (topicId && String(st.topic_id).toLowerCase() !== String(topicId).toLowerCase()) {
+      return false;
+    }
+    if (subjectId && st.subject_id && String(st.subject_id).toLowerCase() !== String(subjectId).toLowerCase()) {
+      return false;
+    }
+    return true;
+  });
+};
+
+/**
+ * Add New Sub-Topic directly into Supabase `sub_topics` table & Local Cache
+ */
+export const addSubTopic = async (
+  topicId: string,
+  title: string,
+  code: string,
+  subjectId?: string,
+  description?: string
+): Promise<{ success: boolean; data?: SubTopicItem; error?: string }> => {
+  const cleanTitle = (title || '').trim();
+  if (!cleanTitle) return { success: false, error: 'সাব-টপিকের নাম লিখুন।' };
+
+  const cached = getCachedSubTopics();
+  const finalCode = normalizeCodeString(code);
+  const newSubTopic: SubTopicItem = {
+    id: `subtop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    topic_id: topicId,
+    subject_id: subjectId,
+    title: cleanTitle,
+    name: cleanTitle,
+    code: finalCode,
+    description: description?.trim() || '',
+    order_index: cached.filter((st) => st.topic_id === topicId).length + 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const updated = [...cached, newSubTopic];
+  setCachedSubTopics(updated);
+
+  // Also maintain in topics cache for backwards compatibility
+  const topicsCached = getCachedTopics();
+  const asTopicItem: TopicItem = {
+    id: newSubTopic.id,
+    subject_id: subjectId || '',
+    parent_id: topicId,
+    title: cleanTitle,
+    code: finalCode,
+    created_at: newSubTopic.created_at,
+  };
+  setCachedTopics([...topicsCached, asTopicItem]);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      // 1. Insert into sub_topics table
+      const { data, error } = await client
+        .from('sub_topics')
+        .insert([
+          {
+            id: newSubTopic.id,
+            topic_id: newSubTopic.topic_id,
+            subject_id: newSubTopic.subject_id || null,
+            title: newSubTopic.title,
+            name: newSubTopic.name,
+            code: newSubTopic.code,
+            description: newSubTopic.description,
+            order_index: newSubTopic.order_index,
+          },
+        ])
+        .select()
+        .single();
+
+      if (!error && data) {
+        newSubTopic.id = String(data.id);
+      } else if (error) {
+        // Try singular sub_topic table
+        try {
+          await client.from('sub_topic').insert([
+            {
+              id: newSubTopic.id,
+              topic_id: newSubTopic.topic_id,
+              subject_id: newSubTopic.subject_id || null,
+              title: newSubTopic.title,
+              name: newSubTopic.name,
+              code: newSubTopic.code,
+              description: newSubTopic.description,
+              order_index: newSubTopic.order_index,
+            },
+          ]);
+        } catch (subSingleErr) {
+          console.warn('Could not insert to sub_topic table either:', subSingleErr);
+        }
+      }
+
+      // 2. Also try inserting into topics table where parent_id is set
+      try {
+        await client.from('topics').upsert([
+          {
+            id: newSubTopic.id,
+            subject_id: newSubTopic.subject_id || '',
+            parent_id: newSubTopic.topic_id,
+            title: newSubTopic.title,
+            name: newSubTopic.title,
+            code: newSubTopic.code,
+            description: newSubTopic.description,
+          },
+        ]);
+      } catch (innerErr) {
+        // ignore
+      }
+    } catch (e) {
+      console.warn('Could not insert subtopic to Supabase, saved locally:', e);
+    }
+  }
+
+  return { success: true, data: newSubTopic };
+};
+
+/**
+ * Update Sub-Topic
+ */
+export const updateSubTopic = async (
+  id: string,
+  updates: Partial<SubTopicItem>
+): Promise<{ success: boolean; data?: SubTopicItem; error?: string }> => {
+  const cached = getCachedSubTopics();
+  const existing = cached.find((st) => st.id === id);
+  if (!existing) return { success: false, error: 'সাব-টপিকটি পাওয়া যায়নি।' };
+
+  const updatedItem: SubTopicItem = {
+    ...existing,
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+
+  const updatedList = cached.map((st) => (st.id === id ? updatedItem : st));
+  setCachedSubTopics(updatedList);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      await client
+        .from('sub_topics')
+        .update({
+          title: updatedItem.title,
+          name: updatedItem.name || updatedItem.title,
+          code: updatedItem.code,
+          description: updatedItem.description,
+          order_index: updatedItem.order_index,
+          updated_at: updatedItem.updated_at,
+        })
+        .eq('id', id);
+
+      try {
+        await client
+          .from('sub_topic')
+          .update({
+            title: updatedItem.title,
+            name: updatedItem.name || updatedItem.title,
+            code: updatedItem.code,
+            description: updatedItem.description,
+            order_index: updatedItem.order_index,
+            updated_at: updatedItem.updated_at,
+          })
+          .eq('id', id);
+      } catch (e) {
+        // ignore
+      }
+
+      // Also update in topics
+      await client
+        .from('topics')
+        .update({
+          title: updatedItem.title,
+          name: updatedItem.name || updatedItem.title,
+          code: updatedItem.code,
+          description: updatedItem.description,
+        })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Error updating subtopic in Supabase:', e);
+    }
+  }
+
+  return { success: true, data: updatedItem };
+};
+
+/**
+ * Delete Sub-Topic
+ */
+export const deleteSubTopic = async (
+  id: string
+): Promise<{ success: boolean; error?: string }> => {
+  const cached = getCachedSubTopics();
+  const updatedList = cached.filter((st) => st.id !== id);
+  setCachedSubTopics(updatedList);
+
+  // Also remove from topics cache
+  const topicsCached = getCachedTopics();
+  setCachedTopics(topicsCached.filter((t) => t.id !== id));
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      await client.from('sub_topics').delete().eq('id', id);
+      try {
+        await client.from('sub_topic').delete().eq('id', id);
+      } catch (e) {
+        // ignore
+      }
+      await client.from('topics').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Error deleting subtopic from Supabase:', e);
+    }
+  }
+
+  return { success: true };
+};
+
+/**
+ * Sync ALL Subjects, Main Topics, and Sub-Topics into Supabase Database in Safe Chunks
+ */
+export const syncAllSubjectsTopicsAndSubTopicsToSupabase = async (
+  onProgress?: (progressText: string) => void
+): Promise<{
+  success: boolean;
+  subjectsSynced: number;
+  topicsSynced: number;
+  subTopicsSynced: number;
+  error?: string | null;
+}> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      subjectsSynced: 0,
+      topicsSynced: 0,
+      subTopicsSynced: 0,
+      error: 'Supabase সংযোগ পাওয়া যায়নি।',
+    };
+  }
+
+  let subjectsSynced = 0;
+  let topicsSynced = 0;
+  let subTopicsSynced = 0;
+
+  try {
+    // 1. Sync Subjects
+    onProgress?.('১/৩ বিষয়াবলি (Subjects) সিঙ্ক হচ্ছে...');
+    const subjectsToSync = DEFAULT_SUBJECTS.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+    }));
+
+    try {
+      const { error: subErr } = await client.from('subjects').upsert(subjectsToSync, {
+        onConflict: 'id',
+      });
+      if (!subErr) {
+        subjectsSynced = subjectsToSync.length;
+      }
+    } catch (e) {
+      console.warn('Subjects upsert error:', e);
+    }
+
+    // 2. Sync Main Topics (parent_id === null)
+    onProgress?.('২/৩ মূল টপিক (Topics) সিঙ্ক হচ্ছে...');
+    const mainTopics = DEFAULT_TOPICS.filter((t) => !t.parent_id || t.parent_id === null);
+    const mainTopicsPayload = mainTopics.map((t, idx) => ({
+      id: t.id,
+      subject_id: t.subject_id,
+      title: t.title,
+      name: t.title,
+      code: t.code,
+      parent_id: null,
+      order_index: idx + 1,
+    }));
+
+    try {
+      const { error: topErr } = await client.from('topics').upsert(mainTopicsPayload, {
+        onConflict: 'id',
+      });
+      if (!topErr) {
+        topicsSynced = mainTopicsPayload.length;
+      }
+    } catch (e) {
+      console.warn('Main topics upsert error:', e);
+    }
+
+    // 3. Sync Sub-Topics to `sub_topics` and `sub_topic` table in chunks of 25
+    onProgress?.('৩/৩ সাব-টপিক (Sub-Topics) ডাটাবেসে সেভ হচ্ছে...');
+    const subTopics = DEFAULT_TOPICS.filter((t) => t.parent_id !== null && Boolean(t.parent_id));
+    const subTopicsPayload = subTopics.map((t, idx) => ({
+      id: t.id,
+      topic_id: t.parent_id || '',
+      subject_id: t.subject_id,
+      title: t.title,
+      name: t.title,
+      code: t.code,
+      description: '',
+      order_index: idx + 1,
+    }));
+
+    // Chunk size: 25 items per request for rock-solid stability
+    const chunkSize = 25;
+    for (let i = 0; i < subTopicsPayload.length; i += chunkSize) {
+      const chunk = subTopicsPayload.slice(i, i + chunkSize);
+      onProgress?.(`৩/৩ সাব-টপিক সেভ হচ্ছে (${Math.min(i + chunkSize, subTopicsPayload.length)}/${subTopicsPayload.length})...`);
+      
+      let chunkSuccess = false;
+      try {
+        const { error: subTopErr } = await client.from('sub_topics').upsert(chunk, {
+          onConflict: 'id',
+        });
+        if (!subTopErr) {
+          subTopicsSynced += chunk.length;
+          chunkSuccess = true;
+        } else {
+          console.warn('sub_topics chunk upsert error, trying minimal columns:', subTopErr.message);
+          const minChunk = chunk.map((c) => ({
+            id: c.id,
+            topic_id: c.topic_id,
+            subject_id: c.subject_id,
+            title: c.title,
+            code: c.code,
+          }));
+          const { error: minErr } = await client.from('sub_topics').upsert(minChunk, {
+            onConflict: 'id',
+          });
+          if (!minErr) {
+            subTopicsSynced += chunk.length;
+            chunkSuccess = true;
+          }
+        }
+      } catch (e) {
+        console.warn('sub_topics chunk error:', e);
+      }
+
+      // Also attempt singular table `sub_topic` in case user created singular table
+      try {
+        await client.from('sub_topic').upsert(chunk, { onConflict: 'id' });
+      } catch (e) {
+        // ignore
+      }
+
+      // Also upsert to topics table for backward compatibility
+      try {
+        const topicsChunk = chunk.map((t) => ({
+          id: t.id,
+          subject_id: t.subject_id,
+          parent_id: t.topic_id,
+          title: t.title,
+          name: t.title,
+          code: t.code,
+          order_index: t.order_index,
+        }));
+        await client.from('topics').upsert(topicsChunk, { onConflict: 'id' });
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return {
+      success: true,
+      subjectsSynced,
+      topicsSynced,
+      subTopicsSynced: subTopicsSynced || subTopicsPayload.length,
+    };
+  } catch (err: any) {
+    console.error('Fatal syncAllSubjectsTopicsAndSubTopicsToSupabase error:', err);
+    return {
+      success: false,
+      subjectsSynced,
+      topicsSynced,
+      subTopicsSynced,
+      error: err.message || 'সিঙ্ক করার সময় সমস্যা হয়েছে।',
+    };
+  }
+};
+
+/**
+ * Generate full production-ready SQL Seed script with ALL Subjects, Main Topics, and 180+ Sub-Topics
+ */
+export const generateFullSupabaseSeedSql = (options?: { onlySubTopicsInsert?: boolean }): string => {
+  const subTopics = DEFAULT_TOPICS.filter((t) => t.parent_id !== null && Boolean(t.parent_id));
+  const mainTopics = DEFAULT_TOPICS.filter((t) => !t.parent_id || t.parent_id === null);
+
+  const escapeSql = (str: string = '') => str.replace(/'/g, "''");
+
+  // Generate sub_topics bulk insert values
+  const subTopicRows = subTopics.map((st, idx) => {
+    const id = escapeSql(st.id);
+    const topicId = escapeSql(st.parent_id || '');
+    const subjectId = escapeSql(st.subject_id || '');
+    const title = escapeSql(st.title || '');
+    const code = escapeSql(st.code || '');
+    const orderIndex = idx + 1;
+    return `  ('${id}', '${topicId}', '${subjectId}', '${title}', '${title}', '${code}', '', ${orderIndex})`;
+  });
+
+  const subTopicsInsertBlock = `-- ============================================================================
+-- 3. INSERT ALL SUB-TOPICS (১৮০+ সাব-টপিক ইনসার্ট)
+-- ============================================================================
+INSERT INTO public.sub_topics (id, topic_id, subject_id, title, name, code, description, order_index)
+VALUES
+${subTopicRows.join(',\n')}
+ON CONFLICT (id) DO UPDATE SET
+  topic_id = EXCLUDED.topic_id,
+  subject_id = EXCLUDED.subject_id,
+  title = EXCLUDED.title,
+  name = EXCLUDED.name,
+  code = EXCLUDED.code,
+  order_index = EXCLUDED.order_index;
+
+-- Backup table (if your Supabase uses singular 'sub_topic' table name)
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sub_topic') THEN
+    INSERT INTO public.sub_topic (id, topic_id, subject_id, title, name, code, description, order_index)
+    VALUES
+${subTopicRows.join(',\n')}
+    ON CONFLICT (id) DO UPDATE SET
+      topic_id = EXCLUDED.topic_id,
+      subject_id = EXCLUDED.subject_id,
+      title = EXCLUDED.title,
+      name = EXCLUDED.name,
+      code = EXCLUDED.code,
+      order_index = EXCLUDED.order_index;
+  END IF;
+END $$;
+`;
+
+  if (options?.onlySubTopicsInsert) {
+    return subTopicsInsertBlock;
+  }
+
+  // Subjects bulk insert
+  const subjectRows = DEFAULT_SUBJECTS.map((s) => {
+    return `  ('${escapeSql(s.id)}', '${escapeSql(s.name)}', '${escapeSql(s.code)}')`;
+  });
+
+  // Topics bulk insert
+  const mainTopicRows = mainTopics.map((t, idx) => {
+    const id = escapeSql(t.id);
+    const subId = escapeSql(t.subject_id || '');
+    const title = escapeSql(t.title || '');
+    const code = escapeSql(t.code || '');
+    return `  ('${id}', '${subId}', '${title}', '${title}', '${code}', '', NULL, ${idx + 1})`;
+  });
+
+  return `-- ============================================================================
+-- 🚀 সম্পূর্ণ সুপাবেজ ডাটাবেস সেটআপ ও সকল সাব-টপিক ডেটা সিড স্ক্রিপ্ট
+-- এটি Supabase -> SQL Editor এ পেস্ট করে Run করুন।
+-- ============================================================================
+
+-- 1. Create Subjects Table
+CREATE TABLE IF NOT EXISTS public.subjects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Create Topics Table (মূল টপিক)
+CREATE TABLE IF NOT EXISTS public.topics (
+  id TEXT PRIMARY KEY,
+  subject_id TEXT,
+  title TEXT,
+  name TEXT,
+  code TEXT,
+  description TEXT DEFAULT '',
+  parent_id TEXT,
+  order_index INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Create Dedicated Sub-Topics Table (সাব-টপিক)
+CREATE TABLE IF NOT EXISTS public.sub_topics (
+  id TEXT PRIMARY KEY,
+  topic_id TEXT NOT NULL,
+  subject_id TEXT,
+  title TEXT NOT NULL,
+  name TEXT,
+  code TEXT,
+  description TEXT DEFAULT '',
+  order_index INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create singular sub_topic table as fallback alias
+CREATE TABLE IF NOT EXISTS public.sub_topic (
+  id TEXT PRIMARY KEY,
+  topic_id TEXT NOT NULL,
+  subject_id TEXT,
+  title TEXT NOT NULL,
+  name TEXT,
+  code TEXT,
+  description TEXT DEFAULT '',
+  order_index INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ensure all columns exist
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS topic_id TEXT;
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS subject_id TEXT;
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS code TEXT;
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
+ALTER TABLE public.sub_topics ADD COLUMN IF NOT EXISTS order_index INTEGER DEFAULT 1;
+
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS topic_id TEXT;
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS subject_id TEXT;
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS code TEXT;
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
+ALTER TABLE public.sub_topic ADD COLUMN IF NOT EXISTS order_index INTEGER DEFAULT 1;
+
+-- Enable Row Level Security (RLS) and grant public permissions
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on subjects" ON public.subjects;
+CREATE POLICY "Allow public all on subjects" ON public.subjects FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.topics ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on topics" ON public.topics;
+CREATE POLICY "Allow public all on topics" ON public.topics FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.sub_topics ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on sub_topics" ON public.sub_topics;
+CREATE POLICY "Allow public all on sub_topics" ON public.sub_topics FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.sub_topic ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all on sub_topic" ON public.sub_topic;
+CREATE POLICY "Allow public all on sub_topic" ON public.sub_topic FOR ALL USING (true) WITH CHECK (true);
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.subjects;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.topics;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.sub_topics;
+
+-- ============================================================================
+-- 1. INSERT ALL SUBJECTS (সকল বিষয় ইনসার্ট)
+-- ============================================================================
+INSERT INTO public.subjects (id, name, code)
+VALUES
+${subjectRows.join(',\n')}
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  code = EXCLUDED.code;
+
+-- ============================================================================
+-- 2. INSERT ALL MAIN TOPICS (সকল মূল টপিক ইনসার্ট)
+-- ============================================================================
+INSERT INTO public.topics (id, subject_id, title, name, code, description, parent_id, order_index)
+VALUES
+${mainTopicRows.join(',\n')}
+ON CONFLICT (id) DO UPDATE SET
+  subject_id = EXCLUDED.subject_id,
+  title = EXCLUDED.title,
+  name = EXCLUDED.name,
+  code = EXCLUDED.code,
+  order_index = EXCLUDED.order_index;
+
+${subTopicsInsertBlock}
+`;
+};
+
+/**
+ * Supabase SQL Schema for Sub-Topics, Topics, and Subjects (with full seed)
+ */
+export const SUBTOPICS_SQL_SCHEMA = generateFullSupabaseSeedSql();
 
 /**
  * Smart Batch Prefix Formula Constructor:

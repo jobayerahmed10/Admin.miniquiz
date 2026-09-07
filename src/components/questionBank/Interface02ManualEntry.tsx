@@ -26,6 +26,7 @@ import {
   filterTopicsForSubject,
   addSubject,
   addTopic,
+  addSubTopic,
   suggestSubjectCode,
   suggestMainTopicCode,
   suggestSubTopicCode,
@@ -240,6 +241,9 @@ export const Interface02ManualEntry: React.FC<Interface02ManualEntryProps> = ({
           : suggestSubTopicCode(currentMainTopic?.code || 'TOP', topicsList);
 
       if (selectedSubjectId && selectedMainTopicId) {
+        // Save to sub_topics table
+        addSubTopic(selectedMainTopicId, title, code, selectedSubjectId);
+        // Also save to topics table
         const res = await addTopic(selectedSubjectId, title, code, selectedMainTopicId);
         if (res.success && res.data) {
           setTopicsList((prev) => [...prev, res.data!]);
