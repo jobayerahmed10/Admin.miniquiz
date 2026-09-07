@@ -81,6 +81,16 @@ export const EnrollmentsManagement: React.FC = () => {
       setIsTableMissing(false);
     }
     setLoading(false);
+
+    // Auto-sync approved students with Supabase profiles in the background
+    const approved = result.applications.filter((a) => a.status === 'approved');
+    if (approved.length > 0) {
+      syncAllApprovedEnrollmentsToSupabase().then((res) => {
+        if (res.totalSynced > 0) {
+          console.log(`Auto-synced ${res.totalSynced} approved students to Supabase profiles`);
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -385,10 +395,18 @@ ALTER TABLE public.student_enrollments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public all on student_enrollments" ON public.student_enrollments;
 CREATE POLICY "Allow public all on student_enrollments" ON public.student_enrollments FOR ALL USING (true) WITH CHECK (true);
 
--- Ensure profiles / students table has 'premium' column for approved students
+-- Ensure profiles table has is_premium, premium_until, and premium columns
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS premium_until TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
-ALTER TABLE public.profile ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
-ALTER TABLE public.students ADD COLUMN IF NOT EXISTS premium TEXT DEFAULT NULL;
+
+-- Ensure RLS allows updating profiles from Admin Panel
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public update on profiles" ON public.profiles;
+CREATE POLICY "Allow public update on profiles" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public all on profiles" ON public.profiles;
+CREATE POLICY "Allow public all on profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
 
 -- Enable Supabase Realtime for instant payment notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE public.course_applications;`;

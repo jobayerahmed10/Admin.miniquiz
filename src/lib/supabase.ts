@@ -5168,18 +5168,35 @@ export const fetchAllCourseApplications = async (): Promise<{
  * - Matches by name / full_name as fallback
  * - Also updates 'students' table and local cache
  */
+/**
+ * CRITICAL USER DIRECTIVE:
+ * যখন পেমেন্ট এনরোলমেন্ট থেকে কাউকে এপ্রোভ করবো তখন তা সুপাবেজের profiles টেবিলে
+ * is_premium কলামে TRUE, premium_until এ মেয়াদ এবং premium কলামে 'premium' লেখা যুক্ত হবে।
+ * 
+ * Supports:
+ * - 'profiles', 'profile', 'students', 'users' tables
+ * - Columns: is_premium (boolean), premium_until (timestamptz), premium (text)
+ * - Converts Bengali digits to English (e.g. ০১৭... -> 017...)
+ * - Matches by phone (01XXXXXXXX, +8801XXXXXXXX, 8801XXXXXXXX, raw)
+ * - Matches by name / full_name as fallback
+ * - Also updates 'students' table and local cache
+ */
 export const syncSupabaseProfilePremium = async (
   phoneOrId: string,
   studentName?: string,
-  premiumValue: string = 'premium'
+  premiumValue: string | boolean = 'premium'
 ): Promise<{ success: boolean; updatedCount: number; error: string | null; details?: string }> => {
   const client = getSupabaseClient();
   if (!client) {
     return { success: false, updatedCount: 0, error: 'সুপাবেজ ক্লায়েন্ট ইনিশিয়ালাইজ করা যায়নি' };
   }
 
-  const raw = (phoneOrId || '').trim();
-  const cleanDigits = raw.replace(/\D/g, '');
+  // Convert Bengali digits to English
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  const rawInput = (phoneOrId || '').trim();
+  const normalizedRaw = rawInput.replace(/[০-৯]/g, (w) => bengaliDigits.indexOf(w).toString());
+  const cleanDigits = normalizedRaw.replace(/\D/g, '');
+
   let national = cleanDigits;
   if (cleanDigits.startsWith('880')) {
     national = '0' + cleanDigits.slice(3);
@@ -5191,8 +5208,34 @@ export const syncSupabaseProfilePremium = async (
   const withoutZero = national.startsWith('0') ? national.substring(1) : national;
 
   const phoneVariants = Array.from(
-    new Set([raw, cleanDigits, national, intl880, intlPlus880, withoutZero].filter((p) => p && p.length >= 6))
+    new Set([rawInput, normalizedRaw, cleanDigits, national, intl880, intlPlus880, withoutZero].filter((p) => p && p.length >= 6))
   );
+
+  const isGranting =
+    premiumValue === 'premium' ||
+    premiumValue === true ||
+    premiumValue === 'true' ||
+    premiumValue === 'TRUE';
+
+  // 1 year from now for premium_until
+  const oneYearFromNow = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Tiered payloads to ensure whatever columns exist in the table get updated smoothly
+  const updatePayloads = isGranting
+    ? [
+        { is_premium: true, premium_until: oneYearFromNow, premium: 'premium' },
+        { is_premium: true, premium_until: oneYearFromNow },
+        { is_premium: true, premium: 'premium' },
+        { is_premium: true },
+        { premium: 'premium' },
+      ]
+    : [
+        { is_premium: false, premium_until: null, premium: null },
+        { is_premium: false, premium_until: null },
+        { is_premium: false, premium: null },
+        { is_premium: false },
+        { premium: null },
+      ];
 
   let updatedCount = 0;
   const matchedIds = new Set<string>();
@@ -5201,55 +5244,78 @@ export const syncSupabaseProfilePremium = async (
   const phoneCols = ['phone', 'mobile', 'phone_number', 'contact_number', 'user_phone'];
   const nameCols = ['name', 'full_name', 'username', 'display_name'];
 
-  for (const table of targetTables) {
-    // 1. Check direct UUID/ID
-    if (raw.length >= 10) {
+  // Helper to execute safe update across multiple payload fallback options
+  const executeSafeUpdate = async (table: string, matchColumn: string, matchValue: any) => {
+    for (const payload of updatePayloads) {
       try {
-        const { data, error } = await client
+        const { data, error, count } = await client
           .from(table)
-          .update({ premium: premiumValue })
-          .eq('id', raw)
+          .update(payload, { count: 'exact' })
+          .eq(matchColumn, matchValue)
           .select('id');
-        if (!error && data && data.length > 0) {
-          data.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
-          updatedCount += data.length;
+        if (!error && ((data && data.length > 0) || (count && count > 0))) {
+          if (data && data.length > 0) {
+            data.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+            updatedCount += data.length;
+          } else if (count) {
+            updatedCount += count;
+          }
+          return true; // Successfully updated with this payload
+        }
+      } catch (e) {}
+
+      // Fallback without select in case select policy is strict
+      try {
+        const { error, count } = await client
+          .from(table)
+          .update(payload, { count: 'exact' })
+          .eq(matchColumn, matchValue);
+        if (!error && count && count > 0) {
+          updatedCount += count;
+          return true;
         }
       } catch (e) {}
     }
+    return false;
+  };
 
-    // 2. Safely find and update by phone columns
+  for (const table of targetTables) {
+    // 1. Check direct UUID/ID
+    if (normalizedRaw.length >= 10) {
+      await executeSafeUpdate(table, 'id', normalizedRaw);
+    }
+
+    // 2. Search by all phone variants across phone columns
     for (const p of phoneVariants) {
       for (const col of phoneCols) {
+        // A. Select matching row first to guarantee safe ID-based update
         try {
-          // Select matching row first to guarantee safe ID-based update
           const { data: matchedRows } = await client.from(table).select('id').eq(col, p).limit(10);
           if (matchedRows && matchedRows.length > 0) {
             for (const r of matchedRows) {
-              const { error: upErr } = await client.from(table).update({ premium: premiumValue }).eq('id', r.id);
-              if (!upErr) {
-                matchedIds.add(`${table}:${r.id}`);
-                updatedCount++;
-              }
+              await executeSafeUpdate(table, 'id', r.id);
             }
           }
         } catch (e) {}
 
-        // Direct column update attempt
-        try {
-          const { data: updatedRows, error: directErr } = await client
-            .from(table)
-            .update({ premium: premiumValue })
-            .eq(col, p)
-            .select('id');
-          if (!directErr && updatedRows && updatedRows.length > 0) {
-            updatedRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
-            updatedCount += updatedRows.length;
-          }
-        } catch (e) {}
+        // B. Direct column exact match
+        await executeSafeUpdate(table, col, p);
+
+        // C. Direct column ilike match for fuzzy / formatted phones
+        for (const payload of updatePayloads) {
+          try {
+            const { data, error } = await client.from(table).update(payload).ilike(col, `%${p}%`).select('id');
+            if (!error && data && data.length > 0) {
+              data.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+              updatedCount += data.length;
+              break;
+            }
+          } catch (e) {}
+        }
       }
     }
 
-    // 3. Find and update by Name if provided
+    // 3. Search and update by Student Name if provided
     if (studentName && studentName.trim().length > 1) {
       const cleanName = studentName.trim();
       for (const col of nameCols) {
@@ -5257,42 +5323,30 @@ export const syncSupabaseProfilePremium = async (
           const { data: matchedNameRows } = await client.from(table).select('id').eq(col, cleanName).limit(10);
           if (matchedNameRows && matchedNameRows.length > 0) {
             for (const r of matchedNameRows) {
-              const { error: upErr } = await client.from(table).update({ premium: premiumValue }).eq('id', r.id);
-              if (!upErr) {
-                matchedIds.add(`${table}:${r.id}`);
-                updatedCount++;
-              }
+              await executeSafeUpdate(table, 'id', r.id);
             }
           }
         } catch (e) {}
 
-        try {
-          const { data: updatedRows, error: nameErr } = await client
-            .from(table)
-            .update({ premium: premiumValue })
-            .eq(col, cleanName)
-            .select('id');
-          if (!nameErr && updatedRows && updatedRows.length > 0) {
-            updatedRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
-            updatedCount += updatedRows.length;
-          }
-        } catch (e) {}
+        await executeSafeUpdate(table, col, cleanName);
+
+        // Fuzzy ilike match for name
+        for (const payload of updatePayloads) {
+          try {
+            const { data, error } = await client.from(table).update(payload).ilike(col, cleanName).select('id');
+            if (!error && data && data.length > 0) {
+              data.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
+              updatedCount += data.length;
+              break;
+            }
+          } catch (e) {}
+        }
       }
     }
 
     // 4. If input has email format
-    if (raw.includes('@')) {
-      try {
-        const { data: emailRows, error: emErr } = await client
-          .from(table)
-          .update({ premium: premiumValue })
-          .eq('email', raw)
-          .select('id');
-        if (!emErr && emailRows && emailRows.length > 0) {
-          emailRows.forEach((r: any) => matchedIds.add(`${table}:${r.id}`));
-          updatedCount += emailRows.length;
-        }
-      } catch (e) {}
+    if (normalizedRaw.includes('@')) {
+      await executeSafeUpdate(table, 'email', normalizedRaw);
     }
   }
 
@@ -5306,7 +5360,7 @@ export const syncSupabaseProfilePremium = async (
         for (const s of localList) {
           const sPhone = (s.phone || '').trim();
           if (phoneVariants.includes(sPhone) || (studentName && s.name === studentName)) {
-            s.premium = premiumValue;
+            s.premium = isGranting ? 'premium' : null;
             changed = true;
           }
         }
@@ -5317,12 +5371,12 @@ export const syncSupabaseProfilePremium = async (
     }
   } catch (e) {}
 
-  console.log(`Supabase Premium Sync completed for ${studentPhoneOrName(raw, studentName)}. Matched: ${matchedIds.size} records.`);
+  console.log(`Supabase Premium Sync completed for ${studentPhoneOrName(rawInput, studentName)}. is_premium: ${isGranting}, Matched records: ${matchedIds.size}`);
   return {
     success: true,
     updatedCount,
     error: null,
-    details: `${matchedIds.size} টি রেকর্ডে 'premium' সফলভাবে সংরক্ষিত হয়েছে`,
+    details: `${matchedIds.size} টি সুপাবেজ অ্যাকাউন্টে is_premium=${isGranting ? 'TRUE' : 'FALSE'} আপডেট করা হয়েছে`,
   };
 };
 
