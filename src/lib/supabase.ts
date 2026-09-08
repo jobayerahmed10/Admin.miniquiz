@@ -1609,6 +1609,11 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
     moveToTrash(current);
   }
   setLocalCachedQuestions([]);
+  try {
+    localStorage.removeItem(LOCAL_BACKUP_KEY);
+  } catch (e) {
+    console.warn('Failed to remove questions backup:', e);
+  }
 
   const client = getSupabaseClient();
   if (!client) {
