@@ -143,7 +143,12 @@ export const QuestionsList: React.FC = () => {
     const itemToDelete = questions.find((q) => String(q.id) === String(deletingQuestionId)) || null;
     setIsDeleting(true);
     try {
-      await deleteQuestion(deletingQuestionId);
+      const res = await deleteQuestion(deletingQuestionId);
+      if (!res.success) {
+        alert('সুপাবেজ থেকে প্রশ্ন মুছে ফেলতে সমস্যা হয়েছে: ' + (res.error || 'অজানা ত্রুটি'));
+        await loadQuestions();
+        return;
+      }
       setQuestions((prev) => prev.filter((q) => String(q.id) !== String(deletingQuestionId)));
       setDeletingQuestionId(null);
       if (itemToDelete) {
@@ -155,8 +160,11 @@ export const QuestionsList: React.FC = () => {
           setUndoItem((curr) => (curr && String(curr.id) === String(itemToDelete.id) ? null : curr));
         }, 8000);
       }
-    } catch (err) {
+      await loadQuestions();
+    } catch (err: any) {
       console.error('Delete question error:', err);
+      alert('প্রশ্ন মুছে ফেলতে ত্রুটি ঘটেছে: ' + (err?.message || 'অজানা ত্রুটি'));
+      await loadQuestions();
     } finally {
       setIsDeleting(false);
     }
@@ -230,7 +238,10 @@ export const QuestionsList: React.FC = () => {
         'আপনি কি নিশ্চিতভাবে সব প্রশ্ন মুছে ফেলতে চান? মনে রাখবেন, সব প্রশ্ন নিরাপদভাবে রিসাইকেল বিনে জমা থাকবে এবং আপনি যেকোনো সময় রিসাইকেল বিন থেকে ফিরিয়ে আনতে (Restore) পারবেন।'
       )
     ) {
-      await clearAllQuestions();
+      const res = await clearAllQuestions();
+      if (!res.success) {
+        alert('সুপাবেজ থেকে সব প্রশ্ন মুছে ফেলতে সমস্যা হয়েছে: ' + (res.error || 'অজানা ত্রুটি'));
+      }
       await loadQuestions();
     }
   };

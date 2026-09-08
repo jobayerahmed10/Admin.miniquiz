@@ -1595,18 +1595,27 @@ export const deleteQuestion = async (
   }
 
   try {
+    // 1. Cascade delete dependent explanations to avoid foreign key violation
+    await client
+      .from('question_explanations')
+      .delete()
+      .eq('question_id', String(id));
+
+    // 2. Direct hard delete on Supabase questions table
     const { error } = await client
       .from('questions')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.warn('Supabase delete error (handled):', error);
+      console.error('Supabase delete error:', error);
+      return { success: false, deletedQuestion: target, error: error.message };
     }
 
     return { success: true, deletedQuestion: target, error: null };
   } catch (err: any) {
-    return { success: true, deletedQuestion: target, error: null };
+    console.error('Supabase delete exception:', err);
+    return { success: false, deletedQuestion: target, error: err?.message || 'Unknown deletion error' };
   }
 };
 
@@ -1636,17 +1645,24 @@ export const deleteBatchQuestions = async (
   }
 
   try {
+    await client
+      .from('question_explanations')
+      .delete()
+      .in('question_id', ids.map(String));
+
     const { error } = await client
       .from('questions')
       .delete()
       .in('id', ids);
 
     if (error) {
-      console.warn('Supabase deleteBatchQuestions warning:', error);
+      console.error('Supabase deleteBatchQuestions error:', error);
+      return { success: false, deletedCount: 0, error: error.message };
     }
     return { success: true, deletedCount: targets.length, error: null };
   } catch (err: any) {
-    return { success: true, deletedCount: targets.length, error: null };
+    console.error('Supabase deleteBatchQuestions exception:', err);
+    return { success: false, deletedCount: 0, error: err?.message || 'Batch delete error' };
   }
 };
 
@@ -1670,17 +1686,24 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
   }
 
   try {
+    await client
+      .from('question_explanations')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
     const { error } = await client
       .from('questions')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000');
 
     if (error) {
-      console.warn('Supabase clearAllQuestions warning:', error);
+      console.error('Supabase clearAllQuestions error:', error);
+      return { success: false, error: error.message };
     }
     return { success: true, error: null };
   } catch (err: any) {
-    return { success: true, error: null };
+    console.error('Supabase clearAllQuestions exception:', err);
+    return { success: false, error: err?.message || 'Clear all error' };
   }
 };
 
