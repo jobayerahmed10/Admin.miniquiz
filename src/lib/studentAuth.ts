@@ -135,7 +135,7 @@ export const loginStudentAccount = async (
     try {
       const { data } = await client
         .from('students')
-        .select('*')
+        .select('id, student_id_code, name, full_name, phone, email, premium, is_premium, enrolled_courses, created_at, target_exam, total_exams_taken, avg_score, study_streak_days')
         .or(`phone.eq.${clean},email.eq.${clean}`)
         .limit(1);
 
@@ -243,11 +243,12 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
   const client = getSupabaseClient();
   if (client) {
     try {
-      // 1. First attempt to fetch from 'profiles' table
+      // 1. First attempt to fetch from 'profiles' table with specific columns and pagination limit
       const { data: profilesData, error: profilesError } = await client
         .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, student_id_code, student_id, name, full_name, username, phone, mobile, phone_number, email, created_at, target_exam, total_exams_taken, avg_score, study_streak_days, premium, is_premium')
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (!profilesError && profilesData && profilesData.length > 0) {
         return profilesData.map((row: any) => ({
@@ -265,11 +266,12 @@ export const fetchAllRegisteredStudentsForAdmin = async (): Promise<StudentUser[
         }));
       }
 
-      // 2. Fallback to 'students' table if profiles is empty or error
+      // 2. Fallback to 'students' table with specific columns and pagination limit
       const { data, error } = await client
         .from('students')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, student_id_code, name, full_name, phone, email, created_at, target_exam, total_exams_taken, avg_score, study_streak_days, premium, is_premium')
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (!error && data && data.length > 0) {
         return data.map((row: any) => ({

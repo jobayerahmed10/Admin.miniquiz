@@ -123,8 +123,7 @@ export const QuestionsList: React.FC = () => {
         status: wq.status || 'published',
         subject: wq.subject || 'সাধারণ',
         topic: wq.topic || '',
-        sub_topic: wq.sub_topic || wq.subtopic || '',
-        subtopic: wq.sub_topic || wq.subtopic || '',
+        sub_topic: wq.sub_topic || (wq as any).subtopic || '',
         post: wq.post || '',
       };
     });

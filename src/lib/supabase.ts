@@ -590,9 +590,9 @@ export const fetchDashboardStats = async (): Promise<{ stats: DashboardStats; er
     let examsList = localExams;
     if (client) {
       try {
-        const { data } = await client.from('exams').select('*');
+        const { data } = await client.from('exams').select('id, status');
         if (data && data.length > 0) {
-          examsList = data;
+          examsList = data as any;
         }
       } catch (e) {}
     }
@@ -630,7 +630,7 @@ export const fetchDashboardStats = async (): Promise<{ stats: DashboardStats; er
 };
 
 // Fetch All Questions from public.questions
-export const fetchAllQuestions = async (): Promise<{ questions: Question[]; error: string | null; isSynced?: boolean }> => {
+export const fetchAllQuestions = async (options?: { limit?: number; offset?: number }): Promise<{ questions: Question[]; error: string | null; isSynced?: boolean }> => {
   const localQuestions = getLocalCachedQuestions();
   const client = getSupabaseClient();
 
@@ -643,11 +643,14 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
   }
 
   try {
+    const fetchLimit = options?.limit ?? 500;
+    const fetchOffset = options?.offset ?? 0;
+
     const { data, error } = await client
       .from('questions')
-      .select('*')
+      .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, sub_topic, post, exam_id, created_at, slug, code, question_code')
       .order('created_at', { ascending: false })
-      .limit(5000);
+      .range(fetchOffset, fetchOffset + fetchLimit - 1);
 
     if (error) {
       console.warn('Supabase fetchAllQuestions error, returning local cache:', error);
@@ -697,10 +700,14 @@ export const fetchAllQuestions = async (): Promise<{ questions: Question[]; erro
 
 // Fetch Single Question by ID
 export const fetchQuestionById = async (id: string | number): Promise<{ question: Question | null; error: string | null }> => {
-  const client = getSupabaseClient();
   const localQuestions = getLocalCachedQuestions();
-  const localFound = localQuestions.find((q) => String(q.id) === String(id));
+  const localFound = id ? localQuestions.find((q) => String(q.id) === String(id)) : null;
 
+  if (!id || id === 'undefined' || id === 'null') {
+    return { question: localFound || null, error: null };
+  }
+
+  const client = getSupabaseClient();
   if (!client) {
     return { question: localFound || null, error: null };
   }
@@ -708,7 +715,7 @@ export const fetchQuestionById = async (id: string | number): Promise<{ question
   try {
     const { data, error } = await client
       .from('questions')
-      .select('*')
+      .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, sub_topic, post, exam_id, created_at, slug, code, question_code')
       .eq('id', id)
       .single();
 
@@ -1131,9 +1138,13 @@ export const fetchQuestionsByExamId = async (
   examId: string | number
 ): Promise<{ questions: Question[]; error: string | null; isSynced?: boolean }> => {
   const localQuestions = getLocalCachedQuestions();
-  const localMatched = localQuestions.filter(
+  const localMatched = examId ? localQuestions.filter(
     (q) => String(q.exam_id) === String(examId) || String(q.exam_id) === String(Number(examId))
-  );
+  ) : [];
+
+  if (!examId || examId === 'undefined' || examId === 'null') {
+    return { questions: localMatched, error: null, isSynced: false };
+  }
 
   const client = getSupabaseClient();
   if (!client) {
@@ -1170,6 +1181,15 @@ export const updateQuestion = async (
   id: string | number,
   updatedFields: Partial<Omit<Question, 'id' | 'created_at'>>
 ): Promise<{ success: boolean; data?: Question; error: string | null; syncedToSupabase?: boolean }> => {
+  if (!id || id === 'undefined' || id === 'null') {
+    return {
+      success: true,
+      data: undefined,
+      error: null,
+      syncedToSupabase: false,
+    };
+  }
+
   // Update in local cache first
   const current = getLocalCachedQuestions();
   let updatedLocal: Question | null = null;
@@ -1869,7 +1889,7 @@ export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | 
   try {
     const { data, error } = await client
       .from('exams')
-      .select('*')
+      .select('id, title, badge, badge_type, subject, topic, post, pass_mark, exam_type, category, question_count, time_minutes, negative_marks, total_marks, description, id_pattern, status, selected_question_codes, question_ids, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -1904,7 +1924,7 @@ export const fetchAllExams = async (): Promise<{ exams: Exam[]; error: string | 
       try {
         const { data: qData } = await client
           .from('questions')
-          .select('*')
+          .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, sub_topic, post, exam_id, created_at, slug, code, question_code')
           .in('exam_id', examIds);
 
         const questionsByExamId: Record<string, Question[]> = {};
@@ -2857,7 +2877,7 @@ export const fetchPublishedCoursesForStudent = async (): Promise<{
   try {
     const { data, error } = await client
       .from('courses')
-      .select('*')
+      .select('id, title, category, badge, badge_subtitle, instructor_name, price, original_price, features, total_classes, classes_count, total_sheets, sheets_count, total_exams, exams_count, enrolled_count, is_enrolled, about_text, description, about, details, routine_text, routine, routine_description, routine_pdf_url, routine_pdf, syllabus_text, syllabus, syllabus_description, syllabus_pdf_url, syllabus_pdf, image_url, image_link, cover_image, status, created_at, updated_at')
       .eq('status', 'published')
       .order('created_at', { ascending: false });
 
@@ -2943,7 +2963,7 @@ export const fetchAllCourses = async (): Promise<{
   try {
     const { data, error } = await client
       .from('courses')
-      .select('*')
+      .select('id, title, category, badge, badge_subtitle, instructor_name, price, original_price, features, total_classes, classes_count, total_sheets, sheets_count, total_exams, exams_count, enrolled_count, is_enrolled, about_text, description, about, details, routine_text, routine, routine_description, routine_pdf_url, routine_pdf, syllabus_text, syllabus, syllabus_description, syllabus_pdf_url, syllabus_pdf, image_url, image_link, cover_image, status, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -4041,7 +4061,7 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
   try {
     const { data, error } = await client
       .from('course_exams')
-      .select('*')
+      .select('id, course_id, title, exam_id, position, questions, is_free, syllabus, details, time_minutes, marks, negative_marks, total_marks, question_count, pass_mark, pass_marks, is_published, created_at, updated_at, subject, topic, is_locked, instructions')
       .eq('course_id', courseId)
       .order('position', { ascending: true });
 
@@ -4164,6 +4184,10 @@ export const fetchQuestionsForCourseExam = async (
   subject?: string,
   topic?: string
 ): Promise<{ questions: CourseExamQuestion[]; error: string | null }> => {
+  if (!examId || examId === 'undefined' || examId === 'null') {
+    return { questions: [], error: null };
+  }
+
   const client = getSupabaseClient();
   const localMap = getLocalCourseExamsCache();
 
@@ -4701,7 +4725,7 @@ export const fetchCourseSheets = async (courseId: string): Promise<{ sheets: Cou
   try {
     const { data, error } = await client
       .from('course_sheets')
-      .select('*')
+      .select('id, course_id, title, subject, topic, pdf_url, file_url, pdf_link, position, created_at, pdf_name, file_size, page_count, total_pages, badge_text, badge, is_locked, locked, order')
       .eq('course_id', courseId)
       .order('position', { ascending: true });
 
@@ -5163,8 +5187,9 @@ export const fetchAllCourseApplications = async (): Promise<{
   try {
     const { data, error } = await client
       .from('course_applications')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, student_name, name, phone_number, phone, mobile, course_title, course_name, course_id, payment_method, gateway, amount, transaction_id, trx_id, trxid, status, notes, created_at, updated_at')
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
     if (error) {
       console.warn('Supabase fetchAllCourseApplications warning:', error.message);
@@ -5422,7 +5447,7 @@ export const syncAllApprovedEnrollmentsToSupabase = async (): Promise<{
 
   if (client) {
     try {
-      const { data } = await client.from('course_applications').select('*');
+      const { data } = await client.from('course_applications').select('id, student_name, name, phone_number, phone, mobile, course_title, course_name, course_id, payment_method, gateway, amount, transaction_id, trx_id, trxid, status, notes, created_at, updated_at');
       if (data && data.length > 0) {
         applicationsList = data.map(normalizeCourseApplicationRow);
         setLocalApplicationsCache(applicationsList);
@@ -5823,14 +5848,15 @@ export const fetchQuestionReports = async (): Promise<{ reports: any[]; error: s
     const { data, error } = await client
       .from('question_reports')
       .select(`
-        *,
+        id, question_id, report_type, reason, details, status, submitted_by, created_at,
         questions (
           id,
           question,
           question_text
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(150);
 
     if (error) {
       console.error('Error fetching question reports:', error);
@@ -5920,10 +5946,13 @@ export const fetchQuestionExplanations = async (): Promise<{
     const { data, error } = await client
       .from('question_explanations')
       .select(`
-        *,
-        questions (*)
+        id, question_id, explanation_text, details, votes, status, submitted_by, created_at,
+        questions (
+          id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, created_at
+        )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(150);
 
     if (error) {
       console.warn('Supabase fetchQuestionExplanations error:', error);
@@ -6229,7 +6258,7 @@ export const fetchBlogCategories = async (): Promise<{ categories: BlogCategory[
   try {
     const { data, error } = await client
       .from('blog_categories')
-      .select('*')
+      .select('id, name, title, slug, description, parent_id, created_at')
       .order('name', { ascending: true });
 
     if (error) {
@@ -6362,8 +6391,9 @@ export const fetchAllBlogs = async (): Promise<{ blogs: Blog[]; error: string | 
   try {
     const { data, error } = await client
       .from('blogs')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, title, slug, excerpt, short_description, content, body, category, category_name, category_id, sub_category, subcategory, sub_category_id, topic, topic_name, subject, topic_id, read_time, author, views, featured, cover_image, status, created_at, updated_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (error) {
       console.warn('Supabase blogs fetch error (using local cache):', error.message);

@@ -7,6 +7,8 @@ import { getSupabaseClient } from './supabase';
 
 const STORAGE_KEY = 'tamreen_subject_posts_v4';
 
+let memoryCachedSubjectPosts: SubjectPost[] | null = null;
+
 export const THEME_COLOR_MAP: Record<string, { hex: string; gradient_class: string; label: string }> = {
   '#10B981': {
     hex: '#10B981',
@@ -466,6 +468,10 @@ export const fetchSubjectPosts = async (): Promise<{
   source: 'supabase' | 'local';
   error?: string;
 }> => {
+  if (memoryCachedSubjectPosts && memoryCachedSubjectPosts.length > 0) {
+    return { posts: memoryCachedSubjectPosts, source: 'supabase' };
+  }
+
   const localPosts = getLocalSubjectPosts();
   const client = getSupabaseClient();
 
@@ -476,7 +482,7 @@ export const fetchSubjectPosts = async (): Promise<{
   try {
     const { data, error } = await client
       .from('subject_posts')
-      .select('*');
+      .select('id, name, title, code, tagline, badge, subtitle, description, theme_color, gradient_class, gradient, icon_name, status, order_index, topics, created_at, updated_at');
 
     if (!error && Array.isArray(data) && data.length > 0) {
       const formatted: SubjectPost[] = data.map((row: any, idx: number) => {
@@ -505,6 +511,7 @@ export const fetchSubjectPosts = async (): Promise<{
       formatted.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
       saveLocalSubjectPosts(formatted);
+      memoryCachedSubjectPosts = formatted;
       return { posts: formatted, source: 'supabase' };
     }
 

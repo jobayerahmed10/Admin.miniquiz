@@ -671,6 +671,11 @@ export const DEFAULT_TOPICS: TopicItem[] = [
   { id: 'top_mental_abr', subject_id: 'sub_mental', parent_id: null, title: 'বিমূর্ত যুক্তি', code: 'MENTAL-ABR' },
 ];
 
+// In-memory cache to prevent repeated database requests during session
+let memoryCachedSubjects: SubjectItem[] | null = null;
+let memoryCachedTopics: TopicItem[] | null = null;
+let memoryCachedSubTopics: SubTopicItem[] | null = null;
+
 /**
  * LocalStorage caching helpers
  */
@@ -845,12 +850,16 @@ export const suggestSubTopicCode = (
  * Fetch Subjects from Supabase (with fallback to local cache & presets)
  */
 export const fetchSubjects = async (): Promise<SubjectItem[]> => {
+  if (memoryCachedSubjects && memoryCachedSubjects.length > 0) {
+    return memoryCachedSubjects;
+  }
+
   const cached = getCachedSubjects();
   const client = getSupabaseClient();
   if (!client) return cached;
 
   try {
-    const { data, error } = await client.from('subjects').select('*').order('name', { ascending: true });
+    const { data, error } = await client.from('subjects').select('id, name, code, created_at').order('name', { ascending: true });
     if (error || !data || data.length === 0) {
       return cached;
     }
@@ -869,6 +878,7 @@ export const fetchSubjects = async (): Promise<SubjectItem[]> => {
 
     const finalSubjects = Array.from(map.values());
     setCachedSubjects(finalSubjects);
+    memoryCachedSubjects = finalSubjects;
     return finalSubjects;
   } catch (e) {
     console.warn('Supabase fetchSubjects error, using cache:', e);
@@ -997,6 +1007,10 @@ export const filterTopicsForSubject = (topics: TopicItem[], subjectId?: string):
  * Fetch Topics from Supabase (with fallback to local cache & presets)
  */
 export const fetchTopics = async (subjectId?: string): Promise<TopicItem[]> => {
+  if (memoryCachedTopics && memoryCachedTopics.length > 0) {
+    return filterTopicsForSubject(memoryCachedTopics, subjectId);
+  }
+
   const cached = getCachedTopics();
   const client = getSupabaseClient();
   if (!client) {
@@ -1004,8 +1018,8 @@ export const fetchTopics = async (subjectId?: string): Promise<TopicItem[]> => {
   }
 
   try {
-    let query = client.from('topics').select('*').order('code', { ascending: true });
-    if (subjectId) {
+    let query = client.from('topics').select('id, subject_id, parent_id, title, name, code, created_at').order('code', { ascending: true });
+    if (subjectId && subjectId !== 'undefined' && subjectId !== 'null' && subjectId.trim() !== '') {
       query = query.eq('subject_id', subjectId);
     }
     const { data, error } = await query;
@@ -1030,6 +1044,7 @@ export const fetchTopics = async (subjectId?: string): Promise<TopicItem[]> => {
 
     const merged = Array.from(updatedMap.values());
     setCachedTopics(merged);
+    memoryCachedTopics = merged;
 
     return filterTopicsForSubject(merged, subjectId);
   } catch (e) {
@@ -1140,6 +1155,10 @@ export const fetchSubTopics = async (
   topicId?: string,
   subjectId?: string
 ): Promise<SubTopicItem[]> => {
+  if (memoryCachedSubTopics && memoryCachedSubTopics.length > 0) {
+    return filterSubTopics(memoryCachedSubTopics, topicId, subjectId);
+  }
+
   const cached = getCachedSubTopics();
   const client = getSupabaseClient();
   if (!client) {
@@ -1147,11 +1166,11 @@ export const fetchSubTopics = async (
   }
 
   try {
-    let query = client.from('sub_topics').select('*').order('code', { ascending: true });
-    if (topicId) {
+    let query = client.from('sub_topics').select('id, topic_id, subject_id, title, name, code, created_at').order('code', { ascending: true });
+    if (topicId && topicId !== 'undefined' && topicId !== 'null' && topicId.trim() !== '') {
       query = query.eq('topic_id', topicId);
     }
-    if (subjectId) {
+    if (subjectId && subjectId !== 'undefined' && subjectId !== 'null' && subjectId.trim() !== '') {
       query = query.eq('subject_id', subjectId);
     }
     let { data, error } = await query;
@@ -1159,11 +1178,11 @@ export const fetchSubTopics = async (
     // Fallback: Check if table name is singular 'sub_topic'
     if (error || !data || data.length === 0) {
       try {
-        let altQuery = client.from('sub_topic').select('*').order('code', { ascending: true });
-        if (topicId) {
+        let altQuery = client.from('sub_topic').select('id, topic_id, subject_id, title, name, code, created_at').order('code', { ascending: true });
+        if (topicId && topicId !== 'undefined' && topicId !== 'null' && topicId.trim() !== '') {
           altQuery = altQuery.eq('topic_id', topicId);
         }
-        if (subjectId) {
+        if (subjectId && subjectId !== 'undefined' && subjectId !== 'null' && subjectId.trim() !== '') {
           altQuery = altQuery.eq('subject_id', subjectId);
         }
         const altRes = await altQuery;
@@ -1206,6 +1225,7 @@ export const fetchSubTopics = async (
 
     const merged = Array.from(map.values());
     setCachedSubTopics(merged);
+    memoryCachedSubTopics = merged;
 
     return filterSubTopics(merged, topicId, subjectId);
   } catch (e) {

@@ -51,9 +51,10 @@ export const StudentPreviewModal: React.FC<StudentPreviewModalProps> = ({ isOpen
       try {
         const { data, error } = await client
           .from('questions')
-          .select('*')
+          .select('id, question, question_text, option_a, option_b, option_c, option_d, correct_answer, correct_option, explanation, subject, category, topic, created_at')
           .eq('status', 'published')
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(50);
 
         if (!error && data) {
           const questionsList: Question[] = data.map((row: any) => ({
