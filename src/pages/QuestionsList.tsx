@@ -105,12 +105,14 @@ export const QuestionsList: React.FC = () => {
   ) => {
     const prefix = options?.custom_prefix || getDefaultSubjectPrefix(workingList[0]?.subject);
 
-    const questionsToInsert = workingList.map((wq, idx) => {
+    const questionsToInsert = workingList.map((wq) => {
       // Find correct answer text
       const optKey = wq.correctAnswer as 'A' | 'B' | 'C' | 'D';
-      const ansText = wq.options[optKey] || `option_${optKey.toLowerCase()}`;
 
       return {
+        id: wq.id || wq.custom_question_id,
+        custom_id: wq.custom_question_id || wq.id,
+        code: wq.id || wq.custom_question_id,
         question: wq.question,
         option_a: wq.options.A || '',
         option_b: wq.options.B || '',
@@ -121,6 +123,8 @@ export const QuestionsList: React.FC = () => {
         status: wq.status || 'published',
         subject: wq.subject || 'সাধারণ',
         topic: wq.topic || '',
+        sub_topic: wq.sub_topic || wq.subtopic || '',
+        subtopic: wq.sub_topic || wq.subtopic || '',
         post: wq.post || '',
       };
     });

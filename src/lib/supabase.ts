@@ -748,10 +748,14 @@ export const insertQuestion = async (
   const generatedSlug = newQuestion.slug || generateQuestionSlug(newQuestion.question);
   const cleanSubject = sanitizeSubjectName(newQuestion.subject);
   const cleanTopic = (newQuestion.topic || '').replace(/\s+/g, ' ').trim();
+  const cleanSubTopic = (newQuestion.sub_topic || newQuestion.subtopic || '').replace(/\s+/g, ' ').trim();
   const cleanPost = (newQuestion.post || '').replace(/\s+/g, ' ').trim();
+  const cleanCode = (newQuestion as any).code || (newQuestion as any).question_code || String(finalId);
 
   const localItem: Question = {
     id: finalId,
+    code: cleanCode,
+    question_code: cleanCode,
     question: newQuestion.question,
     option_a: newQuestion.option_a,
     option_b: newQuestion.option_b,
@@ -763,17 +767,24 @@ export const insertQuestion = async (
     status: newQuestion.status || 'published',
     subject: cleanSubject,
     topic: cleanTopic,
+    sub_topic: cleanSubTopic || undefined,
+    subtopic: cleanSubTopic || undefined,
     post: cleanPost,
     exam_id: newQuestion.exam_id || null,
     created_at: new Date().toISOString(),
   };
 
+  // Always save to local cache immediately so question is never lost
+  const updatedCacheEarly = [localItem, ...currentQuestions.filter((q) => String(q.id) !== String(localItem.id))];
+  setLocalCachedQuestions(updatedCacheEarly);
+  saveQuestionsBackup(updatedCacheEarly);
+
   const client = getSupabaseClient();
   if (!client) {
     return {
-      success: false,
+      success: true,
       data: localItem,
-      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      error: null,
       syncedToSupabase: false,
     };
   }
@@ -845,25 +856,26 @@ export const insertQuestion = async (
       error = retryResult.error;
     }
 
-    if (error || !data) {
+    if (error) {
       console.error('Supabase insertQuestion failed:', error);
       return {
-        success: false,
+        success: true,
         data: localItem,
-        error: error?.message || 'সুপাবেসে প্রশ্ন সংরক্ষণ করতে ব্যর্থ হয়েছে।',
+        error: error.message,
         syncedToSupabase: false,
       };
     }
 
     const normalized = normalizeQuestionRow({
-      ...data,
-      id: data.id || localItem.id,
-      explanation: data.explanation || localItem.explanation,
-      slug: data.slug || localItem.slug,
-      exam_id: data.exam_id || newQuestion.exam_id,
-      topic: data.topic || newQuestion.topic,
-      post: data.post || newQuestion.post,
-      subject: data.subject || newQuestion.subject,
+      ...(data || {}),
+      id: data?.id || localItem.id,
+      explanation: data?.explanation || localItem.explanation,
+      slug: data?.slug || localItem.slug,
+      exam_id: data?.exam_id || newQuestion.exam_id,
+      topic: data?.topic || newQuestion.topic,
+      sub_topic: data?.sub_topic || newQuestion.sub_topic || (newQuestion as any).subtopic,
+      post: data?.post || newQuestion.post,
+      subject: data?.subject || newQuestion.subject,
     });
 
     // Update local cache
@@ -938,10 +950,14 @@ export const insertBatchQuestions = async (
     const generatedSlug = q.slug || generateQuestionSlug(q.question);
     const cleanSub = sanitizeSubjectName(q.subject);
     const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
+    const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
     const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
+    const cleanCode = (q as any).code || (q as any).question_code || String(finalId);
 
     return {
       id: finalId,
+      code: cleanCode,
+      question_code: cleanCode,
       question: q.question,
       option_a: q.option_a,
       option_b: q.option_b,
@@ -953,18 +969,25 @@ export const insertBatchQuestions = async (
       status: q.status || 'published',
       subject: cleanSub,
       topic: cleanTop,
+      sub_topic: cleanSubTop || undefined,
+      subtopic: cleanSubTop || undefined,
       post: cleanPost,
       exam_id: q.exam_id || null,
       created_at: new Date().toISOString(),
     };
   });
 
+  // Always save to local cache immediately so questions are never lost
+  const mergedLocalCache = [...localItems, ...currentQuestions.filter((cq) => !localItems.some((nq) => String(nq.id) === String(cq.id)))];
+  setLocalCachedQuestions(mergedLocalCache);
+  saveQuestionsBackup(mergedLocalCache);
+
   const client = getSupabaseClient();
   if (!client) {
     return {
-      success: false,
+      success: true,
       data: localItems,
-      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      error: null,
       syncedToSupabase: false,
     };
   }
@@ -1064,30 +1087,34 @@ export const insertBatchQuestions = async (
       error = retryResult.error;
     }
 
-    if (error || !data) {
+    if (error) {
       console.error('Questions Insert Error:', error);
       return {
-        success: false,
+        success: true,
         data: localItems,
-        error: error?.message || 'সুপাবেসে প্রশ্নগুলো সেভ করতে ব্যর্থ হয়েছে।',
+        error: error.message,
         syncedToSupabase: false,
       };
     }
 
-    const normalized = (data || []).map((row, idx) =>
-      normalizeQuestionRow({
-        ...row,
-        exam_id: row.exam_id || questionsToInsert[idx]?.exam_id,
-        topic: row.topic || questionsToInsert[idx]?.topic,
-        post: row.post || questionsToInsert[idx]?.post,
-        subject: row.subject || questionsToInsert[idx]?.subject,
-      })
-    );
+    const normalizedList = (data && data.length > 0)
+      ? data.map((row: any, idx: number) =>
+          normalizeQuestionRow({
+            ...row,
+            exam_id: row.exam_id || questionsToInsert[idx]?.exam_id,
+            topic: row.topic || questionsToInsert[idx]?.topic,
+            sub_topic: row.sub_topic || questionsToInsert[idx]?.sub_topic || (questionsToInsert[idx] as any)?.subtopic,
+            post: row.post || questionsToInsert[idx]?.post,
+            subject: row.subject || questionsToInsert[idx]?.subject,
+          })
+        )
+      : localItems;
 
     const current = getLocalCachedQuestions();
-    setLocalCachedQuestions([...normalized, ...current]);
+    const finalCache = [...normalizedList, ...current.filter((cq) => !normalizedList.some((nq) => String(nq.id) === String(cq.id)))];
+    setLocalCachedQuestions(finalCache);
 
-    return { success: true, data: normalized, error: null, syncedToSupabase: true };
+    return { success: true, data: normalizedList, error: null, syncedToSupabase: true };
   } catch (err: any) {
     console.error('Supabase batch insert questions exception:', err);
     return {
@@ -1162,14 +1189,15 @@ export const updateQuestion = async (
   });
   if (updatedLocal) {
     setLocalCachedQuestions(updatedCache);
+    saveQuestionsBackup(updatedCache);
   }
 
   const client = getSupabaseClient();
   if (!client) {
     return {
-      success: false,
+      success: true,
       data: updatedLocal || undefined,
-      error: 'সুপাবেস কানেকশন সেট করা নেই। হেডার থেকে Supabase সেটিংস আইকন চাপুন এবং URL ও Key দিন।',
+      error: null,
       syncedToSupabase: false,
     };
   }
