@@ -104,17 +104,29 @@ const LOCAL_EXAMS_KEY = 'miniquiz_cached_exams';
 
 export const getLocalCachedQuestions = (): Question[] => {
   try {
+    const deletedIds = getDeletedQuestionIds();
     const raw = localStorage.getItem(LOCAL_QUESTIONS_KEY);
+    let list: Question[] = [];
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        list = parsed;
       }
     }
-    const seedQs = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
-    return seedQs;
+    if (list.length === 0) {
+      list = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+    }
+    if (deletedIds.size > 0) {
+      list = list.filter((q) => !deletedIds.has(String(q.id)));
+    }
+    return list;
   } catch (e) {
-    return INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+    const deletedIds = getDeletedQuestionIds();
+    let seedQs = INITIAL_SEED_EXAMS.flatMap((exam) => exam.questions || []);
+    if (deletedIds.size > 0) {
+      seedQs = seedQs.filter((q) => !deletedIds.has(String(q.id)));
+    }
+    return seedQs;
   }
 };
 
@@ -197,6 +209,35 @@ export const getQuestionsBackup = (): { questions: Question[]; timestamp: string
   } catch (e) {
     return null;
   }
+};
+
+const DELETED_IDS_KEY = 'tamrin_deleted_question_ids_v1';
+
+export const getDeletedQuestionIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(DELETED_IDS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return new Set(arr.map(String));
+      }
+    }
+  } catch (e) {}
+  return new Set();
+};
+
+export const addDeletedQuestionIds = (ids: (string | number)[]) => {
+  try {
+    const set = getDeletedQuestionIds();
+    ids.forEach((id) => set.add(String(id)));
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {}
+};
+
+export const clearDeletedQuestionIds = () => {
+  try {
+    localStorage.removeItem(DELETED_IDS_KEY);
+  } catch (e) {}
 };
 
 export const getLocalCachedExams = (): Exam[] => {
@@ -680,7 +721,8 @@ export const fetchAllQuestions = async (options?: { limit?: number; offset?: num
       }
     }
 
-    const cleanList = Array.from(questionMap.values());
+    const deletedIds = getDeletedQuestionIds();
+    const cleanList = Array.from(questionMap.values()).filter((q) => !deletedIds.has(String(q.id)));
 
     // Save merged questions to local cache
     setLocalCachedQuestions(cleanList);
@@ -1533,6 +1575,7 @@ export const autoAssignAndRepairQuestionTopics = async (
 export const deleteQuestion = async (
   id: string | number
 ): Promise<{ success: boolean; deletedQuestion?: Question | null; error: string | null }> => {
+  addDeletedQuestionIds([id]);
   const current = getLocalCachedQuestions();
   const target = current.find((q) => String(q.id) === String(id)) || null;
 
@@ -1542,7 +1585,9 @@ export const deleteQuestion = async (
   }
 
   // Remove from local cache
-  setLocalCachedQuestions(current.filter((q) => String(q.id) !== String(id)));
+  const updated = current.filter((q) => String(q.id) !== String(id));
+  setLocalCachedQuestions(updated);
+  saveQuestionsBackup(updated);
 
   const client = getSupabaseClient();
   if (!client) {
@@ -1571,6 +1616,7 @@ export const deleteBatchQuestions = async (
 ): Promise<{ success: boolean; deletedCount: number; error: string | null }> => {
   if (!ids || ids.length === 0) return { success: true, deletedCount: 0, error: null };
 
+  addDeletedQuestionIds(ids);
   const current = getLocalCachedQuestions();
   const idStrSet = new Set(ids.map((id) => String(id)));
   const targets = current.filter((q) => idStrSet.has(String(q.id)));
@@ -1580,7 +1626,9 @@ export const deleteBatchQuestions = async (
     moveToTrash(targets);
   }
 
-  setLocalCachedQuestions(current.filter((q) => !idStrSet.has(String(q.id))));
+  const updated = current.filter((q) => !idStrSet.has(String(q.id)));
+  setLocalCachedQuestions(updated);
+  saveQuestionsBackup(updated);
 
   const client = getSupabaseClient();
   if (!client) {
@@ -1607,6 +1655,7 @@ export const clearAllQuestions = async (): Promise<{ success: boolean; error: st
   const current = getLocalCachedQuestions();
   if (current.length > 0) {
     moveToTrash(current);
+    addDeletedQuestionIds(current.map((q) => q.id));
   }
   setLocalCachedQuestions([]);
   try {
