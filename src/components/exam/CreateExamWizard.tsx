@@ -248,6 +248,7 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
             question_code: q.question_code || customQuestionId,
             exam_id: targetExamId,
             subject: q.subject || examInfo.subject || 'সাধারণ',
+            subject_id: (q as any).subject_id || (examInfo as any).subject_id,
             question_text: q.question,
             question: q.question,
             option_a: q.option_a,
@@ -260,6 +261,9 @@ export const CreateExamWizard: React.FC<CreateExamWizardProps> = ({
             status: 'published',
             slug: q.slug || generateQuestionSlug(q.question),
             topic: q.topic || examInfo.topic || '',
+            topic_id: (q as any).topic_id || (examInfo as any).topic_id,
+            sub_topic: (q as any).sub_topic || (q as any).subtopic || (examInfo as any).sub_topic || '',
+            sub_topic_id: (q as any).sub_topic_id || (examInfo as any).sub_topic_id,
             post: q.post || examInfo.post || '',
           };
         });

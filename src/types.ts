@@ -53,7 +53,12 @@ export interface Exam {
   badge: string;
   badge_type: ExamBadgeType;
   subject: string;
+  subject_id?: string | null;
   topic?: string | null;
+  topic_id?: string | null;
+  sub_topic?: string | null;
+  subtopic?: string | null;
+  sub_topic_id?: string | null;
   post?: string | null;
   pass_mark?: number;
   exam_type?: 'free' | 'course' | string;

@@ -122,8 +122,11 @@ export const QuestionsList: React.FC = () => {
         explanation: sanitizeExplanation(wq.explanation, wq.options) || '',
         status: wq.status || 'published',
         subject: wq.subject || 'সাধারণ',
+        subject_id: wq.subject_id ? String(wq.subject_id) : undefined,
         topic: wq.topic || '',
+        topic_id: wq.topic_id ? String(wq.topic_id) : undefined,
         sub_topic: wq.sub_topic || (wq as any).subtopic || '',
+        sub_topic_id: wq.sub_topic_id ? String(wq.sub_topic_id) : undefined,
         post: wq.post || '',
       };
     });

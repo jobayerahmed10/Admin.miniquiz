@@ -1821,6 +1821,196 @@ ${subTopicsInsertBlock}
  */
 export const SUBTOPICS_SQL_SCHEMA = generateFullSupabaseSeedSql();
 
+export interface ResolvedSubjectTopicMetadata {
+  subject: string;
+  subject_id: string;
+  topic: string;
+  topic_id: string;
+  sub_topic: string;
+  sub_topic_id: string;
+}
+
+const slugifyName = (text?: string): string => {
+  if (!text) return '';
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_—–-]+/g, '_')
+    .replace(/[^\w\u0980-\u09FF]+/g, '')
+    .substring(0, 32);
+};
+
+/**
+ * Automatically resolves subject, subject_id, topic, topic_id, sub_topic, and sub_topic_id
+ * ensuring that every single field is populated and none are left empty when inserting or updating questions.
+ */
+export const resolveSubjectTopicSubTopicMetadata = (input: {
+  subject?: string | null;
+  subject_id?: string | number | null;
+  topic?: string | null;
+  topic_id?: string | number | null;
+  sub_topic?: string | null;
+  subtopic?: string | null;
+  sub_topic_id?: string | number | null;
+}): ResolvedSubjectTopicMetadata => {
+  const allSubjects = [...getCachedSubjects(), ...DEFAULT_SUBJECTS];
+  const allTopics = [...getCachedTopics(), ...DEFAULT_TOPICS];
+  const allSubTopics = [
+    ...getCachedSubTopics(),
+    ...DEFAULT_TOPICS.filter((t) => t.parent_id !== null && Boolean(t.parent_id)),
+  ];
+
+  let inSubjectId = input.subject_id ? String(input.subject_id).trim() : '';
+  let inSubjectName = (input.subject || '').trim();
+  let inTopicId = input.topic_id ? String(input.topic_id).trim() : '';
+  let inTopicName = (input.topic || '').trim();
+  let inSubTopicId = input.sub_topic_id ? String(input.sub_topic_id).trim() : '';
+  let inSubTopicName = (input.sub_topic || input.subtopic || '').trim();
+
+  let resolvedSubTopicId = inSubTopicId;
+  let resolvedSubTopicName = inSubTopicName;
+  let resolvedTopicId = inTopicId;
+  let resolvedTopicName = inTopicName;
+  let resolvedSubjectId = inSubjectId;
+  let resolvedSubjectName = inSubjectName;
+
+  // 1. Resolve Sub-topic
+  if (resolvedSubTopicId) {
+    const matched =
+      allSubTopics.find((st) => String(st.id).toLowerCase() === resolvedSubTopicId.toLowerCase()) ||
+      allTopics.find((t) => String(t.id).toLowerCase() === resolvedSubTopicId.toLowerCase());
+    if (matched) {
+      if (!resolvedSubTopicName) resolvedSubTopicName = matched.title || (matched as any).name || '';
+      if (!resolvedTopicId && ((matched as any).topic_id || (matched as any).parent_id)) {
+        resolvedTopicId = (matched as any).topic_id || (matched as any).parent_id || '';
+      }
+      if (!resolvedSubjectId && matched.subject_id) {
+        resolvedSubjectId = matched.subject_id;
+      }
+    }
+  } else if (resolvedSubTopicName) {
+    const lower = resolvedSubTopicName.toLowerCase();
+    const matched =
+      allSubTopics.find(
+        (st) => (st.title && st.title.toLowerCase() === lower) || ((st as any).name && (st as any).name.toLowerCase() === lower)
+      ) ||
+      allTopics.find(
+        (t) => Boolean((t as any).parent_id) && t.title && t.title.toLowerCase() === lower
+      );
+    if (matched) {
+      resolvedSubTopicId = matched.id;
+      if (!resolvedTopicId && ((matched as any).topic_id || (matched as any).parent_id)) {
+        resolvedTopicId = (matched as any).topic_id || (matched as any).parent_id || '';
+      }
+      if (!resolvedSubjectId && matched.subject_id) {
+        resolvedSubjectId = matched.subject_id;
+      }
+    } else {
+      resolvedSubTopicId = `subtop_${slugifyName(resolvedSubTopicName) || 'general'}`;
+    }
+  }
+
+  // 2. Resolve Topic
+  if (resolvedTopicId) {
+    const matched = allTopics.find((t) => String(t.id).toLowerCase() === resolvedTopicId.toLowerCase());
+    if (matched) {
+      if (!resolvedTopicName) resolvedTopicName = matched.title || (matched as any).name || '';
+      if (!resolvedSubjectId && matched.subject_id) {
+        resolvedSubjectId = matched.subject_id;
+      }
+    }
+  } else if (resolvedTopicName) {
+    const lower = resolvedTopicName.toLowerCase();
+    const matched =
+      allTopics.find(
+        (t) =>
+          (!(t as any).parent_id || (t as any).parent_id === null) &&
+          ((t.title && t.title.toLowerCase() === lower) || (t.code && t.code.toLowerCase() === lower))
+      ) || allTopics.find((t) => t.title && t.title.toLowerCase() === lower);
+    if (matched) {
+      resolvedTopicId = matched.id;
+      if (!resolvedSubjectId && matched.subject_id) {
+        resolvedSubjectId = matched.subject_id;
+      }
+    } else {
+      resolvedTopicId = `top_${slugifyName(resolvedTopicName) || 'general'}`;
+    }
+  }
+
+  // 3. Resolve Subject
+  if (resolvedSubjectId) {
+    const matched = allSubjects.find((s) => String(s.id).toLowerCase() === resolvedSubjectId.toLowerCase());
+    if (matched) {
+      if (!resolvedSubjectName) resolvedSubjectName = matched.name;
+    }
+  } else if (resolvedSubjectName) {
+    const lower = resolvedSubjectName.toLowerCase();
+    const matched = allSubjects.find(
+      (s) =>
+        (s.name && s.name.toLowerCase() === lower) ||
+        (s.code && s.code.toLowerCase() === lower) ||
+        (s.name && (s.name.includes(resolvedSubjectName) || resolvedSubjectName.includes(s.name)))
+    );
+    if (matched) {
+      resolvedSubjectId = matched.id;
+      resolvedSubjectName = matched.name;
+    } else {
+      resolvedSubjectId = `sub_${slugifyName(resolvedSubjectName) || 'general'}`;
+    }
+  }
+
+  // 4. Default Fallbacks if any are still missing
+  if (!resolvedSubjectName) {
+    resolvedSubjectName = 'বাংলা সাহিত্য';
+    resolvedSubjectId = 'sub_bangla_lit';
+  } else if (!resolvedSubjectId) {
+    resolvedSubjectId = `sub_${slugifyName(resolvedSubjectName) || 'general'}`;
+  }
+
+  if (!resolvedTopicName) {
+    const mainForSub = allTopics.find(
+      (t) =>
+        (!(t as any).parent_id || (t as any).parent_id === null) &&
+        String(t.subject_id).toLowerCase() === resolvedSubjectId.toLowerCase()
+    );
+    if (mainForSub) {
+      resolvedTopicName = mainForSub.title;
+      resolvedTopicId = mainForSub.id;
+    } else {
+      resolvedTopicName = 'সাধারণ বিষয়াবলি';
+      resolvedTopicId = `top_${slugifyName(resolvedSubjectName)}_01`;
+    }
+  } else if (!resolvedTopicId) {
+    resolvedTopicId = `top_${slugifyName(resolvedTopicName) || 'general'}`;
+  }
+
+  if (!resolvedSubTopicName) {
+    const subForMain = allSubTopics.find(
+      (st) =>
+        (((st as any).topic_id && String((st as any).topic_id).toLowerCase() === resolvedTopicId.toLowerCase()) ||
+          ((st as any).parent_id && String((st as any).parent_id).toLowerCase() === resolvedTopicId.toLowerCase()))
+    );
+    if (subForMain) {
+      resolvedSubTopicName = subForMain.title || (subForMain as any).name || '';
+      resolvedSubTopicId = subForMain.id;
+    } else {
+      resolvedSubTopicName = resolvedTopicName;
+      resolvedSubTopicId = `subtop_${slugifyName(resolvedTopicName) || 'general'}_01`;
+    }
+  } else if (!resolvedSubTopicId) {
+    resolvedSubTopicId = `subtop_${slugifyName(resolvedSubTopicName) || 'general'}`;
+  }
+
+  return {
+    subject: resolvedSubjectName,
+    subject_id: resolvedSubjectId,
+    topic: resolvedTopicName,
+    topic_id: resolvedTopicId,
+    sub_topic: resolvedSubTopicName,
+    sub_topic_id: resolvedSubTopicId,
+  };
+};
+
 /**
  * Smart Batch Prefix Formula Constructor:
  * `Q-[SELECTED_SUBTOPIC_CODE OR TOPIC_CODE OR SUBJECT_CODE]-`

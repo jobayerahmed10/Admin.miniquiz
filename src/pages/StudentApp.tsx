@@ -144,9 +144,23 @@ export const StudentApp: React.FC = () => {
         questions = res.questions;
       } else {
         const allQ = await fetchAllQuestions();
-        const matched = allQ.questions.filter(
-          (q) => String(q.exam_id) === String(exam.id) || q.subject === exam.subject
-        );
+        const examSubTopic = (exam.sub_topic || (exam as any).subtopic || '').trim().toLowerCase();
+        const examSubTopicId = (exam as any).sub_topic_id ? String((exam as any).sub_topic_id).trim().toLowerCase() : '';
+        const examTopic = (exam.topic || '').trim().toLowerCase();
+        const examTitle = (exam.title || '').trim().toLowerCase();
+
+        const matched = allQ.questions.filter((q) => {
+          if (String(q.exam_id) === String(exam.id)) return true;
+          const qSubTopicId = q.sub_topic_id ? String(q.sub_topic_id).trim().toLowerCase() : '';
+          const qSubTopic = (q.sub_topic || q.subtopic || '').trim().toLowerCase();
+          const qTopic = (q.topic || '').trim().toLowerCase();
+
+          if (examSubTopicId && (qSubTopicId === examSubTopicId || qSubTopic === examSubTopicId)) return true;
+          if (examSubTopic && (qSubTopic === examSubTopic || qSubTopicId === examSubTopic || qTopic === examSubTopic)) return true;
+          if (examTopic && (qTopic === examTopic || qSubTopic === examTopic)) return true;
+          if (examTitle && (qTopic === examTitle || qSubTopic === examTitle || (examTitle.length > 3 && qTopic.includes(examTitle)))) return true;
+          return q.subject === exam.subject;
+        });
         questions = matched.length > 0 ? matched : allQ.questions.slice(0, 10);
       }
     }

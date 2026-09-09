@@ -287,13 +287,21 @@ export const QuestionBankSelector: React.FC<QuestionBankSelectorProps> = ({
         return false;
       }
 
-      // Topic Filter
+      // Topic & Sub-Topic Filter
       if (topicFilter && !isAllTopics(topicFilter)) {
         const qTop = (q.topic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const qSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const qTopId = String(q.topic_id || '').trim().toLowerCase();
+        const qSubTopId = String(q.sub_topic_id || '').trim().toLowerCase();
         const fTop = topicFilter.replace(/\s+/g, ' ').trim().toLowerCase();
+
         const matchesTopic =
           qTop === fTop ||
-          (qTop.length > 3 && fTop.length > 3 && (qTop.includes(fTop) || fTop.includes(qTop)));
+          qSubTop === fTop ||
+          (qTopId && qTopId === fTop) ||
+          (qSubTopId && qSubTopId === fTop) ||
+          (qTop.length > 3 && fTop.length > 3 && (qTop.includes(fTop) || fTop.includes(qTop))) ||
+          (qSubTop.length > 3 && fTop.length > 3 && (qSubTop.includes(fTop) || fTop.includes(qSubTop)));
         if (!matchesTopic) return false;
       }
 

@@ -393,7 +393,11 @@ export const AddAiQuestionsModal: React.FC<AddAiQuestionsModalProps> = ({
       explanation: q.explanation || '',
       status: 'published',
       subject: subject || q.subject || 'বাংলা',
+      subject_id: (q as any).subject_id,
       topic: q.topic || topic || '',
+      topic_id: (q as any).topic_id,
+      sub_topic: (q as any).sub_topic || (q as any).subtopic || '',
+      sub_topic_id: (q as any).sub_topic_id,
       post: q.post || formatPosts(selectedPosts) || '',
       slug: generateQuestionSlug(q.question),
     }));

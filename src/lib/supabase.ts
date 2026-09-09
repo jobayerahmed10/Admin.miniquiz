@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { saveSubjectPrefixMapping } from './subjectPrefixManager';
 import { sanitizeSubjectName } from './subjectManager';
 import { sanitizeExplanation } from './sanitizeExplanation';
+import { resolveSubjectTopicSubTopicMetadata } from './subjectTopicManager';
 import {
   Question,
   TrashQuestion,
@@ -794,10 +795,22 @@ export const insertQuestion = async (
     finalId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   }
 
+  const resolved = resolveSubjectTopicSubTopicMetadata({
+    subject: newQuestion.subject,
+    subject_id: newQuestion.subject_id,
+    topic: newQuestion.topic,
+    topic_id: newQuestion.topic_id,
+    sub_topic: newQuestion.sub_topic || newQuestion.subtopic,
+    sub_topic_id: newQuestion.sub_topic_id,
+  });
+
   const generatedSlug = newQuestion.slug || generateQuestionSlug(newQuestion.question);
-  const cleanSubject = sanitizeSubjectName(newQuestion.subject);
-  const cleanTopic = (newQuestion.topic || '').replace(/\s+/g, ' ').trim();
-  const cleanSubTopic = (newQuestion.sub_topic || newQuestion.subtopic || '').replace(/\s+/g, ' ').trim();
+  const cleanSubject = resolved.subject;
+  const cleanTopic = resolved.topic;
+  const cleanSubTopic = resolved.sub_topic;
+  const cleanSubTopicId = resolved.sub_topic_id;
+  const cleanSubjectId = resolved.subject_id;
+  const cleanTopicId = resolved.topic_id;
   const cleanPost = (newQuestion.post || '').replace(/\s+/g, ' ').trim();
   const cleanCode = (newQuestion as any).code || (newQuestion as any).question_code || String(finalId);
 
@@ -815,9 +828,12 @@ export const insertQuestion = async (
     slug: generatedSlug,
     status: newQuestion.status || 'published',
     subject: cleanSubject,
+    subject_id: cleanSubjectId,
     topic: cleanTopic,
-    sub_topic: cleanSubTopic || undefined,
-    subtopic: cleanSubTopic || undefined,
+    topic_id: cleanTopicId,
+    sub_topic: cleanSubTopic,
+    subtopic: cleanSubTopic,
+    sub_topic_id: cleanSubTopicId,
     post: cleanPost,
     exam_id: newQuestion.exam_id || null,
     created_at: new Date().toISOString(),
@@ -839,7 +855,6 @@ export const insertQuestion = async (
   }
 
   try {
-    const cleanSubTopic = (newQuestion.sub_topic || newQuestion.subtopic || '').trim();
     const payload: any = {
       id: String(finalId),
       question: newQuestion.question,
@@ -852,8 +867,11 @@ export const insertQuestion = async (
       slug: generatedSlug,
       status: newQuestion.status || 'published',
       subject: cleanSubject,
+      subject_id: cleanSubjectId,
       topic: cleanTopic,
-      ...(cleanSubTopic ? { sub_topic: cleanSubTopic } : {}),
+      topic_id: cleanTopicId,
+      sub_topic: cleanSubTopic,
+      sub_topic_id: cleanSubTopicId,
       post: cleanPost,
       ...(newQuestion.exam_id !== undefined && newQuestion.exam_id !== null ? { exam_id: String(newQuestion.exam_id) } : {}),
     };
@@ -880,6 +898,15 @@ export const insertQuestion = async (
       if (isExamIdError) {
         delete sanitizedPayload.exam_id;
       }
+      if (errStr.includes('sub_topic_id')) {
+        delete sanitizedPayload.sub_topic_id;
+      }
+      if (errStr.includes('topic_id')) {
+        delete sanitizedPayload.topic_id;
+      }
+      if (errStr.includes('subject_id')) {
+        delete sanitizedPayload.subject_id;
+      }
 
       let retryResult = await client
         .from('questions')
@@ -889,6 +916,10 @@ export const insertQuestion = async (
 
       if (retryResult.error) {
         const retryErrStr = ((retryResult.error.message || '') + ' ' + (retryResult.error.details || '')).toLowerCase();
+        if (retryErrStr.includes('sub_topic_id')) delete sanitizedPayload.sub_topic_id;
+        if (retryErrStr.includes('topic_id')) delete sanitizedPayload.topic_id;
+        if (retryErrStr.includes('subject_id')) delete sanitizedPayload.subject_id;
+        if (retryErrStr.includes('sub_topic')) delete sanitizedPayload.sub_topic;
         if (retryErrStr.includes('topic')) delete sanitizedPayload.topic;
         if (retryErrStr.includes('post')) delete sanitizedPayload.post;
         if (retryErrStr.includes('slug')) delete sanitizedPayload.slug;
@@ -922,9 +953,12 @@ export const insertQuestion = async (
       slug: data?.slug || localItem.slug,
       exam_id: data?.exam_id || newQuestion.exam_id,
       topic: data?.topic || newQuestion.topic,
+      topic_id: data?.topic_id || newQuestion.topic_id,
       sub_topic: data?.sub_topic || newQuestion.sub_topic || (newQuestion as any).subtopic,
+      sub_topic_id: data?.sub_topic_id || newQuestion.sub_topic_id,
       post: data?.post || newQuestion.post,
       subject: data?.subject || newQuestion.subject,
+      subject_id: data?.subject_id || newQuestion.subject_id,
     });
 
     // Update local cache
@@ -996,10 +1030,22 @@ export const insertBatchQuestions = async (
       finalId = `q_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
     }
 
+    const resolved = resolveSubjectTopicSubTopicMetadata({
+      subject: q.subject,
+      subject_id: (q as any).subject_id,
+      topic: q.topic,
+      topic_id: (q as any).topic_id,
+      sub_topic: q.sub_topic || (q as any).subtopic,
+      sub_topic_id: (q as any).sub_topic_id,
+    });
+
     const generatedSlug = q.slug || generateQuestionSlug(q.question);
-    const cleanSub = sanitizeSubjectName(q.subject);
-    const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
-    const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+    const cleanSub = resolved.subject;
+    const cleanSubId = resolved.subject_id;
+    const cleanTop = resolved.topic;
+    const cleanTopId = resolved.topic_id;
+    const cleanSubTop = resolved.sub_topic;
+    const cleanSubTopId = resolved.sub_topic_id;
     const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
     const cleanCode = (q as any).code || (q as any).question_code || String(finalId);
 
@@ -1017,9 +1063,12 @@ export const insertBatchQuestions = async (
       slug: generatedSlug,
       status: q.status || 'published',
       subject: cleanSub,
+      subject_id: cleanSubId,
       topic: cleanTop,
-      sub_topic: cleanSubTop || undefined,
-      subtopic: cleanSubTop || undefined,
+      topic_id: cleanTopId,
+      sub_topic: cleanSubTop,
+      subtopic: cleanSubTop,
+      sub_topic_id: cleanSubTopId,
       post: cleanPost,
       exam_id: q.exam_id || null,
       created_at: new Date().toISOString(),
@@ -1059,13 +1108,14 @@ export const insertBatchQuestions = async (
         correct_answer: q.correct_answer || (q as any).correctAnswer || 'option_a',
         explanation: sanitizeExplanation(q.explanation, q) || '',
         status: q.status || 'published',
-        subject: sanitizeSubjectName(q.subject),
-        topic: (q.topic || '').replace(/\s+/g, ' ').trim(),
+        subject: q.subject,
+        subject_id: q.subject_id,
+        topic: q.topic,
+        topic_id: q.topic_id,
+        sub_topic: q.sub_topic,
+        sub_topic_id: q.sub_topic_id,
         post: (q.post || '').replace(/\s+/g, ' ').trim(),
       };
-      if (q.sub_topic || q.subtopic) {
-        item.sub_topic = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
-      }
       if (q.slug) {
         item.slug = q.slug;
       }
@@ -1088,11 +1138,14 @@ export const insertBatchQuestions = async (
       const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
       const isSlugError = errStr.includes('slug');
 
-      // Fallback 1: Keep topic and post, remove slug or exam_id if problematic
+      // Fallback 1: Keep topic and post, remove slug, exam_id, or non-existent sub_topic_id/topic_id/subject_id if problematic
       const fallbackPayload = payload.map((p: any) => {
         const copy = { ...p };
         if (isExamIdError) delete copy.exam_id;
         if (isSlugError) delete copy.slug;
+        if (errStr.includes('sub_topic_id')) delete copy.sub_topic_id;
+        if (errStr.includes('topic_id')) delete copy.topic_id;
+        if (errStr.includes('subject_id')) delete copy.subject_id;
         return copy;
       });
 
@@ -1123,6 +1176,7 @@ export const insertBatchQuestions = async (
           };
           if (!retryErrStr.includes('topic')) minItem.topic = p.topic || '';
           if (!retryErrStr.includes('post')) minItem.post = p.post || '';
+          if (!retryErrStr.includes('sub_topic')) minItem.sub_topic = p.sub_topic;
           return minItem;
         });
 
@@ -1152,9 +1206,12 @@ export const insertBatchQuestions = async (
             ...row,
             exam_id: row.exam_id || questionsToInsert[idx]?.exam_id,
             topic: row.topic || questionsToInsert[idx]?.topic,
+            topic_id: row.topic_id || questionsToInsert[idx]?.topic_id,
             sub_topic: row.sub_topic || questionsToInsert[idx]?.sub_topic || (questionsToInsert[idx] as any)?.subtopic,
+            sub_topic_id: row.sub_topic_id || questionsToInsert[idx]?.sub_topic_id,
             post: row.post || questionsToInsert[idx]?.post,
             subject: row.subject || questionsToInsert[idx]?.subject,
+            subject_id: row.subject_id || questionsToInsert[idx]?.subject_id,
           })
         )
       : localItems;
@@ -1234,15 +1291,51 @@ export const updateQuestion = async (
 
   // Update in local cache first
   const current = getLocalCachedQuestions();
+  const existingQ = current.find((q) => String(q.id) === String(id));
   let updatedLocal: Question | null = null;
-  const sanitizedUpdatedSubject = updatedFields.subject !== undefined ? sanitizeSubjectName(updatedFields.subject) : undefined;
+
+  const needsResolution =
+    updatedFields.subject !== undefined ||
+    updatedFields.subject_id !== undefined ||
+    updatedFields.topic !== undefined ||
+    updatedFields.topic_id !== undefined ||
+    updatedFields.sub_topic !== undefined ||
+    updatedFields.subtopic !== undefined ||
+    updatedFields.sub_topic_id !== undefined;
+
+  let resolvedMeta: ReturnType<typeof resolveSubjectTopicSubTopicMetadata> | null = null;
+  if (needsResolution) {
+    resolvedMeta = resolveSubjectTopicSubTopicMetadata({
+      subject: updatedFields.subject !== undefined ? updatedFields.subject : existingQ?.subject,
+      subject_id: updatedFields.subject_id !== undefined ? updatedFields.subject_id : existingQ?.subject_id,
+      topic: updatedFields.topic !== undefined ? updatedFields.topic : existingQ?.topic,
+      topic_id: updatedFields.topic_id !== undefined ? updatedFields.topic_id : existingQ?.topic_id,
+      sub_topic:
+        updatedFields.sub_topic !== undefined
+          ? updatedFields.sub_topic
+          : updatedFields.subtopic !== undefined
+          ? updatedFields.subtopic
+          : existingQ?.sub_topic || existingQ?.subtopic,
+      sub_topic_id: updatedFields.sub_topic_id !== undefined ? updatedFields.sub_topic_id : existingQ?.sub_topic_id,
+    });
+  }
 
   const updatedCache = current.map((q) => {
     if (String(q.id) === String(id)) {
       updatedLocal = {
         ...q,
         ...updatedFields,
-        ...(sanitizedUpdatedSubject !== undefined ? { subject: sanitizedUpdatedSubject } : {}),
+        ...(resolvedMeta
+          ? {
+              subject: resolvedMeta.subject,
+              subject_id: resolvedMeta.subject_id,
+              topic: resolvedMeta.topic,
+              topic_id: resolvedMeta.topic_id,
+              sub_topic: resolvedMeta.sub_topic,
+              subtopic: resolvedMeta.sub_topic,
+              sub_topic_id: resolvedMeta.sub_topic_id,
+            }
+          : {}),
         updated_at: new Date().toISOString(),
       };
       return updatedLocal;
@@ -1276,10 +1369,22 @@ export const updateQuestion = async (
     if (updatedFields.status !== undefined) payload.status = updatedFields.status;
     if ((updatedFields as any).questions !== undefined) payload.questions = (updatedFields as any).questions;
     if ((updatedFields as any).question_ids !== undefined) payload.question_ids = (updatedFields as any).question_ids;
-    if (sanitizedUpdatedSubject !== undefined) payload.subject = sanitizedUpdatedSubject;
-    if (updatedFields.topic !== undefined) payload.topic = (updatedFields.topic || '').replace(/\s+/g, ' ').trim();
-    if (updatedFields.sub_topic !== undefined || updatedFields.subtopic !== undefined) {
-      payload.sub_topic = (updatedFields.sub_topic || updatedFields.subtopic || '').replace(/\s+/g, ' ').trim();
+    if (resolvedMeta) {
+      payload.subject = resolvedMeta.subject;
+      payload.subject_id = resolvedMeta.subject_id;
+      payload.topic = resolvedMeta.topic;
+      payload.topic_id = resolvedMeta.topic_id;
+      payload.sub_topic = resolvedMeta.sub_topic;
+      payload.sub_topic_id = resolvedMeta.sub_topic_id;
+    } else {
+      if (updatedFields.subject !== undefined) payload.subject = sanitizeSubjectName(updatedFields.subject);
+      if (updatedFields.subject_id !== undefined) payload.subject_id = updatedFields.subject_id ? String(updatedFields.subject_id).trim() : null;
+      if (updatedFields.topic !== undefined) payload.topic = (updatedFields.topic || '').replace(/\s+/g, ' ').trim();
+      if (updatedFields.topic_id !== undefined) payload.topic_id = updatedFields.topic_id ? String(updatedFields.topic_id).trim() : null;
+      if (updatedFields.sub_topic !== undefined || updatedFields.subtopic !== undefined) {
+        payload.sub_topic = (updatedFields.sub_topic || updatedFields.subtopic || '').replace(/\s+/g, ' ').trim();
+      }
+      if (updatedFields.sub_topic_id !== undefined) payload.sub_topic_id = updatedFields.sub_topic_id ? String(updatedFields.sub_topic_id).trim() : null;
     }
     if (updatedFields.post !== undefined) payload.post = (updatedFields.post || '').replace(/\s+/g, ' ').trim();
     if (updatedFields.exam_id !== undefined) payload.exam_id = String(updatedFields.exam_id);
@@ -1299,8 +1404,12 @@ export const updateQuestion = async (
       const isExamIdError = errStr.includes('exam_id') || errStr.includes('schema cache') || error.code === 'PGRST204' || error.code === '42703';
 
       const sanitized = { ...payload };
+      if (errStr.includes('sub_topic_id')) delete sanitized.sub_topic_id;
+      if (errStr.includes('topic_id')) delete sanitized.topic_id;
+      if (errStr.includes('subject_id')) delete sanitized.subject_id;
       delete sanitized.topic;
       delete sanitized.post;
+      delete sanitized.sub_topic;
       if (isExamIdError) {
         delete sanitized.exam_id;
       }
@@ -4254,12 +4363,79 @@ export const fetchCourseExams = async (courseId: string): Promise<{ exams: Cours
   }
 };
 
+// Fetch questions matching subtopic by either sub_topic_id or sub_topic name
+export const fetchQuestionsBySubTopic = async (
+  subTopicIdentifier: { id?: string | number; name?: string; topic?: string; subject?: string } | string
+): Promise<{ questions: Question[]; error: string | null }> => {
+  const localQuestions = getLocalCachedQuestions();
+  let subTopicId: string | undefined;
+  let subTopicName: string | undefined;
+
+  if (typeof subTopicIdentifier === 'string') {
+    subTopicName = subTopicIdentifier.trim();
+    subTopicId = subTopicIdentifier.trim();
+  } else if (subTopicIdentifier) {
+    subTopicId = subTopicIdentifier.id ? String(subTopicIdentifier.id).trim() : undefined;
+    subTopicName = subTopicIdentifier.name ? subTopicIdentifier.name.trim() : undefined;
+  }
+
+  const matchesQuestion = (q: Question): boolean => {
+    const qSubId = q.sub_topic_id ? String(q.sub_topic_id).trim().toLowerCase() : '';
+    const qSub = (q.sub_topic || q.subtopic || '').trim().toLowerCase();
+    const qTopId = q.topic_id ? String(q.topic_id).trim().toLowerCase() : '';
+    const qTop = (q.topic || '').trim().toLowerCase();
+
+    if (subTopicId && (qSubId === subTopicId.toLowerCase() || qTopId === subTopicId.toLowerCase())) {
+      return true;
+    }
+    if (subTopicName) {
+      const targetLower = subTopicName.toLowerCase();
+      if (qSub === targetLower || qTop === targetLower) return true;
+      if (targetLower.length > 3 && (qSub.includes(targetLower) || targetLower.includes(qSub))) return true;
+    }
+    return false;
+  };
+
+  const localMatched = localQuestions.filter(matchesQuestion);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { questions: localMatched, error: null };
+  }
+
+  try {
+    let query = client.from('questions').select('*');
+    if (subTopicId && subTopicName && subTopicId !== subTopicName) {
+      query = query.or(`sub_topic_id.eq.${subTopicId},sub_topic.eq.${subTopicName},topic.eq.${subTopicName}`);
+    } else if (subTopicId) {
+      query = query.or(`sub_topic_id.eq.${subTopicId},sub_topic.eq.${subTopicId}`);
+    } else if (subTopicName) {
+      query = query.or(`sub_topic.eq.${subTopicName},topic.eq.${subTopicName}`);
+    }
+
+    const { data, error } = await query;
+    if (!error && data && data.length > 0) {
+      const normalized = data.map(normalizeQuestionRow);
+      const map = new Map<string | number, Question>();
+      localMatched.forEach((q) => map.set(String(q.id), q));
+      normalized.forEach((q) => map.set(String(q.id), q));
+      return { questions: Array.from(map.values()), error: null };
+    }
+
+    return { questions: localMatched, error: null };
+  } catch (err: any) {
+    return { questions: localMatched, error: err?.message || null };
+  }
+};
+
 // Fetch questions for a specific course exam with multi-tier fallback
 export const fetchQuestionsForCourseExam = async (
   examId: string,
   courseId?: string,
   subject?: string,
-  topic?: string
+  topic?: string,
+  sub_topic?: string,
+  sub_topic_id?: string
 ): Promise<{ questions: CourseExamQuestion[]; error: string | null }> => {
   if (!examId || examId === 'undefined' || examId === 'null') {
     return { questions: [], error: null };
@@ -4345,7 +4521,38 @@ export const fetchQuestionsForCourseExam = async (
       }
     }
 
-    // 4. Fallback by Subject if specified
+    // 4. Fallback by subtopic / topic (matching either sub_topic_id or sub_topic name)
+    if (sub_topic_id || sub_topic || topic) {
+      let subQuery = client.from('questions').select('*');
+      if (sub_topic_id && sub_topic) {
+        subQuery = subQuery.or(`sub_topic_id.eq.${sub_topic_id},sub_topic.eq.${sub_topic},topic.eq.${sub_topic}`);
+      } else if (sub_topic_id) {
+        subQuery = subQuery.or(`sub_topic_id.eq.${sub_topic_id},sub_topic.eq.${sub_topic_id}`);
+      } else if (sub_topic) {
+        subQuery = subQuery.or(`sub_topic.eq.${sub_topic},topic.eq.${sub_topic}`);
+      } else if (topic) {
+        subQuery = subQuery.eq('topic', topic);
+      }
+
+      const { data: subTopicQuestions } = await subQuery.limit(25);
+      if (subTopicQuestions && subTopicQuestions.length > 0) {
+        const qs: CourseExamQuestion[] = subTopicQuestions.map((qRow) => ({
+          id: String(qRow.id),
+          question: qRow.question || '',
+          option_a: qRow.option_a || 'ক. অপশন ১',
+          option_b: qRow.option_b || 'খ. অপশন ২',
+          option_c: qRow.option_c || 'গ. অপশন ৩',
+          option_d: qRow.option_d || 'ঘ. অপশন ৪',
+          correct_answer: (qRow.correct_answer || 'option_a') as any,
+          explanation: qRow.explanation || undefined,
+          subject: qRow.subject || subject || '',
+          topic: qRow.topic || topic || '',
+        }));
+        return { questions: qs, error: null };
+      }
+    }
+
+    // 5. Fallback by Subject if specified
     if (subject && subject !== 'সকল') {
       const { data: subjectQuestions } = await client
         .from('questions')
