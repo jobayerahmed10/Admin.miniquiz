@@ -546,9 +546,18 @@ export const generateSequentialExamId = (
 function normalizeQuestionRow(row: any): Question {
   const qText = row.question || row.question_text || row.title || '';
   const rawSub = row.subject || row.category || row.subject_name || 'বাংলা';
-  const cleanSubject = sanitizeSubjectName(rawSub);
-  const cleanTopic = (row.topic || row.topic_name || '').replace(/\s+/g, ' ').trim();
-  const cleanSubTopic = (row.sub_topic || row.subtopic || row.sub_topic_name || '').replace(/\s+/g, ' ').trim();
+  const rawTopic = row.topic || row.topic_name || '';
+  const rawSubTopic = row.sub_topic || row.subtopic || row.sub_topic_name || '';
+
+  const resolved = resolveSubjectTopicSubTopicMetadata({
+    subject: rawSub,
+    subject_id: row.subject_id,
+    topic: rawTopic,
+    topic_id: row.topic_id,
+    sub_topic: rawSubTopic,
+    sub_topic_id: row.sub_topic_id,
+  });
+
   const cleanPost = (row.post || row.post_name || row.designation || row.position || '').replace(/\s+/g, ' ').trim();
   const qId = row.id || row.question_code || `q_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const qCode = row.question_code || (typeof qId === 'string' ? qId : undefined);
@@ -567,13 +576,13 @@ function normalizeQuestionRow(row: any): Question {
     explanation: sanitizeExplanation(row.explanation || row.description, row) || '',
     slug: row.slug || generateQuestionSlug(qText),
     status: row.status === 'published' ? 'published' : 'draft',
-    subject: cleanSubject,
-    topic: cleanTopic,
-    sub_topic: cleanSubTopic || undefined,
-    subtopic: cleanSubTopic || undefined,
-    subject_id: row.subject_id ? String(row.subject_id) : undefined,
-    topic_id: row.topic_id ? String(row.topic_id) : undefined,
-    sub_topic_id: row.sub_topic_id ? String(row.sub_topic_id) : undefined,
+    subject: resolved.subject,
+    subject_id: resolved.subject_id,
+    topic: resolved.topic,
+    topic_id: resolved.topic_id,
+    sub_topic: resolved.sub_topic || undefined,
+    subtopic: resolved.sub_topic || undefined,
+    sub_topic_id: resolved.sub_topic_id,
     post: cleanPost,
     exam_id: row.exam_id || null,
     created_at: row.created_at || new Date().toISOString(),
@@ -690,7 +699,7 @@ export const fetchAllQuestions = async (options?: { limit?: number; offset?: num
 
     const { data, error } = await client
       .from('questions')
-      .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, sub_topic, post, exam_id, created_at, slug, code, question_code')
+      .select('*')
       .order('created_at', { ascending: false })
       .range(fetchOffset, fetchOffset + fetchLimit - 1);
 
@@ -731,6 +740,18 @@ export const fetchAllQuestions = async (options?: { limit?: number; offset?: num
       saveQuestionsBackup(cleanList);
     }
 
+    // Background auto-repair check: if any rows loaded from Supabase had missing subject_id or topic_id or sub_topic_id, repair them in Supabase
+    if (data && data.length > 0) {
+      const needsSync = data.some((r: any) => !r.subject_id || !r.topic_id || !r.sub_topic || !r.sub_topic_id);
+      if (needsSync) {
+        setTimeout(() => {
+          repairAndSyncAllQuestionMetadataToSupabase().catch((err) =>
+            console.warn('Background auto-repair questions error:', err)
+          );
+        }, 1500);
+      }
+    }
+
     return { questions: cleanList, error: null, isSynced: true };
   } catch (err: any) {
     return {
@@ -758,7 +779,7 @@ export const fetchQuestionById = async (id: string | number): Promise<{ question
   try {
     const { data, error } = await client
       .from('questions')
-      .select('id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, status, subject, topic, sub_topic, post, exam_id, created_at, slug, code, question_code')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -7042,9 +7063,15 @@ export const syncAllQuestionsToSupabase = async (
       }
 
       const payload = chunk.map((q) => {
-        const cleanSub = sanitizeSubjectName(q.subject);
-        const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
-        const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+        const resolved = resolveSubjectTopicSubTopicMetadata({
+          subject: q.subject,
+          subject_id: q.subject_id,
+          topic: q.topic,
+          topic_id: q.topic_id,
+          sub_topic: q.sub_topic || q.subtopic,
+          sub_topic_id: q.sub_topic_id,
+        });
+
         const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
 
         return {
@@ -7056,13 +7083,18 @@ export const syncAllQuestionsToSupabase = async (
           option_d: q.option_d || '',
           correct_answer: q.correct_answer || 'option_a',
           explanation: sanitizeExplanation(q.explanation, q) || '',
-          subject: cleanSub,
-          topic: cleanTop,
-          sub_topic: cleanSubTop,
+          subject: resolved.subject,
+          subject_id: resolved.subject_id || null,
+          topic: resolved.topic || null,
+          topic_id: resolved.topic_id || null,
+          sub_topic: resolved.sub_topic || null,
+          sub_topic_id: resolved.sub_topic_id || null,
           post: cleanPost,
           code: q.code || q.question_code || '',
           status: q.status || 'published',
           updated_at: new Date().toISOString(),
+          ...(q.slug ? { slug: q.slug } : {}),
+          ...(q.exam_id ? { exam_id: String(q.exam_id) } : {}),
         };
       });
 
@@ -7072,19 +7104,17 @@ export const syncAllQuestionsToSupabase = async (
 
       if (error) {
         console.warn('Sync chunk error, trying fallback:', error);
-        // Fallback: strip optional sub_topic, post if error
-        const fallbackPayload = payload.map((p) => ({
-          id: p.id,
-          question: p.question,
-          option_a: p.option_a,
-          option_b: p.option_b,
-          option_c: p.option_c,
-          option_d: p.option_d,
-          correct_answer: p.correct_answer,
-          explanation: p.explanation,
-          subject: p.subject,
-          status: p.status,
-        }));
+        const errStr = (error.message || '').toLowerCase();
+        // Fallback: strip optional columns if error
+        const fallbackPayload = payload.map((p: any) => {
+          const copy = { ...p };
+          if (errStr.includes('exam_id')) delete copy.exam_id;
+          if (errStr.includes('slug')) delete copy.slug;
+          if (errStr.includes('sub_topic_id')) delete copy.sub_topic_id;
+          if (errStr.includes('topic_id')) delete copy.topic_id;
+          if (errStr.includes('subject_id')) delete copy.subject_id;
+          return copy;
+        });
         const retryRes = await client.from('questions').upsert(fallbackPayload, { onConflict: 'id' });
         if (retryRes.error) {
           console.error('Batch sync retry failed:', retryRes.error);
@@ -7112,6 +7142,136 @@ export const syncAllQuestionsToSupabase = async (
 };
 
 /**
+ * Resolves & Backfills Subject, Topic, Sub-Topic Names and IDs for ALL questions in Supabase & Local Cache
+ */
+export const repairAndSyncAllQuestionMetadataToSupabase = async (
+  onProgress?: (progressText: string) => void
+): Promise<{ success: boolean; totalCount: number; updatedCount: number; error: string | null }> => {
+  const currentQuestions = getLocalCachedQuestions();
+  const client = getSupabaseClient();
+
+  let allQuestions = [...currentQuestions];
+
+  // If Supabase client exists, fetch latest list first to make sure we have everything
+  if (client) {
+    try {
+      const { data } = await client.from('questions').select('*');
+      if (data && data.length > 0) {
+        const norm = data.map(normalizeQuestionRow);
+        const map = new Map<string, Question>();
+        allQuestions.forEach((q) => map.set(String(q.id), q));
+        norm.forEach((q) => map.set(String(q.id), q));
+        allQuestions = Array.from(map.values());
+      }
+    } catch (e) {
+      console.warn('Could not pre-fetch questions for repair:', e);
+    }
+  }
+
+  if (allQuestions.length === 0) {
+    return { success: true, totalCount: 0, updatedCount: 0, error: 'কোনো প্রশ্ন পাওয়া যায়নি।' };
+  }
+
+  let updatedCount = 0;
+  const repairedQuestions: Question[] = [];
+
+  for (const q of allQuestions) {
+    const resolved = resolveSubjectTopicSubTopicMetadata({
+      subject: q.subject,
+      subject_id: q.subject_id,
+      topic: q.topic,
+      topic_id: q.topic_id,
+      sub_topic: q.sub_topic || q.subtopic,
+      sub_topic_id: q.sub_topic_id,
+    });
+
+    const hasChanged =
+      q.subject !== resolved.subject ||
+      q.subject_id !== resolved.subject_id ||
+      q.topic !== resolved.topic ||
+      q.topic_id !== resolved.topic_id ||
+      q.sub_topic !== resolved.sub_topic ||
+      q.sub_topic_id !== resolved.sub_topic_id;
+
+    if (hasChanged) {
+      updatedCount++;
+    }
+
+    repairedQuestions.push({
+      ...q,
+      subject: resolved.subject,
+      subject_id: resolved.subject_id,
+      topic: resolved.topic,
+      topic_id: resolved.topic_id,
+      sub_topic: resolved.sub_topic,
+      subtopic: resolved.sub_topic,
+      sub_topic_id: resolved.sub_topic_id,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  // Update local cache & safety backup
+  setLocalCachedQuestions(repairedQuestions);
+  saveQuestionsBackup(repairedQuestions);
+
+  // Sync back to Supabase
+  if (client) {
+    const batchSize = 40;
+    for (let i = 0; i < repairedQuestions.length; i += batchSize) {
+      const chunk = repairedQuestions.slice(i, i + batchSize);
+      if (onProgress) {
+        onProgress(`মোট ${repairedQuestions.length}টি প্রশ্নের মধ্যে ${Math.min(i + batchSize, repairedQuestions.length)}টি মেরামত ও সিঙ্ক হচ্ছে...`);
+      }
+
+      const payload = chunk.map((q) => ({
+        id: String(q.id),
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        explanation: sanitizeExplanation(q.explanation, q) || '',
+        status: q.status || 'published',
+        subject: q.subject,
+        subject_id: q.subject_id || null,
+        topic: q.topic || null,
+        topic_id: q.topic_id || null,
+        sub_topic: q.sub_topic || q.subtopic || null,
+        sub_topic_id: q.sub_topic_id || null,
+        post: (q.post || '').replace(/\s+/g, ' ').trim(),
+        code: q.code || q.question_code || '',
+        updated_at: new Date().toISOString(),
+        ...(q.slug ? { slug: q.slug } : {}),
+        ...(q.exam_id ? { exam_id: String(q.exam_id) } : {}),
+      }));
+
+      try {
+        let { error } = await client.from('questions').upsert(payload, { onConflict: 'id' });
+        if (error) {
+          console.warn('Repair sync chunk error, retrying without optional columns:', error);
+          const errStr = (error.message || '').toLowerCase();
+          const fallbackPayload = payload.map((p: any) => {
+            const copy = { ...p };
+            if (errStr.includes('exam_id')) delete copy.exam_id;
+            if (errStr.includes('slug')) delete copy.slug;
+            if (errStr.includes('sub_topic_id')) delete copy.sub_topic_id;
+            if (errStr.includes('topic_id')) delete copy.topic_id;
+            if (errStr.includes('subject_id')) delete copy.subject_id;
+            return copy;
+          });
+          await client.from('questions').upsert(fallbackPayload, { onConflict: 'id' });
+        }
+      } catch (err) {
+        console.warn('Repair chunk exception:', err);
+      }
+    }
+  }
+
+  return { success: true, totalCount: repairedQuestions.length, updatedCount, error: null };
+};
+
+/**
  * Generate Raw SQL Script for public.questions Table
  */
 export const generateQuestionsSqlScript = (questionsToExport?: Question[]): string => {
@@ -7124,7 +7284,7 @@ export const generateQuestionsSqlScript = (questionsToExport?: Question[]): stri
     return "'" + String(str).replace(/'/g, "''") + "'";
   };
 
-  let sql = `-- ========================================================\n-- Supabase public.questions Table Schema & Data Seed\n-- ========================================================\n\nCREATE TABLE IF NOT EXISTS public.questions (\n  id TEXT PRIMARY KEY,\n  question TEXT NOT NULL,\n  option_a TEXT,\n  option_b TEXT,\n  option_c TEXT,\n  option_d TEXT,\n  correct_answer TEXT DEFAULT 'option_a',\n  explanation TEXT,\n  subject TEXT,\n  topic TEXT,\n  sub_topic TEXT,\n  post TEXT,\n  code TEXT,\n  slug TEXT,\n  status TEXT DEFAULT 'published',\n  exam_id TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\n-- Enable RLS & Public Policies\nALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;\n\nDROP POLICY IF EXISTS "Public Read Questions" ON public.questions;\nCREATE POLICY "Public Read Questions" ON public.questions FOR SELECT USING (true);\n\nDROP POLICY IF EXISTS "Public Insert Questions" ON public.questions;\nCREATE POLICY "Public Insert Questions" ON public.questions FOR INSERT WITH CHECK (true);\n\nDROP POLICY IF EXISTS "Public Update Questions" ON public.questions;\nCREATE POLICY "Public Update Questions" ON public.questions FOR UPDATE USING (true);\n\nDROP POLICY IF EXISTS "Public Delete Questions" ON public.questions;\nCREATE POLICY "Public Delete Questions" ON public.questions FOR DELETE USING (true);\n\n`;
+  let sql = `-- ========================================================\n-- Supabase public.questions Table Schema & Data Seed\n-- ========================================================\n\nCREATE TABLE IF NOT EXISTS public.questions (\n  id TEXT PRIMARY KEY,\n  question TEXT NOT NULL,\n  option_a TEXT,\n  option_b TEXT,\n  option_c TEXT,\n  option_d TEXT,\n  correct_answer TEXT DEFAULT 'option_a',\n  explanation TEXT,\n  subject TEXT,\n  subject_id TEXT,\n  topic TEXT,\n  topic_id TEXT,\n  sub_topic TEXT,\n  sub_topic_id TEXT,\n  post TEXT,\n  code TEXT,\n  slug TEXT,\n  status TEXT DEFAULT 'published',\n  exam_id TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\n-- Enable RLS & Public Policies\nALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;\n\nDROP POLICY IF EXISTS "Public Read Questions" ON public.questions;\nCREATE POLICY "Public Read Questions" ON public.questions FOR SELECT USING (true);\n\nDROP POLICY IF EXISTS "Public Insert Questions" ON public.questions;\nCREATE POLICY "Public Insert Questions" ON public.questions FOR INSERT WITH CHECK (true);\n\nDROP POLICY IF EXISTS "Public Update Questions" ON public.questions;\nCREATE POLICY "Public Update Questions" ON public.questions FOR UPDATE USING (true);\n\nDROP POLICY IF EXISTS "Public Delete Questions" ON public.questions;\nCREATE POLICY "Public Delete Questions" ON public.questions FOR DELETE USING (true);\n\n`;
 
   if (questions.length === 0) {
     sql += `-- (No questions found to seed)\n`;
@@ -7132,15 +7292,20 @@ export const generateQuestionsSqlScript = (questionsToExport?: Question[]): stri
   }
 
   sql += `-- Insert / Upsert All ${questions.length} Questions\n`;
-  sql += `INSERT INTO public.questions (id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, topic, sub_topic, post, code, status)\nVALUES\n`;
+  sql += `INSERT INTO public.questions (id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, subject, subject_id, topic, topic_id, sub_topic, sub_topic_id, post, code, status)\nVALUES\n`;
 
   const rows = questions.map((q) => {
-    const cleanSub = sanitizeSubjectName(q.subject);
-    const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
-    const cleanSubTop = (q.sub_topic || q.subtopic || '').replace(/\s+/g, ' ').trim();
+    const resolved = resolveSubjectTopicSubTopicMetadata({
+      subject: q.subject,
+      subject_id: q.subject_id,
+      topic: q.topic,
+      topic_id: q.topic_id,
+      sub_topic: q.sub_topic || q.subtopic,
+      sub_topic_id: q.sub_topic_id,
+    });
     const cleanPost = (q.post || '').replace(/\s+/g, ' ').trim();
 
-    return `(${escapeSql(q.id)}, ${escapeSql(q.question)}, ${escapeSql(q.option_a)}, ${escapeSql(q.option_b)}, ${escapeSql(q.option_c)}, ${escapeSql(q.option_d)}, ${escapeSql(q.correct_answer || 'option_a')}, ${escapeSql(q.explanation)}, ${escapeSql(cleanSub)}, ${escapeSql(cleanTop)}, ${escapeSql(cleanSubTop)}, ${escapeSql(cleanPost)}, ${escapeSql(q.code || q.question_code)}, ${escapeSql(q.status || 'published')})`;
+    return `(${escapeSql(q.id)}, ${escapeSql(q.question)}, ${escapeSql(q.option_a)}, ${escapeSql(q.option_b)}, ${escapeSql(q.option_c)}, ${escapeSql(q.option_d)}, ${escapeSql(q.correct_answer || 'option_a')}, ${escapeSql(q.explanation)}, ${escapeSql(resolved.subject)}, ${escapeSql(resolved.subject_id)}, ${escapeSql(resolved.topic)}, ${escapeSql(resolved.topic_id)}, ${escapeSql(resolved.sub_topic)}, ${escapeSql(resolved.sub_topic_id)}, ${escapeSql(cleanPost)}, ${escapeSql(q.code || q.question_code)}, ${escapeSql(q.status || 'published')})`;
   });
 
   sql += rows.join(',\n') + '\nON CONFLICT (id) DO UPDATE SET\n';
@@ -7152,8 +7317,11 @@ export const generateQuestionsSqlScript = (questionsToExport?: Question[]): stri
   sql += `  correct_answer = EXCLUDED.correct_answer,\n`;
   sql += `  explanation = EXCLUDED.explanation,\n`;
   sql += `  subject = EXCLUDED.subject,\n`;
+  sql += `  subject_id = EXCLUDED.subject_id,\n`;
   sql += `  topic = EXCLUDED.topic,\n`;
+  sql += `  topic_id = EXCLUDED.topic_id,\n`;
   sql += `  sub_topic = EXCLUDED.sub_topic,\n`;
+  sql += `  sub_topic_id = EXCLUDED.sub_topic_id,\n`;
   sql += `  post = EXCLUDED.post,\n`;
   sql += `  code = EXCLUDED.code,\n`;
   sql += `  status = EXCLUDED.status,\n`;

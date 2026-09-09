@@ -36,6 +36,7 @@ import { isArabicText, getQuestionBankDirectionality } from '../../lib/questionB
 import {
   transferQuestionsSubjectTopic,
   syncAllQuestionsToSupabase,
+  repairAndSyncAllQuestionMetadataToSupabase,
   generateQuestionsSqlScript,
   isSupabaseConfigured,
 } from '../../lib/supabase';
@@ -96,18 +97,18 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
   const handleSyncToSupabase = async () => {
     setIsSyncingToSupabase(true);
-    setSyncProgressMessage('সুপাবেসে প্রশ্ন সিঙ্ক করার প্রস্তুতি চলছে...');
+    setSyncProgressMessage('সুপাবেসে প্রশ্ন, সাবজেক্ট, টপিক ও আইডি সিঙ্ক ও মেরামত চলছে...');
     setSyncStatusAlert(null);
 
     try {
-      const res = await syncAllQuestionsToSupabase((msg) => {
+      const res = await repairAndSyncAllQuestionMetadataToSupabase((msg) => {
         setSyncProgressMessage(msg);
       });
 
       if (res.success) {
         setSyncStatusAlert({
           type: 'success',
-          message: `সফলভাবে ${res.syncedCount}টি প্রশ্ন সুপাবেস (public.questions) ডাটাবেসে সিঙ্ক করা হয়েছে!`,
+          message: `সফলভাবে মোট ${res.totalCount}টি প্রশ্নের সাবজেক্ট, টপিক, সাব-টপিক ও আইডি সুপাবেস (public.questions) ডাটাবেসে সিঙ্ক ও হালনাগাদ করা হয়েছে!`,
         });
         onRefresh();
       } else {
