@@ -556,6 +556,10 @@ function normalizeQuestionRow(row: any): Question {
     topic_id: row.topic_id,
     sub_topic: rawSubTopic,
     sub_topic_id: row.sub_topic_id,
+    id: row.id,
+    code: row.code || row.question_code,
+    question: qText,
+    explanation: row.explanation,
   });
 
   const cleanPost = (row.post || row.post_name || row.designation || row.position || '').replace(/\s+/g, ' ').trim();
@@ -7183,6 +7187,10 @@ export const repairAndSyncAllQuestionMetadataToSupabase = async (
       topic_id: q.topic_id,
       sub_topic: q.sub_topic || q.subtopic,
       sub_topic_id: q.sub_topic_id,
+      id: q.id,
+      code: q.code || q.question_code,
+      question: q.question,
+      explanation: q.explanation,
     });
 
     const hasChanged =

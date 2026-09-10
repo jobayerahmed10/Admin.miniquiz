@@ -24,6 +24,7 @@ import {
   Plus,
   ArrowRightLeft,
   Tag,
+  Bookmark,
   X,
   CheckSquare,
   Square,
@@ -52,7 +53,7 @@ interface Interface01DashboardProps {
   onSelectManual: () => void;
   onSelectCopyPaste: () => void;
   onSelectAiGenerate: () => void;
-  onEditQuestion: (question: Question) => void;
+  onEditQuestion: (q: Question) => void;
   onDeleteQuestion: (id: string | number) => void;
   onRefresh: () => void;
   onClearAll?: () => void;
@@ -73,9 +74,10 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   trashCount = 0,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'subject' | 'topic'>('subject');
+  const [viewMode, setViewMode] = useState<'subject' | 'topic' | 'subtopic'>('subject');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedTopic, setSelectedTopic] = useState<string>('all');
+  const [selectedSubTopic, setSelectedSubTopic] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<(string | number)[]>([]);
@@ -97,7 +99,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
   const handleSyncToSupabase = async () => {
     setIsSyncingToSupabase(true);
-    setSyncProgressMessage('সুপাবেসে প্রশ্ন, সাবজেক্ট, টপিক ও আইডি সিঙ্ক ও মেরামত চলছে...');
+    setSyncProgressMessage('সুপাবেসে প্রশ্ন, সাবজেক্ট, টপিক ও সাব-টপিক সিঙ্ক ও মেরামত চলছে...');
     setSyncStatusAlert(null);
 
     try {
@@ -108,7 +110,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       if (res.success) {
         setSyncStatusAlert({
           type: 'success',
-          message: `সফলভাবে মোট ${res.totalCount}টি প্রশ্নের সাবজেক্ট, টপিক, সাব-টপিক ও আইডি সুপাবেস (public.questions) ডাটাবেসে সিঙ্ক ও হালনাগাদ করা হয়েছে!`,
+          message: `সফলভাবে মোট ${res.totalCount}টি প্রশ্নের সাবজেক্ট, টপিক, সাব-টপিক (Preposition সহ) ও আইডি সুপাবেস (public.questions) ডাটাবেসে সিঙ্ক ও হালনাগাদ করা হয়েছে!`,
         });
         onRefresh();
       } else {
@@ -151,15 +153,36 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
     };
   }, [questions]);
 
-  // Unique topics list
+  // Unique topics list filtered by currently selected subject
   const allUniqueTopics = useMemo(() => {
-    const set = new Set<string>();
+    const counts: Record<string, number> = {};
     questions.forEach((q) => {
+      if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return;
       const cleanTop = (q.topic || '').replace(/\s+/g, ' ').trim();
-      if (cleanTop) set.add(cleanTop);
+      if (cleanTop) {
+        counts[cleanTop] = (counts[cleanTop] || 0) + 1;
+      }
     });
-    return Array.from(set);
-  }, [questions]);
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [questions, selectedSubject]);
+
+  // Unique subtopics list filtered by currently selected subject and topic
+  const allUniqueSubTopics = useMemo(() => {
+    const counts: Record<string, number> = {};
+    questions.forEach((q) => {
+      if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return;
+      if (selectedTopic !== 'all') {
+        const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = (selectedTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qTop !== selTop) return;
+      }
+      const cleanSubTop = (q.sub_topic || (q as any).subtopic || '').replace(/\s+/g, ' ').trim();
+      if (cleanSubTop) {
+        counts[cleanSubTop] = (counts[cleanSubTop] || 0) + 1;
+      }
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [questions, selectedSubject, selectedTopic]);
 
   // Unique subjects list from actual questions (Sanitized & Deduplicated)
   const availableSubjectsFromQuestions = useMemo(() => {
@@ -173,7 +196,6 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
   // Subject counts based on real questions (Sanitized, Trimmed & Case-Insensitive Merged)
   const subjectStats = useMemo(() => {
-    // 1. Group real questions by sanitized subject
     const grouped = groupItemsBySanitizedSubject(questions);
     const countsMap = new Map<string, number>();
     grouped.forEach((g) => {
@@ -191,10 +213,8 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       { color: 'from-cyan-500 to-blue-600', text: 'text-cyan-400', bg: 'bg-cyan-950/40 border-cyan-500/30' },
     ];
 
-    // Priority default subjects to guarantee visual completeness
     const defaultPrioritySubs = ['বাংলা ভাষা ও ব্যাকরণ', 'English Grammar', 'গণিত', 'সাধারণ জ্ঞান', 'বিজ্ঞান', 'কম্পিউটার ও তথ্যপ্রযুক্তি', 'বাংলাদেশ বিষয়াবলি', 'আন্তর্জাতিক বিষয়াবলি'];
     
-    // Merge existing question subjects first, then standard priority subjects
     const uniqueSubjectsList = Array.from(
       new Set([...grouped.map((g) => g.name), ...defaultPrioritySubs])
     ).filter(Boolean);
@@ -213,6 +233,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
   const topicStats = useMemo(() => {
     const counts: Record<string, number> = {};
     questions.forEach((q) => {
+      if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return;
       const top = (q.topic || '').replace(/\s+/g, ' ').trim() || 'সাধারণ টপিক';
       counts[top] = (counts[top] || 0) + 1;
     });
@@ -236,7 +257,42 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         ...palette,
       };
     });
-  }, [questions]);
+  }, [questions, selectedSubject]);
+
+  // Sub-Topic counts based on real questions
+  const subTopicStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    questions.forEach((q) => {
+      if (selectedSubject !== 'all' && !isSameSubject(q.subject, selectedSubject)) return;
+      if (selectedTopic !== 'all') {
+        const qTop = (q.topic || 'সাধারণ টপিক').replace(/\s+/g, ' ').trim().toLowerCase();
+        const selTop = (selectedTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qTop !== selTop) return;
+      }
+      const subTop = (q.sub_topic || (q as any).subtopic || '').replace(/\s+/g, ' ').trim() || 'সাধারণ সাব-টপিক';
+      counts[subTop] = (counts[subTop] || 0) + 1;
+    });
+
+    const colorPalettes = [
+      { color: 'from-sky-500 to-indigo-600', text: 'text-sky-400', bg: 'bg-sky-950/40 border-sky-500/30' },
+      { color: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-500/30' },
+      { color: 'from-amber-500 to-orange-600', text: 'text-amber-400', bg: 'bg-amber-950/40 border-amber-500/30' },
+      { color: 'from-purple-500 to-pink-600', text: 'text-purple-400', bg: 'bg-purple-950/40 border-purple-500/30' },
+      { color: 'from-rose-500 to-red-600', text: 'text-rose-400', bg: 'bg-rose-950/40 border-rose-500/30' },
+      { color: 'from-teal-500 to-cyan-600', text: 'text-teal-400', bg: 'bg-teal-950/40 border-teal-500/30' },
+    ];
+
+    const uniqueSubTopics = Object.keys(counts).filter(Boolean);
+
+    return uniqueSubTopics.map((name, idx) => {
+      const palette = colorPalettes[idx % colorPalettes.length];
+      return {
+        name,
+        count: counts[name] || 0,
+        ...palette,
+      };
+    });
+  }, [questions, selectedSubject, selectedTopic]);
 
   // Filter questions for the list table
   const filteredQuestions = useMemo(() => {
@@ -247,6 +303,11 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         const selTop = (selectedTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
         if (qTop !== selTop) return false;
       }
+      if (selectedSubTopic !== 'all') {
+        const qSubTop = (q.sub_topic || (q as any).subtopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const selSubTop = (selectedSubTopic || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (qSubTop !== selSubTop) return false;
+      }
       if (selectedStatus !== 'all' && q.status !== selectedStatus) return false;
       if (selectedLanguage !== 'all') {
         const isArab = isArabicText(q.question);
@@ -255,12 +316,24 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
       }
       if (searchQuery.trim()) {
         const qSub = sanitizeSubjectName(q.subject);
-        const qStr = (q.question + ' ' + (q.subject || '') + ' ' + qSub + ' ' + (q.topic || '') + ' ' + (q.id || '')).toLowerCase();
+        const qStr = (
+          q.question +
+          ' ' +
+          (q.subject || '') +
+          ' ' +
+          qSub +
+          ' ' +
+          (q.topic || '') +
+          ' ' +
+          (q.sub_topic || '') +
+          ' ' +
+          (q.id || '')
+        ).toLowerCase();
         if (!qStr.includes(searchQuery.toLowerCase())) return false;
       }
       return true;
     });
-  }, [questions, selectedSubject, selectedTopic, selectedStatus, selectedLanguage, searchQuery]);
+  }, [questions, selectedSubject, selectedTopic, selectedSubTopic, selectedStatus, selectedLanguage, searchQuery]);
 
   // Count matching questions for transfer preview
   const transferMatchingCount = useMemo(() => {
@@ -616,15 +689,19 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
         </div>
       )}
 
-      {/* 4. Subject & Topic Breakdown with Switch & Transfer Action */}
+      {/* 4. Subject, Topic & Sub-Topic Breakdown with Switch & Transfer Action */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-black text-white">
-              {viewMode === 'subject' ? 'বিষয় ভিত্তিক প্রশ্ন সংখ্যা' : 'টপিক ভিত্তিক প্রশ্ন সংখ্যা'}
+              {viewMode === 'subject'
+                ? 'বিষয় ভিত্তিক প্রশ্ন সংখ্যা'
+                : viewMode === 'topic'
+                ? 'টপিক ভিত্তিক প্রশ্ন সংখ্যা'
+                : 'সাব-টপিক ভিত্তিক প্রশ্ন সংখ্যা'}
             </h2>
 
-            {/* View Switcher: Subject vs Topic */}
+            {/* View Switcher: Subject vs Topic vs Sub-Topic */}
             <div className="flex items-center bg-[#050914] border border-slate-800 rounded-xl p-0.5 text-xs font-bold">
               <button
                 onClick={() => setViewMode('subject')}
@@ -648,6 +725,17 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                 <Tag className="w-3 h-3" />
                 <span>টপিক ভিত্তিক</span>
               </button>
+              <button
+                onClick={() => setViewMode('subtopic')}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+                  viewMode === 'subtopic'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Bookmark className="w-3 h-3" />
+                <span>সাব-টপিক ভিত্তিক</span>
+              </button>
             </div>
           </div>
 
@@ -666,6 +754,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               onClick={() => {
                 setSelectedSubject('all');
                 setSelectedTopic('all');
+                setSelectedSubTopic('all');
               }}
               className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
             >
@@ -683,7 +772,11 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               return (
                 <div
                   key={sub.name}
-                  onClick={() => setSelectedSubject(isSelected ? 'all' : sub.name)}
+                  onClick={() => {
+                    setSelectedSubject(isSelected ? 'all' : sub.name);
+                    setSelectedTopic('all');
+                    setSelectedSubTopic('all');
+                  }}
                   className={`cursor-pointer rounded-3xl p-4 border transition-all ${
                     isSelected
                       ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
@@ -709,7 +802,7 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               );
             })}
           </div>
-        ) : (
+        ) : viewMode === 'topic' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {topicStats.length === 0 ? (
               <div className="col-span-full text-center py-6 bg-[#0b1322] border border-slate-800 rounded-3xl text-slate-400 text-xs">
@@ -719,7 +812,10 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
               topicStats.map((top) => (
                 <div
                   key={top.name}
-                  onClick={() => setSelectedTopic(selectedTopic === top.name ? 'all' : top.name)}
+                  onClick={() => {
+                    setSelectedTopic(selectedTopic === top.name ? 'all' : top.name);
+                    setSelectedSubTopic('all');
+                  }}
                   className={`cursor-pointer rounded-3xl p-4 border transition-all ${
                     selectedTopic === top.name
                       ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
@@ -739,6 +835,42 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
                     <div
                       className={`h-full rounded-full bg-gradient-to-r ${top.color}`}
                       style={{ width: `${Math.min(100, (top.count / Math.max(1, questions.length)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {subTopicStats.length === 0 ? (
+              <div className="col-span-full text-center py-6 bg-[#0b1322] border border-slate-800 rounded-3xl text-slate-400 text-xs">
+                কোনো সাব-টপিক পাওয়া যায়নি।
+              </div>
+            ) : (
+              subTopicStats.map((subTop) => (
+                <div
+                  key={subTop.name}
+                  onClick={() => setSelectedSubTopic(selectedSubTopic === subTop.name ? 'all' : subTop.name)}
+                  className={`cursor-pointer rounded-3xl p-4 border transition-all ${
+                    selectedSubTopic === subTop.name
+                      ? 'bg-[#121c2d] border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
+                      : 'bg-[#0b1322] border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-black ${subTop.text} truncate max-w-[100px]`} title={subTop.name}>
+                      {subTop.name}
+                    </span>
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                  </div>
+                  <p className="text-base font-black text-white font-mono mb-2">
+                    {subTop.count.toLocaleString()} টি
+                  </p>
+                  <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${subTop.color}`}
+                      style={{ width: `${Math.min(100, (subTop.count / Math.max(1, questions.length)) * 100)}%` }}
                     />
                   </div>
                 </div>
@@ -814,15 +946,15 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
 
         {/* Filter Toolbar */}
         <div className="bg-[#0b1322] border border-slate-800 rounded-3xl p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
             {/* Search Input */}
-            <div className="relative flex-1 w-full">
+            <div className="relative md:col-span-4 w-full">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="প্রশ্ন, বিষয় বা আইডি দিয়ে খুঁজুন..."
+                placeholder="প্রশ্ন, বিষয়, সাব-টপিক বা আইডি খুঁজুন..."
                 className="w-full bg-[#050914] border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
@@ -830,8 +962,12 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             {/* Subject Select */}
             <select
               value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+              onChange={(e) => {
+                setSelectedSubject(e.target.value);
+                setSelectedTopic('all');
+                setSelectedSubTopic('all');
+              }}
+              className="md:col-span-3 bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full"
             >
               <option value="all">সকল বিষয় ({questions.length})</option>
               {subjectStats.map((sub) => (
@@ -844,13 +980,30 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             {/* Topic Select */}
             <select
               value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              className="bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+              onChange={(e) => {
+                setSelectedTopic(e.target.value);
+                setSelectedSubTopic('all');
+              }}
+              className="md:col-span-2 bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full"
             >
-              <option value="all">সকল টপিক</option>
+              <option value="all">সকল টপিক ({allUniqueTopics.reduce((acc, t) => acc + t.count, 0)})</option>
               {allUniqueTopics.map((top) => (
-                <option key={top} value={top}>
-                  {top}
+                <option key={top.name} value={top.name}>
+                  {top.name} ({top.count})
+                </option>
+              ))}
+            </select>
+
+            {/* Sub-Topic Select */}
+            <select
+              value={selectedSubTopic}
+              onChange={(e) => setSelectedSubTopic(e.target.value)}
+              className="md:col-span-2 bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-emerald-400 font-semibold focus:outline-none focus:border-emerald-500 w-full"
+            >
+              <option value="all">সকল সাব-টপিক ({allUniqueSubTopics.reduce((acc, st) => acc + st.count, 0)})</option>
+              {allUniqueSubTopics.map((subTop) => (
+                <option key={subTop.name} value={subTop.name}>
+                  {subTop.name} ({subTop.count})
                 </option>
               ))}
             </select>
@@ -859,11 +1012,11 @@ export const Interface01Dashboard: React.FC<Interface01DashboardProps> = ({
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="bg-[#050914] border border-slate-800 rounded-2xl px-3.5 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+              className="md:col-span-1 bg-[#050914] border border-slate-800 rounded-2xl px-3 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 w-full"
             >
-              <option value="all">সকল স্থিতি</option>
-              <option value="published">প্রকাশিত (Live)</option>
-              <option value="draft">ড্রাফট (Draft)</option>
+              <option value="all">স্থিতি</option>
+              <option value="published">লাইভ</option>
+              <option value="draft">ড্রাফট</option>
             </select>
           </div>
 

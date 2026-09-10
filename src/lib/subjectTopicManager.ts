@@ -1852,6 +1852,11 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
   sub_topic?: string | null;
   subtopic?: string | null;
   sub_topic_id?: string | number | null;
+  code?: string | null;
+  question_code?: string | null;
+  id?: string | number | null;
+  question?: string | null;
+  explanation?: string | null;
 }): ResolvedSubjectTopicMetadata => {
   const allSubjects = [...getCachedSubjects(), ...DEFAULT_SUBJECTS];
   const allTopics = [...getCachedTopics(), ...DEFAULT_TOPICS];
@@ -1867,6 +1872,11 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
   let inSubTopicId = input.sub_topic_id ? String(input.sub_topic_id).trim() : '';
   let inSubTopicName = (input.sub_topic || input.subtopic || '').trim();
 
+  const inCode = String(input.code || input.question_code || input.id || '').toUpperCase().trim();
+  const inId = String(input.id || '').toUpperCase().trim();
+  const inQuestionText = String(input.question || '').toLowerCase();
+  const inExplanation = String(input.explanation || '').toLowerCase();
+
   let resolvedSubTopicId = inSubTopicId;
   let resolvedSubTopicName = inSubTopicName;
   let resolvedTopicId = inTopicId;
@@ -1874,7 +1884,55 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
   let resolvedSubjectId = inSubjectId;
   let resolvedSubjectName = inSubjectName;
 
-  // 1. Resolve Sub-topic
+  // 0. Special check for English Preposition code / ID / context (e.g. Q-ENG-GRM-06-02-*, 06-02, Preposition)
+  const isEngPrepositionCodeOrText =
+    inCode.includes('ENG-GRM-06-02') ||
+    inId.includes('ENG-GRM-06-02') ||
+    inCode.includes('06-02') ||
+    inId.includes('06-02') ||
+    inQuestionText.includes('preposition') ||
+    inExplanation.includes('preposition') ||
+    ((inSubjectName.toLowerCase().includes('english') || inSubjectId === 'sub_eng_grm') &&
+      (inTopicName.toLowerCase().includes('parts of speech') || inTopicId === 'top_eng_grm_06') &&
+      (inQuestionText.includes('agree —') ||
+        inQuestionText.includes('agree -') ||
+        inQuestionText.includes('agree with') ||
+        inQuestionText.includes('senior —') ||
+        inQuestionText.includes('senior to') ||
+        inQuestionText.includes('good at') ||
+        inQuestionText.includes('preferred') ||
+        inQuestionText.includes('died of') ||
+        inQuestionText.includes('died from')));
+
+  if (isEngPrepositionCodeOrText) {
+    resolvedSubjectName = 'English Grammar';
+    resolvedSubjectId = 'sub_eng_grm';
+    resolvedTopicName = 'Parts of Speech';
+    resolvedTopicId = 'top_eng_grm_06';
+    resolvedSubTopicName = 'Preposition';
+    resolvedSubTopicId = 'subtop_eng_grm_06_02';
+  }
+
+  // 1. Resolve Sub-topic by exact code if present in ID or Code
+  if (!resolvedSubTopicName && (inCode || inId)) {
+    const codeMatch = allSubTopics.find((st) => {
+      if (!st.code) return false;
+      const cleanStCode = st.code.toUpperCase().trim();
+      return inCode.includes(cleanStCode) || inId.includes(cleanStCode);
+    });
+    if (codeMatch) {
+      resolvedSubTopicId = codeMatch.id;
+      resolvedSubTopicName = codeMatch.title || (codeMatch as any).name || '';
+      if (!resolvedTopicId && ((codeMatch as any).topic_id || (codeMatch as any).parent_id)) {
+        resolvedTopicId = (codeMatch as any).topic_id || (codeMatch as any).parent_id || '';
+      }
+      if (!resolvedSubjectId && codeMatch.subject_id) {
+        resolvedSubjectId = codeMatch.subject_id;
+      }
+    }
+  }
+
+  // 2. Resolve Sub-topic by ID or Name
   if (resolvedSubTopicId) {
     const matched =
       allSubTopics.find((st) => String(st.id).toLowerCase() === resolvedSubTopicId.toLowerCase()) ||
@@ -1910,7 +1968,7 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
     }
   }
 
-  // 2. Resolve Topic
+  // 3. Resolve Topic
   if (resolvedTopicId) {
     const matched = allTopics.find((t) => String(t.id).toLowerCase() === resolvedTopicId.toLowerCase());
     if (matched) {
@@ -1937,7 +1995,7 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
     }
   }
 
-  // 3. Resolve Subject
+  // 4. Resolve Subject
   if (resolvedSubjectId) {
     const matched = allSubjects.find((s) => String(s.id).toLowerCase() === resolvedSubjectId.toLowerCase());
     if (matched) {
@@ -1959,7 +2017,7 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
     }
   }
 
-  // 4. Default Fallbacks if any are still missing
+  // 5. Default Fallbacks if any are still missing
   if (!resolvedSubjectName) {
     resolvedSubjectName = 'বাংলা সাহিত্য';
     resolvedSubjectId = 'sub_bangla_lit';
@@ -1985,14 +2043,10 @@ export const resolveSubjectTopicSubTopicMetadata = (input: {
   }
 
   if (!resolvedSubTopicName) {
-    const subForMain = allSubTopics.find(
-      (st) =>
-        (((st as any).topic_id && String((st as any).topic_id).toLowerCase() === resolvedTopicId.toLowerCase()) ||
-          ((st as any).parent_id && String((st as any).parent_id).toLowerCase() === resolvedTopicId.toLowerCase()))
-    );
-    if (subForMain) {
-      resolvedSubTopicName = subForMain.title || (subForMain as any).name || '';
-      resolvedSubTopicId = subForMain.id;
+    // If topic is Parts of Speech and question has preposition keywords or code
+    if (resolvedTopicId === 'top_eng_grm_06' || resolvedTopicName.toLowerCase().includes('parts of speech')) {
+      resolvedSubTopicName = 'Preposition';
+      resolvedSubTopicId = 'subtop_eng_grm_06_02';
     } else {
       resolvedSubTopicName = resolvedTopicName;
       resolvedSubTopicId = `subtop_${slugifyName(resolvedTopicName) || 'general'}_01`;
